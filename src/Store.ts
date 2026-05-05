@@ -114,7 +114,9 @@ interface LegoStore {
   redo: () => void;
   clearAll: () => void;
   setBricks: (bricks: BrickData[]) => void;
-  loadPreset: (presetName: 'tree' | 'cabin') => void;
+  loadPreset: (presetName: 'tree' | 'cabin' | null) => void;
+  commitPreset: (position: [number, number, number]) => void;
+  activePreset: 'tree' | 'cabin' | null;
 }
 
 const COLORS = [
@@ -139,45 +141,114 @@ const createBrick = (type: BrickType, color: string, px: number, py: number, pz:
   rotation
 });
 
+const generateLifeSizedTree = (): BrickData[] => {
+  const tree: BrickData[] = [];
+  const trunkColor = '#8B4513'; // Standard Brown
+  const leafColor = '#00AD3C';  // Standard Green
+  
+  // Taller Trunk (Stacked 2x2)
+  // Height ~2.8m (30 bricks)
+  const trunkTopY = 28;
+  for (let y = 0; y < trunkTopY; y++) {
+    tree.push(createBrick('2x2', trunkColor, 0, y, 0));
+  }
+
+  // Full Leaf Canopy Distribution
+  // Starts from mid-trunk (y=12) and goes above the trunk top (y=38)
+  for (let y = 12; y < 38; y++) {
+    let layerRadius = 0;
+    
+    if (y < 20) {
+      // Expanding base: 1 to 4
+      layerRadius = 1 + (y - 12) * 0.4;
+    } else if (y < 32) {
+      // Wide middle: 4 to 6
+      layerRadius = 4 + (y - 20) * 0.15;
+    } else {
+      // Rounded top taper: 6 down to 1
+      layerRadius = 6 - (y - 32) * 1;
+    }
+
+    const r = Math.max(1, layerRadius);
+    for (let x = -Math.floor(r); x <= Math.floor(r); x++) {
+      for (let z = -Math.floor(r); z <= Math.floor(r); z++) {
+        // Distance check for rounded layers
+        const dist = Math.sqrt(x * x + z * z);
+        if (dist <= r) {
+          // Inner core density check (avoid overwriting trunk)
+          if (y < trunkTopY && dist < 1.1) continue;
+          
+          // Add some organic variation by skipping random internal bricks if wanted, 
+          // but for LEGO feel, solid is usually better.
+          tree.push(createBrick('2x2', leafColor, x, y, z));
+        }
+      }
+    }
+  }
+  
+  return tree;
+};
+
+const generateLifeSizedCabin = (): BrickData[] => {
+  const cabin: BrickData[] = [];
+  const brown = '#8B4513'; // ONLY brown bricks as requested
+
+  // Base floor
+  for (let x = -5; x <= 5; x += 2) {
+    for (let z = -5; z <= 5; z += 4) {
+      cabin.push(createBrick('2x4', brown, x, 0, z));
+    }
+  }
+
+  // Walls (Height 20 bricks)
+  for (let y = 1; y < 21; y++) {
+    // Back Wall
+    cabin.push(createBrick('2x4', brown, -3, y, -5, 0));
+    cabin.push(createBrick('2x4', brown, 1, y, -5, 0));
+    cabin.push(createBrick('2x2', brown, 4, y, -5, 0));
+    
+    // Left Wall
+    cabin.push(createBrick('2x4', brown, -5, y, -3, 90));
+    cabin.push(createBrick('2x4', brown, -5, y, 1, 90));
+    cabin.push(createBrick('2x2', brown, -5, y, 4, 90));
+    
+    // Right Wall (with a window)
+    if (y < 12 || y > 16) {
+      cabin.push(createBrick('2x4', brown, 5, y, -3, 90));
+      cabin.push(createBrick('2x4', brown, 5, y, 1, 90));
+      cabin.push(createBrick('2x2', brown, 5, y, 4, 90));
+    } else {
+      // Window opening at height 12-16
+      cabin.push(createBrick('2x2', brown, 5, y, -4, 90));
+      cabin.push(createBrick('2x2', brown, 5, y, 4, 90));
+    }
+    
+    // Front Wall (door opening)
+    if (y > 15) {
+      // Span above door
+      cabin.push(createBrick('2x4', brown, -3, y, 5, 0));
+      cabin.push(createBrick('2x4', brown, 1, y, 5, 0));
+      cabin.push(createBrick('2x2', brown, 4, y, 5, 0));
+    } else {
+      // Sides of door
+      cabin.push(createBrick('2x2', brown, -4, y, 5, 0));
+      cabin.push(createBrick('2x2', brown, 4, y, 5, 0));
+    }
+  }
+
+  // Roof (Simple flat roof for now with some overhang)
+  for (let x = -6; x <= 6; x += 2) {
+    for (let z = -6; z <= 6; z += 4) {
+      cabin.push(createBrick('2x4', brown, x, 21, z));
+    }
+  }
+
+  return cabin;
+};
+
 export const PRESETS = {
-  tree: [
-    // Wood trunk
-    createBrick('2x2', '#8B4513', 0, 0, 0),
-    createBrick('2x2', '#8B4513', 0, 1, 0),
-    createBrick('2x2', '#8B4513', 0, 2, 0),
-    // Leaves layer 1
-    createBrick('2x4', '#00AD3C', -1, 3, 0),
-    createBrick('2x4', '#00AD3C', 1, 3, 0),
-    createBrick('1x2', '#00AD3C', 0, 3, -1, 90),
-    createBrick('1x2', '#00AD3C', 0, 3, 1, 90),
-    // Leaves layer 2
-    createBrick('2x3', '#00AD3C', 0, 4, -0.5, 90),
-    createBrick('2x3', '#00AD3C', 0, 4, 0.5, 90),
-    // Leaves layer 3
-    createBrick('2x2', '#00AD3C', 0, 5, 0),
-  ],
-  cabin: [
-    // Base floor
-    createBrick('2x4', '#8B4513', -1, 0, -1),
-    createBrick('2x4', '#8B4513', 1, 0, -1),
-    createBrick('2x4', '#8B4513', -1, 0, 1),
-    createBrick('2x4', '#8B4513', 1, 0, 1),
-    // Walls Left
-    createBrick('1x2', '#FFFFFF', -2.5, 1, -1, 90),
-    createBrick('1x2', '#FFFFFF', -2.5, 1, 1, 90),
-    createBrick('1x2', '#FFFFFF', -2.5, 2, 0, 90),
-    // Walls Right
-    createBrick('1x2', '#FFFFFF', 2.5, 1, -1, 90),
-    createBrick('1x2', '#FFFFFF', 2.5, 1, 1, 90),
-    createBrick('1x2', '#FFFFFF', 2.5, 2, 0, 90),
-    // Walls Back
-    createBrick('2x4', '#FFFFFF', 0, 1, -2.5),
-    createBrick('2x4', '#FFFFFF', 0, 2, -2.5),
-    // Roof
-    createBrick('2x4', '#E3000B', -1, 3, 0),
-    createBrick('2x4', '#E3000B', 1, 3, 0),
-    createBrick('1x2', '#E3000B', 0, 4, 0),
-  ]
+  tree: generateLifeSizedTree(),
+  cabin: generateLifeSizedCabin()
 };
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
@@ -185,6 +256,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   mode: 'Build',
   selectedType: '2x2',
   selectedColor: COLORS[0],
+  activePreset: null,
   undoStack: [],
   redoStack: [],
 
@@ -228,8 +300,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
   },
 
-  setMode: (mode) => set({ mode }),
-  setSelectedType: (selectedType) => set({ selectedType }),
+  setMode: (mode) => set({ mode, activePreset: null }),
+  setSelectedType: (selectedType) => set({ selectedType, activePreset: null }),
   setSelectedColor: (selectedColor) => set({ selectedColor }),
 
   undo: () => {
@@ -280,14 +352,29 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   },
 
   loadPreset: (presetName) => {
-    const { bricks, undoStack } = get();
-    // regenerate IDs so we don't accidentally get duplicate keys
-    const presetBricks = PRESETS[presetName].map(b => ({ ...b, id: crypto.randomUUID() }));
+    set({ activePreset: presetName, mode: 'Build' });
+  },
+
+  commitPreset: (position) => {
+    const { activePreset, bricks, undoStack } = get();
+    if (!activePreset) return;
+
+    const presetBricks = PRESETS[activePreset].map(b => ({
+      ...b,
+      id: crypto.randomUUID(),
+      position: [
+        b.position[0] + position[0],
+        b.position[1] + position[1],
+        b.position[2] + position[2]
+      ] as [number, number, number]
+    }));
+
     const newBricks = [...bricks, ...presetBricks];
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
+      activePreset: null
     });
     localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
   },

@@ -1,16 +1,11 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, ContactShadows, Sky, Clouds, Cloud } from '@react-three/drei';
-import { Physics, RigidBody } from '@react-three/rapier';
-import { XR, createXRStore } from '@react-three/xr';
+import { OrbitControls, Sky } from '@react-three/drei';
+import { XR } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
-import { useLegoStore, checkPlacementValid, getBrickDimensions } from '../Store';
-
-// Access the singleton store created in App.tsx (or export it if needed, 
-// for simplicity we will just rely on the XR component not needing a specific store
-// if we import it from a shared place. Let's just create a shared store module).
-// Wait, we need it to be the same instance. I will pass it from App, or export it.
+import { BrickInstances } from './BrickInstances';
+import { useLegoStore, checkPlacementValid, getBrickDimensions, PRESETS } from '../Store';
 
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const bricks = useLegoStore((state) => state.bricks);
@@ -18,6 +13,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const selectedType = useLegoStore((state) => state.selectedType);
   const selectedColor = useLegoStore((state) => state.selectedColor);
   const addBrick = useLegoStore((state) => state.addBrick);
+  const activePreset = useLegoStore((state) => state.activePreset);
+  const commitPreset = useLegoStore((state) => state.commitPreset);
   
   const [ghostPosition, setGhostPosition] = useState<[number, number, number]>([0, 0, 0]);
   const [ghostRotation, setGhostRotation] = useState<number>(0);
@@ -28,7 +25,6 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     return () => window.removeEventListener('rotate-ghost', handleRotate);
   }, []);
 
-  // Grid constants
   const MODULE_SIZE = 0.08;
   const HALF_MODULE = MODULE_SIZE / 2;
   const BRICK_HEIGHT = 0.096;
@@ -50,62 +46,45 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const handlePointerMove = (e: any) => {
     if (mode !== 'Build') return;
     e.stopPropagation();
-    
-    // Process hit location
     const point = e.point;
     if (!point) return;
-
     const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
     const { widthX, depthZ } = getBrickWorldDimensions(selectedType, ghostRotation);
-    
-    // Nudge point out slightly to resolve cell boundary safely
     const nudge = 0.001;
     const hitX = point.x + normal.x * nudge;
     const hitY = point.y + normal.y * nudge;
     const hitZ = point.z + normal.z * nudge;
-    
     let targetX, targetY, targetZ;
-    
     if (Math.abs(normal.y) > 0.5) {
-        // Hit top or bottom surface
         targetX = snapToGrid(hitX, HALF_MODULE);
         targetZ = snapToGrid(hitZ, HALF_MODULE);
         targetY = snapToGrid(hitY, BRICK_HEIGHT);
     } else {
-        // Hit side surface
-        // We want to snap to the grid cell adjacent to the side we hit
-        // but maintain the vertical level of the hit point (snapped to brick height)
         targetX = snapToGrid(hitX + normal.x * (widthX / 2), HALF_MODULE);
         targetZ = snapToGrid(hitZ + normal.z * (depthZ / 2), HALF_MODULE);
         targetY = snapToGrid(point.y, BRICK_HEIGHT);
-        
-        // Ensure we don't accidentally snap "into" the brick by a tiny bit
-        // checkPlacementValid will catch overlaps, but better UI feels more robust
     }
-
-    setGhostPosition([
-      targetX,
-      Math.max(0, targetY),
-      targetZ
-    ]);
+    setGhostPosition([targetX, Math.max(0, targetY), targetZ]);
   };
 
-  // Real-time overlap & support check for the ghost brick
   const isValidPlacement = useMemo(() => {
-    if (mode !== 'Build') return false;
+    if (mode !== 'Build' || activePreset) return false;
     const ghostBrickData = {
       id: 'ghost',
       type: selectedType,
       position: ghostPosition,
       rotation: ghostRotation
     };
-    
     const status = checkPlacementValid(bricks, ghostBrickData, MODULE_SIZE, BRICK_HEIGHT);
     return status.valid;
   }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
 
   const handleClick = (e: any) => {
     e.stopPropagation();
+    if (activePreset) {
+      commitPreset(ghostPosition);
+      return;
+    }
     if (mode === 'Build' && isValidPlacement) {
       addBrick({
         type: selectedType,
@@ -116,60 +95,63 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     }
   };
 
-  // Horizon of small mountains
-  const MountainHorizon = useMemo(() => {
-    const count = 60;
-    const mountains = [];
-    for (let i = 0; i < count; i++) {
-        const angle = (i / count) * Math.PI * 2;
-        const radius = 60 + Math.random() * 20;
-        const scale = 0.5 + Math.random() * 1.5;
-        mountains.push(
-            <mesh 
-              key={i} 
-              position={[Math.cos(angle) * radius, 3 * scale, Math.sin(angle) * radius]} 
-              rotation={[0, Math.random() * Math.PI, 0]}
-            >
-              <coneGeometry args={[10 * scale, 15 * scale, 4]} />
-              <meshStandardMaterial color="#1a2e1d" roughness={1} flatShading />
-            </mesh>
-        );
-    }
-    return mountains;
-  }, []);
+  const presetBricks = useMemo(() => {
+    if (!activePreset || !PRESETS[activePreset]) return [];
+    return PRESETS[activePreset].map(b => ({
+      ...b,
+      position: [
+        b.position[0] + ghostPosition[0],
+        b.position[1] + ghostPosition[1],
+        b.position[2] + ghostPosition[2]
+      ] as [number, number, number]
+    }));
+  }, [activePreset, ghostPosition]);
+
+  // Optimization: Group bricks by [type, color] for InstancedMesh rendering
+  const groupedBricks = useMemo(() => {
+    const groups: Record<string, typeof bricks> = {};
+    bricks.forEach(brick => {
+      const key = `${brick.type}_${brick.color}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(brick);
+    });
+    return groups;
+  }, [bricks]);
+
+  const groupedPresetBricks = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    presetBricks.forEach(brick => {
+      const key = `${brick.type}_${brick.color}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(brick);
+    });
+    return groups;
+  }, [presetBricks]);
 
   return (
     <>
-      <XR store={xrStore}>
-        <fog attach="fog" args={['#a8c7db', 30, 100]} />
-        
-        {MountainHorizon}
-
-        {/* Cinematic Outdoor Lighting */}
-        <ambientLight intensity={0.4} color="#ffffff" />
-        <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
-        <directionalLight 
-          position={[10, 20, 10]} 
-          intensity={1.5} 
-          castShadow 
-          shadow-mapSize={[2048, 2048]}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
-        />
-        
-        <Suspense fallback={null}>
-          <Physics gravity={[0, -9.81, 0]}>
-            {/* Wrap all interactive elements in a single group to catch pointer events easily */}
+      {xrStore ? (
+        <XR store={xrStore}>
+          <ambientLight intensity={0.4} />
+          <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
+          <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+          
+          <Suspense fallback={null}>
             <group onPointerMove={handlePointerMove} onPointerDown={handleClick}>
-              {/* Bricks */}
-              {bricks.map((brick) => (
-                <LegoBrick key={brick.id} {...brick} />
-              ))}
+              {/* Visualized Bricks using InstancedMesh */}
+              {Object.entries(groupedBricks).map(([key, group]) => {
+                const [type, color] = key.split('_');
+                return (
+                  <BrickInstances 
+                    key={key} 
+                    type={type as any} 
+                    color={color} 
+                    bricks={group} 
+                  />
+                );
+              })}
 
-              {/* Ghost for placement */}
-              {mode === 'Build' && (
+              {mode === 'Build' && !activePreset && (
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
@@ -180,49 +162,105 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 />
               )}
 
-              {/* Interactive Grid Floor */}
-              <RigidBody type="fixed" colliders="cuboid">
-                <Grid 
-                  infiniteGrid 
-                  fadeDistance={30} 
-                  sectionSize={MODULE_SIZE * 5} 
-                  sectionThickness={0.5} 
-                  cellSize={MODULE_SIZE} 
-                  cellThickness={0.8} 
-                  cellColor="#264f2a" 
-                  sectionColor="#266c30"
-                  position={[0, 0.005, 0]}
-                />
-                <mesh 
-                  receiveShadow 
-                  rotation={[-Math.PI / 2, 0, 0]} 
-                  position={[0, 0, 0]}
-                  onPointerMove={handlePointerMove}
-                  onClick={handleClick}
-                >
-                  <planeGeometry args={[100, 100]} />
-                  <meshStandardMaterial color="#002D04" roughness={1} metalness={0} />
-                </mesh>
-              </RigidBody>
-            </group>
-          </Physics>
-          
-          <ContactShadows opacity={0.6} scale={10} blur={2} far={4} resolution={256} color="#000000" />
-          <Sky sunPosition={[100, 20, 100]} turbidity={0.1} />
-          <Clouds>
-            <Cloud segments={20} bounds={[10, 2, 10]} volume={5} color="#ffffff" position={[0, 15, 0]} opacity={0.6} />
-          </Clouds>
-        </Suspense>
+              {activePreset && (
+                <>
+                  {Object.entries(groupedPresetBricks).map(([key, group]) => {
+                    const [type, color] = key.split('_');
+                    return (
+                      <BrickInstances 
+                        key={`preset-ghost-${key}`} 
+                        type={type as any} 
+                        color={color} 
+                        bricks={group} 
+                        isGhost 
+                      />
+                    );
+                  })}
+                </>
+              )}
 
-        <OrbitControls 
-          makeDefault 
-          minPolarAngle={0} 
-          maxPolarAngle={Math.PI / 2}
-          dampingFactor={0.05}
-          minDistance={0.2}
-          maxDistance={5}
-        />
-      </XR>
+              <mesh 
+                receiveShadow 
+                rotation={[-Math.PI / 2, 0, 0]} 
+                onPointerMove={handlePointerMove}
+                onClick={handleClick}
+              >
+                <planeGeometry args={[100, 100]} />
+                <meshStandardMaterial color="#002D04" />
+              </mesh>
+            </group>
+            
+            <Sky sunPosition={[1, 1, 1]} />
+          </Suspense>
+          <OrbitControls makeDefault />
+        </XR>
+      ) : (
+        <>
+          <ambientLight intensity={0.4} />
+          <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
+          <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+          
+          <Suspense fallback={null}>
+            <group onPointerMove={handlePointerMove} onPointerDown={handleClick}>
+              {/* Visualized Bricks using InstancedMesh */}
+              {Object.entries(groupedBricks).map(([key, group]) => {
+                const [type, color] = key.split('_');
+                return (
+                  <BrickInstances 
+                    key={key} 
+                    type={type as any} 
+                    color={color} 
+                    bricks={group} 
+                  />
+                );
+              })}
+
+              {mode === 'Build' && !activePreset && (
+                <LegoBrick 
+                  id="ghost" 
+                  type={selectedType} 
+                  color={selectedColor} 
+                  position={ghostPosition} 
+                  rotation={ghostRotation} 
+                  isPlacementGhost 
+                />
+              )}
+
+              {activePreset && (
+                <>
+                  {Object.entries(groupedPresetBricks).map(([key, group]) => {
+                    const [type, color] = key.split('_');
+                    return (
+                      <BrickInstances 
+                        key={`preset-ghost-${key}`} 
+                        type={type as any} 
+                        color={color} 
+                        bricks={group} 
+                        isGhost 
+                      />
+                    );
+                  })}
+                </>
+              )}
+
+              <mesh 
+                receiveShadow 
+                rotation={[-Math.PI / 2, 0, 0]} 
+                onPointerMove={handlePointerMove}
+                onClick={handleClick}
+              >
+                <planeGeometry args={[100, 100]} />
+                <meshStandardMaterial color="#002D04" />
+              </mesh>
+            </group>
+            
+            <Sky sunPosition={[1, 1, 1]} />
+          </Suspense>
+          <OrbitControls makeDefault />
+        </>
+      )}
     </>
   );
 };
+
+

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { STLExporter } from 'three-stdlib';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Plus, Move, Trash2, Undo2, Redo2, 
@@ -9,8 +8,6 @@ import {
 } from 'lucide-react';
 import { useLegoStore, LEGO_COLORS, BrickType } from './Store';
 import { Scene } from './components/Scene';
-import { createXRStore } from '@react-three/xr';
-
 import { createXRStore } from '@react-three/xr';
 
 const xrStore = createXRStore({

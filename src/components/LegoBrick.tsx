@@ -1,10 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { RoundedBox } from '@react-three/drei';
-import { RigidBody, RapierRigidBody, CuboidCollider } from '@react-three/rapier';
-import { useXR } from '@react-three/xr';
+import React, { useState } from 'react';
 import * as THREE from 'three';
-import { useLegoStore, BrickType, getBrickDimensions, checkPlacementValid } from '../Store';
+import { useLegoStore, BrickType, getBrickDimensions } from '../Store';
 
 interface LegoBrickProps {
   id: string;
@@ -13,6 +9,7 @@ interface LegoBrickProps {
   position: [number, number, number];
   rotation: number;
   isPlacementGhost?: boolean;
+  hideMesh?: boolean;
 }
 
 const MODULE_SIZE = 0.08; // 8cm per module - better for hand tracking
@@ -21,26 +18,16 @@ const STUD_RADIUS = 0.024;
 const STUD_HEIGHT = 0.016;
 
 export const LegoBrick: React.FC<LegoBrickProps> = ({ 
-  id, type, color, position, rotation: initialRotation, isPlacementGhost 
+  id, type, color, position, rotation: initialRotation, isPlacementGhost, hideMesh 
 }) => {
   const { w, d } = getBrickDimensions(type);
-  const rigidBodyRef = useRef<RapierRigidBody>(null);
   const [isGrabbed, setIsGrabbed] = useState(false);
   const [rotation, setRotation] = useState(initialRotation);
-  const [previousPosition, setPreviousPosition] = useState(position);
-  const [previousRotation, setPreviousRotation] = useState(initialRotation);
-  const xrState = useXR();
-  const isPresenting = xrState.session !== null;
-  const updateBrick = useLegoStore((state) => state.updateBrick);
   const removeBrick = useLegoStore((state) => state.removeBrick);
-  const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
 
   const width = w * MODULE_SIZE;
   const depth = d * MODULE_SIZE;
-
-  // Constants for snapping
-  const halfModule = MODULE_SIZE / 2;
 
   const handleSelectStart = (e: any) => {
     if (mode === 'Delete') {
@@ -48,36 +35,8 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
       removeBrick(id);
     } else if (mode === 'Move') {
       e.stopPropagation();
-      setPreviousPosition(position);
-      setPreviousRotation(rotation);
       setIsGrabbed(true);
-      // Optional: attach to controller, but follow standard frame translation works via ray
       e.target?.setPointerCapture?.(e.pointerId);
-    }
-  };
-
-  const handlePointerMove = (e: any) => {
-    if (isGrabbed && rigidBodyRef.current) {
-      e.stopPropagation();
-      if (e.point) {
-        // Snap while dragging for tactile feedback
-        const snappedX = Math.round(e.point.x / halfModule) * halfModule;
-        const snappedY = Math.max(0, Math.round(e.point.y / BRICK_HEIGHT) * BRICK_HEIGHT);
-        const snappedZ = Math.round(e.point.z / halfModule) * halfModule;
-        
-        rigidBodyRef.current.setNextKinematicTranslation({
-          x: snappedX,
-          y: snappedY,
-          z: snappedZ
-        });
-      }
-    }
-  };
-
-  const handleRotate = (e: any) => {
-    e.stopPropagation();
-    if (isGrabbed) {
-      setRotation(prev => (prev + 90) % 360);
     }
   };
 
@@ -86,129 +45,70 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
       e.stopPropagation();
       setIsGrabbed(false);
       e.target?.releasePointerCapture?.(e.pointerId);
-      
-      if (rigidBodyRef.current) {
-        const currentPos = rigidBodyRef.current.translation();
-        
-        // Snap to grid on release
-        const snappedX = Math.round(currentPos.x / halfModule) * halfModule;
-        const snappedY = Math.max(0, Math.round(currentPos.y / BRICK_HEIGHT) * BRICK_HEIGHT);
-        const snappedZ = Math.round(currentPos.z / halfModule) * halfModule;
-        
-        // Snap rotation to 90deg
-        const snappedRot = Math.round(rotation / 90) * 90;
-        
-        // Check for overlap & floating
-        const potentialBrickData = {
-          id, type,
-          position: [snappedX, snappedY, snappedZ] as [number, number, number],
-          rotation: snappedRot
-        };
-        
-        const placementStatus = checkPlacementValid(bricks, potentialBrickData, MODULE_SIZE, BRICK_HEIGHT);
-
-        if (!placementStatus.valid) {
-          // Revert to previous
-          rigidBodyRef.current.setTranslation({ x: previousPosition[0], y: previousPosition[1], z: previousPosition[2] }, true);
-          const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (previousRotation * Math.PI) / 180, 0));
-          rigidBodyRef.current.setRotation(quat, true);
-          setRotation(previousRotation);
-          updateBrick(id, { 
-            position: previousPosition,
-            rotation: previousRotation
-          });
-        } else {
-          // Accept new position
-          rigidBodyRef.current.setTranslation({ x: snappedX, y: snappedY, z: snappedZ }, true);
-          const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (snappedRot * Math.PI) / 180, 0));
-          rigidBodyRef.current.setRotation(quat, true);
-          
-          updateBrick(id, { 
-            position: [snappedX, snappedY, snappedZ],
-            rotation: snappedRot 
-          });
-        }
-      }
     }
   };
 
-  // WebXR specific pointer/hand tracking is handled natively by R3F events
-  // When grabbing, if we want strict controller lock, we could query the XR controller,
-  // but setNextKinematicTranslation via handlePointerMove works well cross-device.
+  const handlePointerMove = (e: any) => {};
 
-  useEffect(() => {
-    const handlePunch = () => {
-      if (rigidBodyRef.current && !isGrabbed && !isPlacementGhost) {
-        rigidBodyRef.current.applyImpulse({
-          x: (Math.random() - 0.5) * 5,
-          y: Math.random() * 10 + 5,
-          z: (Math.random() - 0.5) * 5
-        }, true);
-      }
-    };
-    window.addEventListener('punch-all', handlePunch);
-    return () => window.removeEventListener('punch-all', handlePunch);
-  }, [isGrabbed, isPlacementGhost]);
+  const handleRotate = (e: any) => {
+    e.stopPropagation();
+    if (isGrabbed) {
+      setRotation(prev => (prev + 90) % 360);
+    }
+  };
 
   return (
     <group 
+      position={position}
+      rotation={[0, (rotation * Math.PI) / 180, 0]}
       onPointerDown={handleSelectStart} 
       onPointerUp={handleSelectEnd}
       onPointerMove={handlePointerMove}
-      onContextMenu={handleRotate} // Use right click to rotate on desktop
+      onContextMenu={handleRotate}
     >
-      <RigidBody 
-        ref={rigidBodyRef}
-        type={isGrabbed || isPlacementGhost ? "kinematicPosition" : "fixed"}
-        colliders={false}
-        position={position}
-        rotation={[0, (rotation * Math.PI) / 180, 0]}
-        enabledRotations={[false, true, false]}
-      >
-        <group position={[0, BRICK_HEIGHT / 2, 0]}>
-          {/* Main Body */}
-          <RoundedBox
-            args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]}
-            radius={0.004}
-            smoothness={4}
-          >
-            <meshStandardMaterial 
-              color={color} 
-              roughness={0.1} 
-              metalness={0.1}
-              transparent={isPlacementGhost}
-              opacity={isPlacementGhost ? 0.4 : 1}
-              envMapIntensity={1.5}
-            />
-          </RoundedBox>
-
-          {/* Studs */}
-          {Array.from({ length: w }).map((_, i) => (
-            Array.from({ length: d }).map((_, j) => (
-              <mesh 
-                key={`${i}-${j}`} 
-                position={[
-                  (i - (w - 1) / 2) * MODULE_SIZE,
-                  BRICK_HEIGHT / 2 + STUD_HEIGHT / 2,
-                  (j - (d - 1) / 2) * MODULE_SIZE
-                ]}
-              >
-                <cylinderGeometry args={[STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 16]} />
-                <meshStandardMaterial 
-                  color={color} 
-                  roughness={0.1} 
-                  metalness={0.1}
-                  transparent={isPlacementGhost}
-                  opacity={isPlacementGhost ? 0.4 : 1}
-                />
-              </mesh>
-            ))
-          ))}
-        </group>
-        
-        {/* Simplified Collider */}
-        <CuboidCollider args={[width / 2, BRICK_HEIGHT / 2, depth / 2]} position={[0, BRICK_HEIGHT / 2, 0]} />
-      </RigidBody>
+      <group position={[0, BRICK_HEIGHT / 2, 0]}>
+        {hideMesh ? (
+          <mesh>
+            <boxGeometry args={[width, BRICK_HEIGHT, depth]} />
+            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+          </mesh>
+        ) : (
+          <>
+            <mesh>
+              <boxGeometry args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]} />
+              <meshStandardMaterial 
+                color={color} 
+                roughness={0.1} 
+                metalness={0.1}
+                transparent={isPlacementGhost}
+                opacity={isPlacementGhost ? 0.5 : 1}
+                envMapIntensity={1.5}
+              />
+            </mesh>
+            {Array.from({ length: w }).map((_, i) => (
+              Array.from({ length: d }).map((_, j) => (
+                <mesh 
+                  key={`${i}-${j}`} 
+                  position={[
+                    (i - (w - 1) / 2) * MODULE_SIZE,
+                    BRICK_HEIGHT / 2 + STUD_HEIGHT / 2,
+                    (j - (d - 1) / 2) * MODULE_SIZE
+                  ]}
+                >
+                  <cylinderGeometry args={[STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 16]} />
+                  <meshStandardMaterial 
+                    color={color} 
+                    roughness={0.1} 
+                    metalness={0.1}
+                    transparent={isPlacementGhost}
+                    opacity={isPlacementGhost ? 0.5 : 1}
+                  />
+                </mesh>
+              ))
+            ))}
+          </>
+        )}
+      </group>
     </group>
   );
 };
