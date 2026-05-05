@@ -67,15 +67,20 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     let targetX, targetY, targetZ;
     
     if (Math.abs(normal.y) > 0.5) {
-        // Hit top/bottom: align directly to grid
+        // Hit top or bottom surface
         targetX = snapToGrid(hitX, HALF_MODULE);
         targetZ = snapToGrid(hitZ, HALF_MODULE);
         targetY = snapToGrid(hitY, BRICK_HEIGHT);
     } else {
-        // Hit side: push center point outwards by half the brick size
+        // Hit side surface
+        // We want to snap to the grid cell adjacent to the side we hit
+        // but maintain the vertical level of the hit point (snapped to brick height)
         targetX = snapToGrid(hitX + normal.x * (widthX / 2), HALF_MODULE);
         targetZ = snapToGrid(hitZ + normal.z * (depthZ / 2), HALF_MODULE);
-        targetY = snapToGrid(hitY, BRICK_HEIGHT);
+        targetY = snapToGrid(point.y, BRICK_HEIGHT);
+        
+        // Ensure we don't accidentally snap "into" the brick by a tiny bit
+        // checkPlacementValid will catch overlaps, but better UI feels more robust
     }
 
     setGhostPosition([
@@ -111,28 +116,34 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     }
   };
 
+  // Horizon of small mountains
+  const MountainHorizon = useMemo(() => {
+    const count = 60;
+    const mountains = [];
+    for (let i = 0; i < count; i++) {
+        const angle = (i / count) * Math.PI * 2;
+        const radius = 60 + Math.random() * 20;
+        const scale = 0.5 + Math.random() * 1.5;
+        mountains.push(
+            <mesh 
+              key={i} 
+              position={[Math.cos(angle) * radius, 3 * scale, Math.sin(angle) * radius]} 
+              rotation={[0, Math.random() * Math.PI, 0]}
+            >
+              <coneGeometry args={[10 * scale, 15 * scale, 4]} />
+              <meshStandardMaterial color="#1a2e1d" roughness={1} flatShading />
+            </mesh>
+        );
+    }
+    return mountains;
+  }, []);
+
   return (
     <>
       <XR store={xrStore}>
-        <fog attach="fog" args={['#a8c7db', 20, 80]} />
+        <fog attach="fog" args={['#a8c7db', 30, 100]} />
         
-        {/* Low Poly Mountains */}
-        <mesh position={[-40, 5, -50]}>
-          <coneGeometry args={[20, 15, 4]} />
-          <meshStandardMaterial color="#2d4a32" roughness={0.9} flatShading />
-        </mesh>
-        <mesh position={[20, 8, -60]}>
-          <coneGeometry args={[25, 20, 5]} />
-          <meshStandardMaterial color="#223e25" roughness={0.9} flatShading />
-        </mesh>
-        <mesh position={[50, 4, -40]} rotation={[0, Math.PI / 4, 0]}>
-          <coneGeometry args={[18, 12, 4]} />
-          <meshStandardMaterial color="#36543b" roughness={0.9} flatShading />
-        </mesh>
-        <mesh position={[-50, 10, 30]} rotation={[0, Math.PI / 8, 0]}>
-          <coneGeometry args={[30, 25, 4]} />
-          <meshStandardMaterial color="#1a341d" roughness={0.9} flatShading />
-        </mesh>
+        {MountainHorizon}
 
         {/* Cinematic Outdoor Lighting */}
         <ambientLight intensity={0.4} color="#ffffff" />
@@ -142,10 +153,10 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           intensity={1.5} 
           castShadow 
           shadow-mapSize={[2048, 2048]}
-          shadow-camera-left={-5}
-          shadow-camera-right={5}
-          shadow-camera-top={5}
-          shadow-camera-bottom={-5}
+          shadow-camera-left={-10}
+          shadow-camera-right={10}
+          shadow-camera-top={10}
+          shadow-camera-bottom={-10}
         />
         
         <Suspense fallback={null}>
@@ -173,21 +184,23 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               <RigidBody type="fixed" colliders="cuboid">
                 <Grid 
                   infiniteGrid 
-                  fadeDistance={10} 
-                  sectionSize={MODULE_SIZE} 
-                  sectionThickness={1.5} 
+                  fadeDistance={30} 
+                  sectionSize={MODULE_SIZE * 5} 
+                  sectionThickness={0.5} 
                   cellSize={MODULE_SIZE} 
-                  cellThickness={1} 
-                  cellColor="#1b4d22" 
+                  cellThickness={0.8} 
+                  cellColor="#264f2a" 
                   sectionColor="#266c30"
-                  position={[0, 0.001, 0]}
+                  position={[0, 0.005, 0]}
                 />
                 <mesh 
                   receiveShadow 
                   rotation={[-Math.PI / 2, 0, 0]} 
                   position={[0, 0, 0]}
+                  onPointerMove={handlePointerMove}
+                  onClick={handleClick}
                 >
-                  <planeGeometry args={[50, 50]} />
+                  <planeGeometry args={[100, 100]} />
                   <meshStandardMaterial color="#002D04" roughness={1} metalness={0} />
                 </mesh>
               </RigidBody>
