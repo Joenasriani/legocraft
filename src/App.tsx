@@ -28,7 +28,8 @@ export default function App() {
     bricks, mode, setMode, 
     selectedType, setSelectedType,
     selectedColor, setSelectedColor,
-    undo, redo, clearAll, setBricks
+    undo, redo, clearAll, setBricks,
+    toastMessage
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(true);
@@ -81,6 +82,12 @@ export default function App() {
 
       {/* UI Overlay */}
       <div className="absolute inset-0 z-10 pointer-events-none p-6 flex flex-col justify-between">
+        {toastMessage && (
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
+            <Info size={16} />
+            {toastMessage}
+          </div>
+        )}
         
         {/* Top Bar */}
         <div className="flex justify-between items-center pointer-events-auto">

@@ -145,6 +145,7 @@ interface LegoStore {
   selectedColor: string;
   undoStack: HistoryState[];
   redoStack: HistoryState[];
+  toastMessage: string | null;
   
   // Actions
   addBrick: (brick: Omit<BrickData, 'id'>) => void;
@@ -153,6 +154,7 @@ interface LegoStore {
   setMode: (mode: AppMode) => void;
   setSelectedType: (type: BrickType) => void;
   setSelectedColor: (color: string) => void;
+  setToastMessage: (msg: string | null) => void;
   undo: () => void;
   redo: () => void;
   clearAll: () => void;
@@ -302,6 +304,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   activePreset: null,
   undoStack: [],
   redoStack: [],
+  toastMessage: null,
+
+  setToastMessage: (msg) => set({ toastMessage: msg }),
 
   addBrick: (newBrickData) => {
     const { bricks, undoStack } = get();
@@ -346,7 +351,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     if (hasBrickAbove) {
       if (typeof window !== 'undefined') {
-        window.alert("Cannot delete: brick has another brick above it.");
+        get().setToastMessage("Cannot delete: brick has another brick above it.");
+        setTimeout(() => {
+          if (get().toastMessage === "Cannot delete: brick has another brick above it.") {
+            get().setToastMessage(null);
+          }
+        }, 3000);
       }
       return;
     }
