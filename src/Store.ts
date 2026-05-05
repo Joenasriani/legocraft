@@ -21,7 +21,7 @@ export const getBrickDimensions = (type: BrickType) => {
   }
 };
 
-export const getOccupiedCells = (brick: BrickData, moduleSize: number) => {
+export const getOccupiedCells = (brick: Omit<BrickData, 'color'>, moduleSize: number) => {
   const { w, d } = getBrickDimensions(brick.type);
   const rot = Math.round(brick.rotation / 90) % 4; // 0, 1, 2, 3
   
@@ -44,6 +44,49 @@ export const getOccupiedCells = (brick: BrickData, moduleSize: number) => {
     }
   }
   return cells;
+};
+
+export const checkPlacementValid = (
+  bricks: Omit<BrickData, 'color'>[], 
+  ghostData: Omit<BrickData, 'color'>, 
+  moduleSize: number, 
+  brickHeight: number, 
+  epsilon: number = 0.01
+) => {
+  const ghostCells = getOccupiedCells(ghostData, moduleSize);
+
+  // Overlap check
+  const isOverlap = bricks.some(b => {
+    if (b.id === ghostData.id) return false;
+    if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
+    const bCells = getOccupiedCells(b, moduleSize);
+    return ghostCells.some(gc => 
+      bCells.some(bc => 
+        Math.abs(gc.x - bc.x) < epsilon && 
+        Math.abs(gc.z - bc.z) < epsilon
+      )
+    );
+  });
+
+  if (isOverlap) return { valid: false, reason: 'overlap' };
+
+  // Ground check
+  if (ghostData.position[1] < epsilon) return { valid: true, reason: 'grounded' };
+
+  // Support check
+  const isSupported = bricks.some(b => {
+    if (b.id === ghostData.id) return false;
+    if (Math.abs(b.position[1] - (ghostData.position[1] - brickHeight)) > epsilon) return false;
+    const bCells = getOccupiedCells(b, moduleSize);
+    return ghostCells.some(gc => 
+      bCells.some(bc => 
+        Math.abs(gc.x - bc.x) < epsilon && 
+        Math.abs(gc.z - bc.z) < epsilon
+      )
+    );
+  });
+
+  return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
 };
 
 export type AppMode = 'Build' | 'Move' | 'Delete';

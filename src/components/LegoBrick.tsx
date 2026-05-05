@@ -4,7 +4,7 @@ import { RoundedBox } from '@react-three/drei';
 import { RigidBody, RapierRigidBody, CuboidCollider } from '@react-three/rapier';
 import { useXR } from '@react-three/xr';
 import * as THREE from 'three';
-import { useLegoStore, BrickType, getBrickDimensions, getOccupiedCells } from '../Store';
+import { useLegoStore, BrickType, getBrickDimensions, checkPlacementValid } from '../Store';
 
 interface LegoBrickProps {
   id: string;
@@ -98,29 +98,16 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
         // Snap rotation to 90deg
         const snappedRot = Math.round(rotation / 90) * 90;
         
-        // Check for overlap
-        const EPSILON = 0.01;
+        // Check for overlap & floating
         const potentialBrickData = {
-          id, type, color,
+          id, type,
           position: [snappedX, snappedY, snappedZ] as [number, number, number],
           rotation: snappedRot
         };
         
-        const testCells = getOccupiedCells(potentialBrickData, MODULE_SIZE);
-        const overlap = bricks.some(b => {
-          if (b.id === id) return false; // Don't check against self
-          if (Math.abs(b.position[1] - snappedY) > EPSILON) return false;
-          
-          const bCells = getOccupiedCells(b, MODULE_SIZE);
-          return testCells.some(tc => 
-            bCells.some(bc => 
-              Math.abs(tc.x - bc.x) < EPSILON && 
-              Math.abs(tc.z - bc.z) < EPSILON
-            )
-          );
-        });
+        const placementStatus = checkPlacementValid(bricks, potentialBrickData, MODULE_SIZE, BRICK_HEIGHT);
 
-        if (overlap) {
+        if (!placementStatus.valid) {
           // Revert to previous
           rigidBodyRef.current.setTranslation({ x: previousPosition[0], y: previousPosition[1], z: previousPosition[2] }, true);
           const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, (previousRotation * Math.PI) / 180, 0));

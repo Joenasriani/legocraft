@@ -5,7 +5,7 @@ import { Physics, RigidBody } from '@react-three/rapier';
 import { XR, createXRStore } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
-import { useLegoStore, getOccupiedCells, getBrickDimensions } from '../Store';
+import { useLegoStore, checkPlacementValid, getBrickDimensions } from '../Store';
 
 // Access the singleton store created in App.tsx (or export it if needed, 
 // for simplicity we will just rely on the XR component not needing a specific store
@@ -51,73 +51,52 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     if (mode !== 'Build') return;
     e.stopPropagation();
     
+    // Process hit location
     const point = e.point;
+    if (!point) return;
+
     const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
-
-    if (point) {
-      const { widthX, depthZ } = getBrickWorldDimensions(selectedType, ghostRotation);
-      
-      let targetX = point.x + normal.x * (widthX / 2);
-      let targetY = point.y;
-      
-      if (Math.abs(normal.y) > 0.5) {
-          targetY = normal.y > 0 ? point.y : point.y - BRICK_HEIGHT;
-      } else {
-          // Snap downward more aggressively if clicking on a side wall so it aligns
-          targetY = Math.floor(point.y / BRICK_HEIGHT) * BRICK_HEIGHT; 
-      }
-      let targetZ = point.z + normal.z * (depthZ / 2);
-
-      setGhostPosition([
-        snapToGrid(targetX, HALF_MODULE),
-        Math.max(0, snapToGrid(targetY, BRICK_HEIGHT)),
-        snapToGrid(targetZ, HALF_MODULE)
-      ]);
+    const { widthX, depthZ } = getBrickWorldDimensions(selectedType, ghostRotation);
+    
+    // Nudge point out slightly to resolve cell boundary safely
+    const nudge = 0.001;
+    const hitX = point.x + normal.x * nudge;
+    const hitY = point.y + normal.y * nudge;
+    const hitZ = point.z + normal.z * nudge;
+    
+    let targetX, targetY, targetZ;
+    
+    if (Math.abs(normal.y) > 0.5) {
+        // Hit top/bottom: align directly to grid
+        targetX = snapToGrid(hitX, HALF_MODULE);
+        targetZ = snapToGrid(hitZ, HALF_MODULE);
+        targetY = snapToGrid(hitY, BRICK_HEIGHT);
+    } else {
+        // Hit side: push center point outwards by half the brick size
+        targetX = snapToGrid(hitX + normal.x * (widthX / 2), HALF_MODULE);
+        targetZ = snapToGrid(hitZ + normal.z * (depthZ / 2), HALF_MODULE);
+        targetY = snapToGrid(hitY, BRICK_HEIGHT);
     }
+
+    setGhostPosition([
+      targetX,
+      Math.max(0, targetY),
+      targetZ
+    ]);
   };
 
-  // Real-time overlap check for the ghost brick
+  // Real-time overlap & support check for the ghost brick
   const isValidPlacement = useMemo(() => {
     if (mode !== 'Build') return false;
-    const EPSILON = 0.01;
     const ghostBrickData = {
       id: 'ghost',
       type: selectedType,
-      color: selectedColor,
       position: ghostPosition,
       rotation: ghostRotation
     };
-    const ghostCells = getOccupiedCells(ghostBrickData, MODULE_SIZE);
-
-    const isOverlap = bricks.some(b => {
-      if (Math.abs(b.position[1] - ghostPosition[1]) > EPSILON) return false;
-      const bCells = getOccupiedCells(b, MODULE_SIZE);
-      return ghostCells.some(gc => 
-        bCells.some(bc => 
-          Math.abs(gc.x - bc.x) < EPSILON && 
-          Math.abs(gc.z - bc.z) < EPSILON
-        )
-      );
-    });
-
-    if (isOverlap) return false;
-
-    // Ground check: y=0 is always supported
-    if (ghostPosition[1] < EPSILON) return true;
-
-    // Support check: must have at least one occupied cell directly underneath
-    const isSupported = bricks.some(b => {
-      if (Math.abs(b.position[1] - (ghostPosition[1] - BRICK_HEIGHT)) > EPSILON) return false;
-      const bCells = getOccupiedCells(b, MODULE_SIZE);
-      return ghostCells.some(gc => 
-        bCells.some(bc => 
-          Math.abs(gc.x - bc.x) < EPSILON && 
-          Math.abs(gc.z - bc.z) < EPSILON
-        )
-      );
-    });
-
-    return isSupported;
+    
+    const status = checkPlacementValid(bricks, ghostBrickData, MODULE_SIZE, BRICK_HEIGHT);
+    return status.valid;
   }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
 
   const handleClick = (e: any) => {
@@ -135,13 +114,18 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   return (
     <>
       <XR store={xrStore}>
-        {/* Lights */}
-        <ambientLight intensity={0.7} />
+        {/* Cinematic Outdoor Lighting */}
+        <ambientLight intensity={0.4} color="#ffffff" />
+        <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
         <directionalLight 
-          position={[5, 10, 5]} 
-          intensity={1.2} 
+          position={[10, 20, 10]} 
+          intensity={1.5} 
           castShadow 
-          shadow-mapSize={[1024, 1024]}
+          shadow-mapSize={[2048, 2048]}
+          shadow-camera-left={-5}
+          shadow-camera-right={5}
+          shadow-camera-top={5}
+          shadow-camera-bottom={-5}
         />
         
         <Suspense fallback={null}>
@@ -158,7 +142,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
-                  color={isValidPlacement ? selectedColor : '#ff0000'} 
+                  color={isValidPlacement ? '#22c55e' : '#ef4444'} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 
@@ -171,11 +155,11 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                   infiniteGrid 
                   fadeDistance={10} 
                   sectionSize={MODULE_SIZE} 
-                  sectionThickness={1.2} 
+                  sectionThickness={1.5} 
                   cellSize={MODULE_SIZE} 
                   cellThickness={1} 
-                  cellColor="#4a4" 
-                  sectionColor="#4a4"
+                  cellColor="#1b4d22" 
+                  sectionColor="#266c30"
                   position={[0, 0.001, 0]}
                 />
                 <mesh 
@@ -184,16 +168,16 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                   position={[0, 0, 0]}
                 >
                   <planeGeometry args={[50, 50]} />
-                  <meshStandardMaterial color="#3a7d2b" roughness={1} />
+                  <meshStandardMaterial color="#002D04" roughness={1} metalness={0} />
                 </mesh>
               </RigidBody>
             </group>
           </Physics>
           
           <ContactShadows opacity={0.6} scale={10} blur={2} far={4} resolution={256} color="#000000" />
-          <Sky sunPosition={[100, 20, 100]} />
+          <Sky sunPosition={[100, 20, 100]} turbidity={0.1} />
           <Clouds>
-            <Cloud segments={20} bounds={[10, 2, 10]} volume={10} color="#ffffff" position={[0, 15, 0]} />
+            <Cloud segments={20} bounds={[10, 2, 10]} volume={5} color="#ffffff" position={[0, 15, 0]} opacity={0.6} />
           </Clouds>
         </Suspense>
 
