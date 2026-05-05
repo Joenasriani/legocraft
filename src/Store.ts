@@ -80,6 +80,7 @@ const COLORS = [
   '#FFFFFF', // White
   '#000000', // Black
   '#00AD3C', // Green
+  '#8B4513', // Wood/Brown
 ];
 
 export const useLegoStore = create<LegoStore>((set, get) => ({

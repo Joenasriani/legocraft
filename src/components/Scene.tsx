@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows, Sky, Clouds, Cloud } from '@react-three/drei';
 import { Physics, RigidBody } from '@react-three/rapier';
 import { XR, createXRStore } from '@react-three/xr';
 import * as THREE from 'three';
@@ -77,7 +77,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   };
 
   // Real-time overlap check for the ghost brick
-  const isOverlap = useMemo(() => {
+  const isValidPlacement = useMemo(() => {
     if (mode !== 'Build') return false;
     const EPSILON = 0.01;
     const ghostBrickData = {
@@ -89,7 +89,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     };
     const ghostCells = getOccupiedCells(ghostBrickData, MODULE_SIZE);
 
-    return bricks.some(b => {
+    const isOverlap = bricks.some(b => {
       if (Math.abs(b.position[1] - ghostPosition[1]) > EPSILON) return false;
       const bCells = getOccupiedCells(b, MODULE_SIZE);
       return ghostCells.some(gc => 
@@ -99,11 +99,30 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
         )
       );
     });
+
+    if (isOverlap) return false;
+
+    // Ground check: y=0 is always supported
+    if (ghostPosition[1] < EPSILON) return true;
+
+    // Support check: must have at least one occupied cell directly underneath
+    const isSupported = bricks.some(b => {
+      if (Math.abs(b.position[1] - (ghostPosition[1] - BRICK_HEIGHT)) > EPSILON) return false;
+      const bCells = getOccupiedCells(b, MODULE_SIZE);
+      return ghostCells.some(gc => 
+        bCells.some(bc => 
+          Math.abs(gc.x - bc.x) < EPSILON && 
+          Math.abs(gc.z - bc.z) < EPSILON
+        )
+      );
+    });
+
+    return isSupported;
   }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
 
   const handleClick = (e: any) => {
     e.stopPropagation();
-    if (mode === 'Build' && !isOverlap) {
+    if (mode === 'Build' && isValidPlacement) {
       addBrick({
         type: selectedType,
         color: selectedColor,
@@ -139,7 +158,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
-                  color={isOverlap ? '#ff0000' : selectedColor} 
+                  color={isValidPlacement ? selectedColor : '#ff0000'} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 
@@ -150,28 +169,32 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               <RigidBody type="fixed" colliders="cuboid">
                 <Grid 
                   infiniteGrid 
-                  fadeDistance={20} 
-                  sectionSize={MODULE_SIZE * 10} 
-                  sectionThickness={1} 
+                  fadeDistance={10} 
+                  sectionSize={MODULE_SIZE} 
+                  sectionThickness={1.2} 
                   cellSize={MODULE_SIZE} 
-                  cellThickness={0.5} 
-                  cellColor="#444" 
-                  sectionColor="#666"
+                  cellThickness={1} 
+                  cellColor="#4a4" 
+                  sectionColor="#4a4"
+                  position={[0, 0.001, 0]}
                 />
                 <mesh 
                   receiveShadow 
                   rotation={[-Math.PI / 2, 0, 0]} 
-                  position={[0, -0.001, 0]}
+                  position={[0, 0, 0]}
                 >
                   <planeGeometry args={[50, 50]} />
-                  <meshStandardMaterial transparent opacity={0.05} color="white" />
+                  <meshStandardMaterial color="#3a7d2b" roughness={1} />
                 </mesh>
               </RigidBody>
             </group>
           </Physics>
           
           <ContactShadows opacity={0.6} scale={10} blur={2} far={4} resolution={256} color="#000000" />
-          <Environment preset="apartment" />
+          <Sky sunPosition={[100, 20, 100]} />
+          <Clouds>
+            <Cloud segments={20} bounds={[10, 2, 10]} volume={10} color="#ffffff" position={[0, 15, 0]} />
+          </Clouds>
         </Suspense>
 
         <OrbitControls 
