@@ -111,9 +111,33 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
   }, [bricks, presetBricks, activePreset, mode]);
 
-  const handleClick = (e: any) => {
+  const pointerDownPos = useRef<{ x: number, y: number } | null>(null);
+
+  const handlePointerDown = (e: any) => {
     e.stopPropagation();
     if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
+    const clientX = e.clientX ?? e.nativeEvent?.clientX ?? 0;
+    const clientY = e.clientY ?? e.nativeEvent?.clientY ?? 0;
+    pointerDownPos.current = { x: clientX, y: clientY };
+  };
+
+  const handlePointerUp = (e: any) => {
+    e.stopPropagation();
+    if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
+    
+    if (pointerDownPos.current) {
+      const clientX = e.clientX ?? e.nativeEvent?.clientX ?? 0;
+      const clientY = e.clientY ?? e.nativeEvent?.clientY ?? 0;
+      const dx = clientX - pointerDownPos.current.x;
+      const dy = clientY - pointerDownPos.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      pointerDownPos.current = null;
+      
+      if (distance > 5) {
+        return; // It was a drag
+      }
+    }
     
     if (activePreset && isValidStructurePlacement) {
       commitPreset(ghostPosition);
@@ -161,7 +185,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
           
           <Suspense fallback={null}>
-            <group onPointerMove={handlePointerMove} onPointerDown={handleClick} onContextMenu={(e) => { e.stopPropagation(); }}>
+            <group onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onContextMenu={(e) => { e.stopPropagation(); }}>
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {
                 const [type, color] = key.split('_');
@@ -207,7 +231,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 receiveShadow 
                 rotation={[-Math.PI / 2, 0, 0]} 
                 onPointerMove={handlePointerMove}
-                onClick={handleClick}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
               >
                 <planeGeometry args={[100, 100]} />
                 <meshStandardMaterial color="#002D04" />
@@ -225,7 +250,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
           
           <Suspense fallback={null}>
-            <group onPointerMove={handlePointerMove} onPointerDown={handleClick} onContextMenu={(e) => { e.stopPropagation(); }}>
+            <group onPointerMove={handlePointerMove} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onContextMenu={(e) => { e.stopPropagation(); }}>
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {
                 const [type, color] = key.split('_');
@@ -271,7 +296,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 receiveShadow 
                 rotation={[-Math.PI / 2, 0, 0]} 
                 onPointerMove={handlePointerMove}
-                onClick={handleClick}
+                onPointerDown={handlePointerDown}
+                onPointerUp={handlePointerUp}
               >
                 <planeGeometry args={[100, 100]} />
                 <meshStandardMaterial color="#002D04" />

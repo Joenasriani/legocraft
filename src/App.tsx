@@ -89,7 +89,17 @@ export default function App() {
           </div>
           <div className="flex gap-4">
             <button 
-              onClick={() => xrStore.enterVR()} 
+              onClick={() => {
+                const xrErrorMsg = "VR not supported or no hardware found.";
+                try {
+                  const p = xrStore.enterVR();
+                  if (p && p.catch) {
+                    p.catch(() => alert(xrErrorMsg));
+                  }
+                } catch (e) {
+                  alert(xrErrorMsg);
+                }
+              }} 
               className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
             >
               Enter VR

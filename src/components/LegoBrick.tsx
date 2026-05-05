@@ -18,12 +18,12 @@ const STUD_RADIUS = 0.024;
 const STUD_HEIGHT = 0.016;
 
 export const LegoBrick: React.FC<LegoBrickProps> = ({ 
-  id, type, color, position, rotation: initialRotation, isPlacementGhost, hideMesh 
+  id, type, color, position, rotation, isPlacementGhost, hideMesh 
 }) => {
   const { w, d } = getBrickDimensions(type);
   const [isGrabbed, setIsGrabbed] = useState(false);
-  const [rotation, setRotation] = useState(initialRotation);
   const removeBrick = useLegoStore((state) => state.removeBrick);
+  const updateBrick = useLegoStore((state) => state.updateBrick);
   const mode = useLegoStore((state) => state.mode);
 
   const width = w * MODULE_SIZE;
@@ -52,8 +52,8 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
 
   const handleRotate = (e: any) => {
     e.stopPropagation();
-    if (isGrabbed) {
-      setRotation(prev => (prev + 90) % 360);
+    if (isGrabbed && !isPlacementGhost) {
+      updateBrick(id, { rotation: (rotation + 90) % 360 });
     }
   };
 

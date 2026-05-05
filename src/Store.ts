@@ -319,6 +319,38 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
   removeBrick: (id) => {
     const { bricks, undoStack } = get();
+
+    const brickToRemove = bricks.find(b => b.id === id);
+    if (!brickToRemove) return;
+
+    // Check if there's any brick directly above it
+    const epsilon = 0.01;
+    const ms = 0.08;
+    const bh = 0.096;
+    const myCells = getOccupiedCells(brickToRemove, ms);
+
+    const hasBrickAbove = bricks.some(b => {
+      if (b.id === id) return false;
+      const dy = b.position[1] - brickToRemove.position[1];
+      if (Math.abs(dy - bh) < epsilon) {
+        const bCells = getOccupiedCells(b, ms);
+        return myCells.some(mc => 
+          bCells.some(bc => 
+            Math.abs(mc.x - bc.x) < epsilon && 
+            Math.abs(mc.z - bc.z) < epsilon
+          )
+        );
+      }
+      return false;
+    });
+
+    if (hasBrickAbove) {
+      if (typeof window !== 'undefined') {
+        window.alert("Cannot delete: brick has another brick above it.");
+      }
+      return;
+    }
+
     const newBricks = bricks.filter(b => b.id !== id);
     
     set({
