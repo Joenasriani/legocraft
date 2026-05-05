@@ -5,15 +5,14 @@ import { Physics, RigidBody } from '@react-three/rapier';
 import { XR, createXRStore } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
-import { useLegoStore } from '../Store';
+import { useLegoStore, getOccupiedCells } from '../Store';
 
-// Create a singleton store for the scene if not passed from above
-const defaultStore = createXRStore({
-  hand: true,
-  controller: true,
-});
+// Access the singleton store created in App.tsx (or export it if needed, 
+// for simplicity we will just rely on the XR component not needing a specific store
+// if we import it from a shared place. Let's just create a shared store module).
+// Wait, we need it to be the same instance. I will pass it from App, or export it.
 
-export const Scene = () => {
+export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
   const selectedType = useLegoStore((state) => state.selectedType);
@@ -21,6 +20,13 @@ export const Scene = () => {
   const addBrick = useLegoStore((state) => state.addBrick);
   
   const [ghostPosition, setGhostPosition] = useState<[number, number, number]>([0, 0, 0]);
+  const [ghostRotation, setGhostRotation] = useState<number>(0);
+
+  useEffect(() => {
+    const handleRotate = () => setGhostRotation(r => (r + 90) % 360);
+    window.addEventListener('rotate-ghost', handleRotate);
+    return () => window.removeEventListener('rotate-ghost', handleRotate);
+  }, []);
 
   // Grid constants
   const MODULE_SIZE = 0.08;
@@ -33,13 +39,18 @@ export const Scene = () => {
   const handlePointerMove = (e: any) => {
     if (mode !== 'Build') return;
     const point = e.point;
+    const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
+
     if (point) {
-      // Offset Y slightly to snap to the top of surfaces
-      const yOffset = point.y > 0.01 ? 0 : 0;
+      // Offset point outwards slightly along the normal so it snaps to the *next* block space
+      const x = point.x + normal.x * HALF_MODULE * 0.1;
+      const y = point.y + normal.y * BRICK_HEIGHT * 0.1;
+      const z = point.z + normal.z * HALF_MODULE * 0.1;
+
       setGhostPosition([
-        snapToGrid(point.x, HALF_MODULE),
-        Math.max(0, snapToGrid(point.y + yOffset, BRICK_HEIGHT)),
-        snapToGrid(point.z, HALF_MODULE)
+        snapToGrid(x, HALF_MODULE),
+        Math.max(0, snapToGrid(y, BRICK_HEIGHT)),
+        snapToGrid(z, HALF_MODULE)
       ]);
     }
   };
@@ -47,18 +58,43 @@ export const Scene = () => {
   const handleClick = (e: any) => {
     e.stopPropagation();
     if (mode === 'Build') {
-      addBrick({
+      const EPSILON = 0.01;
+      // Get the cells the new brick will occupy
+      const ghostBrickData = {
+        id: 'ghost',
         type: selectedType,
         color: selectedColor,
         position: ghostPosition,
-        rotation: 0
+        rotation: ghostRotation
+      };
+      const ghostCells = getOccupiedCells(ghostBrickData, MODULE_SIZE);
+
+      // Check if any existing bricks occupy the same cells at the same height
+      const overlap = bricks.some(b => {
+        if (Math.abs(b.position[1] - ghostPosition[1]) > EPSILON) return false;
+        const bCells = getOccupiedCells(b, MODULE_SIZE);
+        return ghostCells.some(gc => 
+          bCells.some(bc => 
+            Math.abs(gc.x - bc.x) < EPSILON && 
+            Math.abs(gc.z - bc.z) < EPSILON
+          )
+        );
       });
+
+      if (!overlap) {
+        addBrick({
+          type: selectedType,
+          color: selectedColor,
+          position: ghostPosition,
+          rotation: ghostRotation
+        });
+      }
     }
   };
 
   return (
     <>
-      <XR store={defaultStore}>
+      <XR store={xrStore}>
         {/* Lights */}
         <ambientLight intensity={0.7} />
         <directionalLight 
@@ -70,46 +106,47 @@ export const Scene = () => {
         
         <Suspense fallback={null}>
           <Physics gravity={[0, -9.81, 0]}>
-            {/* Bricks */}
-            {bricks.map((brick) => (
-              <LegoBrick key={brick.id} {...brick} />
-            ))}
+            {/* Wrap all interactive elements in a single group to catch pointer events easily */}
+            <group onPointerMove={handlePointerMove} onPointerDown={handleClick}>
+              {/* Bricks */}
+              {bricks.map((brick) => (
+                <LegoBrick key={brick.id} {...brick} />
+              ))}
 
-            {/* Ghost for placement */}
-            {mode === 'Build' && (
-              <LegoBrick 
-                id="ghost" 
-                type={selectedType} 
-                color={selectedColor} 
-                position={ghostPosition} 
-                rotation={0} 
-                isPlacementGhost 
-              />
-            )}
+              {/* Ghost for placement */}
+              {mode === 'Build' && (
+                <LegoBrick 
+                  id="ghost" 
+                  type={selectedType} 
+                  color={selectedColor} 
+                  position={ghostPosition} 
+                  rotation={ghostRotation} 
+                  isPlacementGhost 
+                />
+              )}
 
-            {/* Interactive Grid Floor */}
-            <RigidBody type="fixed" colliders="cuboid">
-              <Grid 
-                infiniteGrid 
-                fadeDistance={20} 
-                sectionSize={MODULE_SIZE * 10} 
-                sectionThickness={1} 
-                cellSize={MODULE_SIZE} 
-                cellThickness={0.5} 
-                cellColor="#444" 
-                sectionColor="#666"
-              />
-              <mesh 
-                receiveShadow 
-                rotation={[-Math.PI / 2, 0, 0]} 
-                position={[0, -0.001, 0]}
-                onPointerMove={handlePointerMove} 
-                onPointerDown={handleClick}
-              >
-                <planeGeometry args={[50, 50]} />
-                <meshStandardMaterial transparent opacity={0.05} color="white" />
-              </mesh>
-            </RigidBody>
+              {/* Interactive Grid Floor */}
+              <RigidBody type="fixed" colliders="cuboid">
+                <Grid 
+                  infiniteGrid 
+                  fadeDistance={20} 
+                  sectionSize={MODULE_SIZE * 10} 
+                  sectionThickness={1} 
+                  cellSize={MODULE_SIZE} 
+                  cellThickness={0.5} 
+                  cellColor="#444" 
+                  sectionColor="#666"
+                />
+                <mesh 
+                  receiveShadow 
+                  rotation={[-Math.PI / 2, 0, 0]} 
+                  position={[0, -0.001, 0]}
+                >
+                  <planeGeometry args={[50, 50]} />
+                  <meshStandardMaterial transparent opacity={0.05} color="white" />
+                </mesh>
+              </RigidBody>
+            </group>
           </Physics>
           
           <ContactShadows opacity={0.6} scale={10} blur={2} far={4} resolution={256} color="#000000" />

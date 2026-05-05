@@ -10,6 +10,42 @@ export interface BrickData {
   rotation: number; // Y-axis rotation in degrees
 }
 
+export const getBrickDimensions = (type: BrickType) => {
+  switch (type) {
+    case '1x1': return { w: 1, d: 1 };
+    case '1x2': return { w: 1, d: 2 };
+    case '2x2': return { w: 2, d: 2 };
+    case '2x3': return { w: 2, d: 3 };
+    case '2x4': return { w: 2, d: 4 };
+    default: return { w: 1, d: 1 };
+  }
+};
+
+export const getOccupiedCells = (brick: BrickData, moduleSize: number) => {
+  const { w, d } = getBrickDimensions(brick.type);
+  const rot = Math.round(brick.rotation / 90) % 4; // 0, 1, 2, 3
+  
+  // Effective width and depth based on rotation
+  const isRotated = rot === 1 || rot === 3 || rot === -1 || rot === -3;
+  const ew = isRotated ? d : w;
+  const ed = isRotated ? w : d;
+
+  const cells = [];
+  const startX = brick.position[0] - (ew - 1) * (moduleSize / 2);
+  const startZ = brick.position[2] - (ed - 1) * (moduleSize / 2);
+
+  for (let i = 0; i < ew; i++) {
+    for (let j = 0; j < ed; j++) {
+      cells.push({
+        x: startX + i * moduleSize,
+        y: brick.position[1],
+        z: startZ + j * moduleSize,
+      });
+    }
+  }
+  return cells;
+};
+
 export type AppMode = 'Build' | 'Move' | 'Delete';
 
 interface HistoryState {

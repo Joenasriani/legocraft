@@ -11,11 +11,14 @@ import { useLegoStore, LEGO_COLORS, BrickType } from './Store';
 import { Scene } from './components/Scene';
 import { createXRStore } from '@react-three/xr';
 
-const BRICK_TYPES: BrickType[] = ['1x1', '1x2', '2x2', '2x3', '2x4'];
+import { createXRStore } from '@react-three/xr';
+
 const xrStore = createXRStore({
   hand: true,
   controller: true,
 });
+
+const BRICK_TYPES: BrickType[] = ['1x1', '1x2', '2x2', '2x3', '2x4'];
 
 export default function App() {
   const { 
@@ -68,8 +71,8 @@ export default function App() {
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
-        <Canvas shadows camera={{ position: [10, 10, 10], fov: 50 }}>
-          <Scene />
+        <Canvas shadows camera={{ position: [0.5, 0.5, 0.5], fov: 60 }}>
+          <Scene xrStore={xrStore} />
         </Canvas>
       </div>
 
@@ -81,8 +84,16 @@ export default function App() {
           <div className="text-xl font-extrabold tracking-[2px] flex items-center gap-2">
             BRICK <span className="font-light opacity-60">XR</span>
           </div>
-          <div className="bg-green-500/20 border border-green-500/40 text-green-400 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider">
-            Quest 3 • Passthrough Active
+          <div className="flex gap-4">
+            <button 
+              onClick={() => xrStore.enterVR()} 
+              className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
+            >
+              Enter VR
+            </button>
+            <div className="bg-green-500/20 border border-green-500/40 text-green-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center">
+              WebXR Ready
+            </div>
           </div>
         </div>
 
@@ -162,6 +173,13 @@ export default function App() {
             </div>
 
             <div className="flex gap-3">
+              <button onClick={() => {
+                // simple 90deg rotation of the ghost brick by updating a local state
+                window.dispatchEvent(new CustomEvent('rotate-ghost'));
+              }} className="text-blue-400 hover:text-blue-300 px-3 py-2 text-[13px] font-semibold transition-colors">
+                Rotate Brick
+              </button>
+              <div className="w-px h-6 bg-glass-border self-center" />
               <button onClick={handlePunchAll} className="text-orange-400 hover:text-orange-300 px-3 py-2 text-[13px] font-semibold transition-colors">
                 Punch
               </button>
