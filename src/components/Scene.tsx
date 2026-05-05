@@ -114,6 +114,26 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   return (
     <>
       <XR store={xrStore}>
+        <fog attach="fog" args={['#a8c7db', 20, 80]} />
+        
+        {/* Low Poly Mountains */}
+        <mesh position={[-40, 5, -50]}>
+          <coneGeometry args={[20, 15, 4]} />
+          <meshStandardMaterial color="#2d4a32" roughness={0.9} flatShading />
+        </mesh>
+        <mesh position={[20, 8, -60]}>
+          <coneGeometry args={[25, 20, 5]} />
+          <meshStandardMaterial color="#223e25" roughness={0.9} flatShading />
+        </mesh>
+        <mesh position={[50, 4, -40]} rotation={[0, Math.PI / 4, 0]}>
+          <coneGeometry args={[18, 12, 4]} />
+          <meshStandardMaterial color="#36543b" roughness={0.9} flatShading />
+        </mesh>
+        <mesh position={[-50, 10, 30]} rotation={[0, Math.PI / 8, 0]}>
+          <coneGeometry args={[30, 25, 4]} />
+          <meshStandardMaterial color="#1a341d" roughness={0.9} flatShading />
+        </mesh>
+
         {/* Cinematic Outdoor Lighting */}
         <ambientLight intensity={0.4} color="#ffffff" />
         <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
@@ -142,7 +162,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
-                  color={isValidPlacement ? '#22c55e' : '#ef4444'} 
+                  color={selectedColor} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 

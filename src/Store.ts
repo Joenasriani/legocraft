@@ -114,6 +114,7 @@ interface LegoStore {
   redo: () => void;
   clearAll: () => void;
   setBricks: (bricks: BrickData[]) => void;
+  loadPreset: (presetName: 'tree' | 'cabin') => void;
 }
 
 const COLORS = [
@@ -125,6 +126,59 @@ const COLORS = [
   '#00AD3C', // Green
   '#8B4513', // Wood/Brown
 ];
+
+// Presets using accurate sizing
+const ms = 0.08; // MODULE_SIZE
+const bh = 0.096; // BRICK_HEIGHT
+
+const createBrick = (type: BrickType, color: string, px: number, py: number, pz: number, rotation: number = 0): BrickData => ({
+  id: crypto.randomUUID(),
+  type,
+  color,
+  position: [px * ms, py * bh, pz * ms],
+  rotation
+});
+
+export const PRESETS = {
+  tree: [
+    // Wood trunk
+    createBrick('2x2', '#8B4513', 0, 0, 0),
+    createBrick('2x2', '#8B4513', 0, 1, 0),
+    createBrick('2x2', '#8B4513', 0, 2, 0),
+    // Leaves layer 1
+    createBrick('2x4', '#00AD3C', -1, 3, 0),
+    createBrick('2x4', '#00AD3C', 1, 3, 0),
+    createBrick('1x2', '#00AD3C', 0, 3, -1, 90),
+    createBrick('1x2', '#00AD3C', 0, 3, 1, 90),
+    // Leaves layer 2
+    createBrick('2x3', '#00AD3C', 0, 4, -0.5, 90),
+    createBrick('2x3', '#00AD3C', 0, 4, 0.5, 90),
+    // Leaves layer 3
+    createBrick('2x2', '#00AD3C', 0, 5, 0),
+  ],
+  cabin: [
+    // Base floor
+    createBrick('2x4', '#8B4513', -1, 0, -1),
+    createBrick('2x4', '#8B4513', 1, 0, -1),
+    createBrick('2x4', '#8B4513', -1, 0, 1),
+    createBrick('2x4', '#8B4513', 1, 0, 1),
+    // Walls Left
+    createBrick('1x2', '#FFFFFF', -2.5, 1, -1, 90),
+    createBrick('1x2', '#FFFFFF', -2.5, 1, 1, 90),
+    createBrick('1x2', '#FFFFFF', -2.5, 2, 0, 90),
+    // Walls Right
+    createBrick('1x2', '#FFFFFF', 2.5, 1, -1, 90),
+    createBrick('1x2', '#FFFFFF', 2.5, 1, 1, 90),
+    createBrick('1x2', '#FFFFFF', 2.5, 2, 0, 90),
+    // Walls Back
+    createBrick('2x4', '#FFFFFF', 0, 1, -2.5),
+    createBrick('2x4', '#FFFFFF', 0, 2, -2.5),
+    // Roof
+    createBrick('2x4', '#E3000B', -1, 3, 0),
+    createBrick('2x4', '#E3000B', 1, 3, 0),
+    createBrick('1x2', '#E3000B', 0, 4, 0),
+  ]
+};
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
   bricks: [],
@@ -222,6 +276,19 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
   setBricks: (newBricks) => {
     set({ bricks: newBricks, undoStack: [], redoStack: [] });
+    localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
+  },
+
+  loadPreset: (presetName) => {
+    const { bricks, undoStack } = get();
+    // regenerate IDs so we don't accidentally get duplicate keys
+    const presetBricks = PRESETS[presetName].map(b => ({ ...b, id: crypto.randomUUID() }));
+    const newBricks = [...bricks, ...presetBricks];
+    set({
+      undoStack: [...undoStack, { bricks: [...bricks] }],
+      redoStack: [],
+      bricks: newBricks,
+    });
     localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
   },
 }));

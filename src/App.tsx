@@ -187,6 +187,13 @@ export default function App() {
                 Clear
               </button>
               <div className="w-px h-6 bg-glass-border self-center" />
+              <button onClick={() => useLegoStore.getState().loadPreset('tree')} className="text-green-400 hover:text-green-300 px-3 py-2 text-[13px] font-semibold transition-colors">
+                + Tree
+              </button>
+              <button onClick={() => useLegoStore.getState().loadPreset('cabin')} className="text-amber-600 hover:text-amber-500 px-3 py-2 text-[13px] font-semibold transition-colors">
+                + Cabin
+              </button>
+              <div className="w-px h-6 bg-glass-border self-center" />
               <button onClick={handleScreenshot} className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
                 Screenshot
               </button>
