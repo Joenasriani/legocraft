@@ -55,7 +55,7 @@ export const checkPlacementValid = (
 ) => {
   const ghostCells = getOccupiedCells(ghostData, moduleSize);
 
-  // Overlap check
+  // MUST NOT OVERLAP
   const isOverlap = bricks.some(b => {
     if (b.id === ghostData.id) return false;
     if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
@@ -71,19 +71,28 @@ export const checkPlacementValid = (
   if (isOverlap) return { valid: false, reason: 'overlap' };
 
   // Ground check
-  if (ghostData.position[1] < epsilon) return { valid: true, reason: 'grounded' };
+  if (ghostData.position[1] <= epsilon) return { valid: true, reason: 'grounded' };
 
-  // Support check
+  // Connection check (Support from below)
   const isSupported = bricks.some(b => {
     if (b.id === ghostData.id) return false;
-    if (Math.abs(b.position[1] - (ghostData.position[1] - brickHeight)) > epsilon) return false;
-    const bCells = getOccupiedCells(b, moduleSize);
-    return ghostCells.some(gc => 
-      bCells.some(bc => 
-        Math.abs(gc.x - bc.x) < epsilon && 
-        Math.abs(gc.z - bc.z) < epsilon
-      )
-    );
+    
+    // The brick below must be exactly `brickHeight` below the ghost brick.
+    // The ghost is at y, the supporting brick is at y - brickHeight.
+    // So ghostData.position[1] - b.position[1] should be roughly brickHeight.
+    const dy = ghostData.position[1] - b.position[1];
+    
+    if (Math.abs(dy - brickHeight) < epsilon) {
+      const bCells = getOccupiedCells(b, moduleSize);
+      return ghostCells.some(gc => 
+        bCells.some(bc => 
+          Math.abs(gc.x - bc.x) < epsilon && 
+          Math.abs(gc.z - bc.z) < epsilon
+        )
+      );
+    }
+    
+    return false;
   });
 
   return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
@@ -368,6 +377,41 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         b.position[2] + position[2]
       ] as [number, number, number]
     }));
+
+    // STRUCTURE PLACEMENT VALIDATION
+    // Find the base layer (minimum Y)
+    const minY = Math.min(...presetBricks.map(b => b.position[1]));
+    const baseBricks = presetBricks.filter(b => b.position[1] === minY);
+    
+    // Check if at least one base brick is validly placed (grounded or connected)
+    const epsilon = 0.01;
+    let isValidPlacement = false;
+    
+    if (minY <= epsilon) {
+      isValidPlacement = true; // Grounded
+    } else {
+      // Check if any base brick connects to existing bricks
+      // (Using the same connection logic as checkPlacementValid)
+      for (const baseBrick of baseBricks) {
+        const dummyValid = checkPlacementValid(bricks, baseBrick, ms, bh, epsilon);
+        // We only care if it's connected (overlap means invalid, but checkPlacementValid returns valid=false for overlap)
+        if (dummyValid.valid) {
+          isValidPlacement = true;
+          break;
+        }
+      }
+    }
+    
+    // Additionally, check for NO OVERLAPS with existing bricks
+    const hasOverlap = presetBricks.some(pb => {
+      const dummyValid = checkPlacementValid(bricks, pb, ms, bh, epsilon);
+      return !dummyValid.valid && dummyValid.reason === 'overlap';
+    });
+
+    if (!isValidPlacement || hasOverlap) {
+      // DO NOT place the structure at all
+      return;
+    }
 
     const newBricks = [...bricks, ...presetBricks];
     set({

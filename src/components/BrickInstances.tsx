@@ -1,6 +1,5 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getBrickDimensions, useLegoStore } from '../Store';
 
 interface BrickInstancesProps {
@@ -16,55 +15,58 @@ const STUD_RADIUS = 0.024;
 const STUD_HEIGHT = 0.016;
 
 export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bricks, isGhost }) => {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const bodyMeshRef = useRef<THREE.InstancedMesh>(null);
+  const studMeshRef = useRef<THREE.InstancedMesh>(null);
   const removeBrick = useLegoStore(state => state.removeBrick);
   const mode = useLegoStore(state => state.mode);
 
   const handlePointerDown = (e: any) => {
     if (isGhost) return;
     
-    // Deletion: either Delete mode (left click) or Squeeze/Right-Click (button === 2)
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === 'contextmenu';
     if (mode === 'Delete' || isSqueeze) {
       e.stopPropagation();
       const instanceId = e.instanceId;
-      if (instanceId !== undefined && bricks[instanceId]) {
-        removeBrick(bricks[instanceId].id);
+      if (instanceId !== undefined) {
+        // If they click on body or stud, the IDs map predictably
+        // For stud mesh, instanceId is (brickIndex * w * d) + some offset
+        // For body mesh, instanceId is brickIndex
+        const isStud = e.object === studMeshRef.current;
+        let brickIndex = instanceId;
+        
+        if (isStud) {
+          const { w, d } = getBrickDimensions(type);
+          brickIndex = Math.floor(instanceId / (w * d));
+        }
+
+        if (bricks[brickIndex]) {
+          removeBrick(bricks[brickIndex].id);
+        }
       }
     }
   };
   
-  const geometry = useMemo(() => {
-    try {
-      const { w, d } = getBrickDimensions(type);
-      const width = w * MODULE_SIZE;
-      const depth = d * MODULE_SIZE;
-
-      const bodyGeom = new THREE.BoxGeometry(width - 0.002, BRICK_HEIGHT, depth - 0.002);
-      bodyGeom.translate(0, BRICK_HEIGHT / 2, 0);
-      
-      const studGeoms: THREE.BufferGeometry[] = [bodyGeom];
-      
-      for (let i = 0; i < w; i++) {
-        for (let j = 0; j < d; j++) {
-          const studGeom = new THREE.CylinderGeometry(STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 12);
-          studGeom.translate(
-            (i - (w - 1) / 2) * MODULE_SIZE,
-            BRICK_HEIGHT + STUD_HEIGHT / 2,
-            (j - (d - 1) / 2) * MODULE_SIZE
-          );
-          studGeoms.push(studGeom);
-        }
-      }
-
-      const merged = mergeGeometries(studGeoms, false);
-      
-      return merged || bodyGeom;
-    } catch (e) {
-      console.error('Error creating merged brick geometry:', e);
-      return new THREE.BoxGeometry(0.08, 0.096, 0.08);
-    }
+  const { width, depth, w, d } = useMemo(() => {
+    const dims = getBrickDimensions(type);
+    return {
+      width: dims.w * MODULE_SIZE,
+      depth: dims.d * MODULE_SIZE,
+      w: dims.w,
+      d: dims.d
+    };
   }, [type]);
+
+  const bodyGeom = useMemo(() => {
+    const geom = new THREE.BoxGeometry(width - 0.002, BRICK_HEIGHT, depth - 0.002);
+    geom.translate(0, BRICK_HEIGHT / 2, 0);
+    return geom;
+  }, [width, depth]);
+
+  const studGeom = useMemo(() => {
+    const geom = new THREE.CylinderGeometry(STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 12);
+    geom.translate(0, BRICK_HEIGHT + STUD_HEIGHT / 2, 0);
+    return geom;
+  }, []);
 
   const material = useMemo(() => {
     return new THREE.MeshStandardMaterial({ 
@@ -77,10 +79,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
     });
   }, [color, isGhost]);
 
-  // Handle matrix updates...
   useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
+    const bodyMesh = bodyMeshRef.current;
+    const studMesh = studMeshRef.current;
+    if (!bodyMesh || !studMesh) return;
     
     const matrix = new THREE.Matrix4();
     const position = new THREE.Vector3();
@@ -88,8 +90,15 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
     const scale = new THREE.Vector3(1, 1, 1);
     const euler = new THREE.Euler();
     
+    const studMatrix = new THREE.Matrix4();
+    const studPos = new THREE.Vector3();
+    
     const count = bricks.length;
     const capacity = 5000;
+    const numStuds = w * d;
+    const studCapacity = capacity * numStuds;
+    
+    let studIndex = 0;
     
     for (let i = 0; i < capacity; i++) {
       if (i < count) {
@@ -104,30 +113,60 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
           scale.set(1, 1, 1);
           
           matrix.compose(position, quaternion, scale);
-          mesh.setMatrixAt(i, matrix);
+          bodyMesh.setMatrixAt(i, matrix);
+          
+          // Place studs
+          for (let x = 0; x < w; x++) {
+            for (let z = 0; z < d; z++) {
+              const localX = (x - (w - 1) / 2) * MODULE_SIZE;
+              const localZ = (z - (d - 1) / 2) * MODULE_SIZE;
+              
+              studPos.set(localX, 0, localZ);
+              studPos.applyQuaternion(quaternion);
+              studPos.add(position);
+              
+              studMatrix.compose(studPos, quaternion, scale);
+              studMesh.setMatrixAt(studIndex, studMatrix);
+              studIndex++;
+            }
+          }
         }
       } else {
-        // Hide unused instances
         scale.set(0, 0, 0);
         matrix.makeScale(0, 0, 0);
-        mesh.setMatrixAt(i, matrix);
+        bodyMesh.setMatrixAt(i, matrix);
+        
+        for (let s = 0; s < numStuds; s++) {
+          studMesh.setMatrixAt(studIndex, matrix);
+          studIndex++;
+        }
       }
     }
     
-    if (mesh.instanceMatrix) {
-      mesh.instanceMatrix.needsUpdate = true;
-    }
-  }, [bricks]);
+    if (bodyMesh.instanceMatrix) bodyMesh.instanceMatrix.needsUpdate = true;
+    if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
+  }, [bricks, w, d]);
 
   return (
-    <instancedMesh 
-      ref={meshRef} 
-      args={[geometry, material, 5000]} 
-      castShadow={!isGhost} 
-      receiveShadow={!isGhost}
-      onPointerDown={handlePointerDown}
-      onContextMenu={handlePointerDown}
-      raycast={isGhost ? () => null : undefined}
-    />
+    <group>
+      <instancedMesh 
+        ref={bodyMeshRef} 
+        args={[bodyGeom, material, 5000]} 
+        castShadow={!isGhost} 
+        receiveShadow={!isGhost}
+        onPointerDown={handlePointerDown}
+        onContextMenu={handlePointerDown}
+        raycast={isGhost ? () => null : undefined}
+      />
+      <instancedMesh 
+        ref={studMeshRef} 
+        args={[studGeom, material, 5000 * w * d]} 
+        castShadow={!isGhost} 
+        receiveShadow={!isGhost}
+        onPointerDown={handlePointerDown}
+        onContextMenu={handlePointerDown}
+        raycast={isGhost ? () => null : undefined}
+      />
+    </group>
   );
 };
