@@ -5,7 +5,7 @@ import { XR } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
 import { BrickInstances } from './BrickInstances';
-import { useLegoStore, checkPlacementValid, getBrickDimensions, PRESETS } from '../Store';
+import { useLegoStore, checkPlacementValid, checkStructureValid, getBrickDimensions, PRESETS } from '../Store';
 
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const bricks = useLegoStore((state) => state.bricks);
@@ -48,22 +48,37 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     e.stopPropagation();
     const point = e.point;
     if (!point) return;
+    
     const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
-    const { widthX, depthZ } = getBrickWorldDimensions(selectedType, ghostRotation);
     const nudge = 0.001;
     const hitX = point.x + normal.x * nudge;
     const hitY = point.y + normal.y * nudge;
     const hitZ = point.z + normal.z * nudge;
-    let targetX, targetY, targetZ;
+
+    const { w, d } = getBrickDimensions(selectedType);
+    const rot = Math.round(ghostRotation / 90) % 4;
+    const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
+    const effW = isRot ? d : w;
+    const effD = isRot ? w : d;
+
+    const alignSnap = (val: number, count: number, step: number) => {
+      if (count % 2 === 1) {
+        return Math.round(val / step) * step;
+      } else {
+        return Math.floor(val / step) * step + (step / 2);
+      }
+    };
+
+    let targetX = alignSnap(hitX, effW, MODULE_SIZE);
+    let targetZ = alignSnap(hitZ, effD, MODULE_SIZE);
+    let targetY;
+    
     if (Math.abs(normal.y) > 0.5) {
-        targetX = snapToGrid(hitX, HALF_MODULE);
-        targetZ = snapToGrid(hitZ, HALF_MODULE);
-        targetY = snapToGrid(hitY, BRICK_HEIGHT);
+      targetY = Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
     } else {
-        targetX = snapToGrid(hitX + normal.x * (widthX / 2), HALF_MODULE);
-        targetZ = snapToGrid(hitZ + normal.z * (depthZ / 2), HALF_MODULE);
-        targetY = snapToGrid(point.y, BRICK_HEIGHT);
+      targetY = Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) * BRICK_HEIGHT;
     }
+    
     setGhostPosition([targetX, Math.max(0, targetY), targetZ]);
   };
 
@@ -79,24 +94,6 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     return status.valid;
   }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
 
-  const handleClick = (e: any) => {
-    e.stopPropagation();
-    if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
-    
-    if (activePreset) {
-      commitPreset(ghostPosition);
-      return;
-    }
-    if (mode === 'Build' && isValidPlacement) {
-      addBrick({
-        type: selectedType,
-        color: selectedColor,
-        position: ghostPosition,
-        rotation: ghostRotation
-      });
-    }
-  };
-
   const presetBricks = useMemo(() => {
     if (!activePreset || !PRESETS[activePreset]) return [];
     return PRESETS[activePreset].map(b => ({
@@ -108,6 +105,29 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       ] as [number, number, number]
     }));
   }, [activePreset, ghostPosition]);
+
+  const isValidStructurePlacement = useMemo(() => {
+    if (mode !== 'Build' || !activePreset) return false;
+    return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
+  }, [bricks, presetBricks, activePreset, mode]);
+
+  const handleClick = (e: any) => {
+    e.stopPropagation();
+    if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
+    
+    if (activePreset && isValidStructurePlacement) {
+      commitPreset(ghostPosition);
+      return;
+    }
+    if (mode === 'Build' && !activePreset && isValidPlacement) {
+      addBrick({
+        type: selectedType,
+        color: selectedColor,
+        position: ghostPosition,
+        rotation: ghostRotation
+      });
+    }
+  };
 
   // Optimization: Group bricks by [type, color] for InstancedMesh rendering
   const groupedBricks = useMemo(() => {
@@ -134,8 +154,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     <>
       {xrStore ? (
         <XR store={xrStore}>
-          <color attach="background" args={['#87CEEB']} />
-          <fog attach="fog" args={['#87CEEB', 20, 60]} />
+          <color attach="background" args={['#4da6ff']} />
+          <fog attach="fog" args={['#4da6ff', 50, 300]} />
           <ambientLight intensity={0.4} />
           <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
@@ -155,7 +175,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {mode === 'Build' && !activePreset && (
+              {mode === 'Build' && !activePreset && isValidPlacement && (
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
@@ -166,7 +186,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 />
               )}
 
-              {activePreset && (
+              {activePreset && isValidStructurePlacement && (
                 <>
                   {Object.entries(groupedPresetBricks).map(([key, group]) => {
                     const [type, color] = key.split('_');
@@ -198,8 +218,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
         </XR>
       ) : (
         <>
-          <color attach="background" args={['#87CEEB']} />
-          <fog attach="fog" args={['#87CEEB', 20, 60]} />
+          <color attach="background" args={['#4da6ff']} />
+          <fog attach="fog" args={['#4da6ff', 50, 300]} />
           <ambientLight intensity={0.4} />
           <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
@@ -219,7 +239,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {mode === 'Build' && !activePreset && (
+              {mode === 'Build' && !activePreset && isValidPlacement && (
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
@@ -230,7 +250,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 />
               )}
 
-              {activePreset && (
+              {activePreset && isValidStructurePlacement && (
                 <>
                   {Object.entries(groupedPresetBricks).map(([key, group]) => {
                     const [type, color] = key.split('_');

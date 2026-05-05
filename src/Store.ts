@@ -98,6 +98,40 @@ export const checkPlacementValid = (
   return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
 };
 
+export const checkStructureValid = (
+  bricks: Omit<BrickData, 'color'>[],
+  presetBricks: Omit<BrickData, 'color'>[],
+  moduleSize: number,
+  brickHeight: number,
+  epsilon: number = 0.01
+) => {
+  if (presetBricks.length === 0) return false;
+  const minY = Math.min(...presetBricks.map(b => b.position[1]));
+  const baseBricks = presetBricks.filter(b => b.position[1] === minY);
+  
+  let isValidPlacement = false;
+  if (minY <= epsilon) {
+    isValidPlacement = true;
+  } else {
+    for (const baseBrick of baseBricks) {
+      const dummyValid = checkPlacementValid(bricks, baseBrick, moduleSize, brickHeight, epsilon);
+      if (dummyValid.valid) {
+        isValidPlacement = true;
+        break;
+      }
+    }
+  }
+
+  if (!isValidPlacement) return false;
+
+  const hasOverlap = presetBricks.some(pb => {
+    const dummyValid = checkPlacementValid(bricks, pb, moduleSize, brickHeight, epsilon);
+    return !dummyValid.valid && dummyValid.reason === 'overlap';
+  });
+
+  return !hasOverlap;
+};
+
 export type AppMode = 'Build' | 'Move' | 'Delete';
 
 interface HistoryState {
@@ -379,37 +413,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }));
 
     // STRUCTURE PLACEMENT VALIDATION
-    // Find the base layer (minimum Y)
-    const minY = Math.min(...presetBricks.map(b => b.position[1]));
-    const baseBricks = presetBricks.filter(b => b.position[1] === minY);
-    
-    // Check if at least one base brick is validly placed (grounded or connected)
-    const epsilon = 0.01;
-    let isValidPlacement = false;
-    
-    if (minY <= epsilon) {
-      isValidPlacement = true; // Grounded
-    } else {
-      // Check if any base brick connects to existing bricks
-      // (Using the same connection logic as checkPlacementValid)
-      for (const baseBrick of baseBricks) {
-        const dummyValid = checkPlacementValid(bricks, baseBrick, ms, bh, epsilon);
-        // We only care if it's connected (overlap means invalid, but checkPlacementValid returns valid=false for overlap)
-        if (dummyValid.valid) {
-          isValidPlacement = true;
-          break;
-        }
-      }
-    }
-    
-    // Additionally, check for NO OVERLAPS with existing bricks
-    const hasOverlap = presetBricks.some(pb => {
-      const dummyValid = checkPlacementValid(bricks, pb, ms, bh, epsilon);
-      return !dummyValid.valid && dummyValid.reason === 'overlap';
-    });
-
-    if (!isValidPlacement || hasOverlap) {
-      // DO NOT place the structure at all
+    if (!checkStructureValid(bricks, presetBricks, ms, bh)) {
       return;
     }
 
