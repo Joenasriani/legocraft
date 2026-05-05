@@ -1,0 +1,6 @@
+{
+  "name": "BrickXR",
+  "description": "Immersive Lego building game for Mixed Reality with hand tracking, physics, and grid snapping.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
