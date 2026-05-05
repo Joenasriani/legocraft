@@ -1,11 +1,11 @@
-import React, { Suspense, useState, useRef, useEffect } from 'react';
+import React, { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
 import { Physics, RigidBody } from '@react-three/rapier';
 import { XR, createXRStore } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
-import { useLegoStore, getOccupiedCells } from '../Store';
+import { useLegoStore, getOccupiedCells, getBrickDimensions } from '../Store';
 
 // Access the singleton store created in App.tsx (or export it if needed, 
 // for simplicity we will just rely on the XR component not needing a specific store
@@ -35,60 +35,81 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
   const snapToGrid = (val: number, step: number) => Math.round(val / step) * step;
 
-  // Handle building placement
+  const getBrickWorldDimensions = (type: string, rotation: number) => {
+    const { w, d } = getBrickDimensions(type as any);
+    const rot = Math.round(rotation / 90) % 4;
+    const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
+    const effW = isRot ? d : w;
+    const effD = isRot ? w : d;
+    return {
+      widthX: effW * MODULE_SIZE,
+      depthZ: effD * MODULE_SIZE
+    };
+  };
+
   const handlePointerMove = (e: any) => {
     if (mode !== 'Build') return;
+    e.stopPropagation();
+    
     const point = e.point;
     const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
 
     if (point) {
-      // Offset point outwards slightly along the normal so it snaps to the *next* block space
-      const x = point.x + normal.x * HALF_MODULE * 0.1;
-      const y = point.y + normal.y * BRICK_HEIGHT * 0.1;
-      const z = point.z + normal.z * HALF_MODULE * 0.1;
+      const { widthX, depthZ } = getBrickWorldDimensions(selectedType, ghostRotation);
+      
+      let targetX = point.x + normal.x * (widthX / 2);
+      let targetY = point.y;
+      
+      if (Math.abs(normal.y) > 0.5) {
+          targetY = normal.y > 0 ? point.y : point.y - BRICK_HEIGHT;
+      } else {
+          // Snap downward more aggressively if clicking on a side wall so it aligns
+          targetY = Math.floor(point.y / BRICK_HEIGHT) * BRICK_HEIGHT; 
+      }
+      let targetZ = point.z + normal.z * (depthZ / 2);
 
       setGhostPosition([
-        snapToGrid(x, HALF_MODULE),
-        Math.max(0, snapToGrid(y, BRICK_HEIGHT)),
-        snapToGrid(z, HALF_MODULE)
+        snapToGrid(targetX, HALF_MODULE),
+        Math.max(0, snapToGrid(targetY, BRICK_HEIGHT)),
+        snapToGrid(targetZ, HALF_MODULE)
       ]);
     }
   };
 
+  // Real-time overlap check for the ghost brick
+  const isOverlap = useMemo(() => {
+    if (mode !== 'Build') return false;
+    const EPSILON = 0.01;
+    const ghostBrickData = {
+      id: 'ghost',
+      type: selectedType,
+      color: selectedColor,
+      position: ghostPosition,
+      rotation: ghostRotation
+    };
+    const ghostCells = getOccupiedCells(ghostBrickData, MODULE_SIZE);
+
+    return bricks.some(b => {
+      if (Math.abs(b.position[1] - ghostPosition[1]) > EPSILON) return false;
+      const bCells = getOccupiedCells(b, MODULE_SIZE);
+      return ghostCells.some(gc => 
+        bCells.some(bc => 
+          Math.abs(gc.x - bc.x) < EPSILON && 
+          Math.abs(gc.z - bc.z) < EPSILON
+        )
+      );
+    });
+  }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
+
   const handleClick = (e: any) => {
     e.stopPropagation();
-    if (mode === 'Build') {
-      const EPSILON = 0.01;
-      // Get the cells the new brick will occupy
-      const ghostBrickData = {
-        id: 'ghost',
+    if (mode === 'Build' && !isOverlap) {
+      addBrick({
         type: selectedType,
         color: selectedColor,
         position: ghostPosition,
         rotation: ghostRotation
-      };
-      const ghostCells = getOccupiedCells(ghostBrickData, MODULE_SIZE);
-
-      // Check if any existing bricks occupy the same cells at the same height
-      const overlap = bricks.some(b => {
-        if (Math.abs(b.position[1] - ghostPosition[1]) > EPSILON) return false;
-        const bCells = getOccupiedCells(b, MODULE_SIZE);
-        return ghostCells.some(gc => 
-          bCells.some(bc => 
-            Math.abs(gc.x - bc.x) < EPSILON && 
-            Math.abs(gc.z - bc.z) < EPSILON
-          )
-        );
       });
-
-      if (!overlap) {
-        addBrick({
-          type: selectedType,
-          color: selectedColor,
-          position: ghostPosition,
-          rotation: ghostRotation
-        });
-      }
     }
   };
 
@@ -118,7 +139,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 <LegoBrick 
                   id="ghost" 
                   type={selectedType} 
-                  color={selectedColor} 
+                  color={isOverlap ? '#ff0000' : selectedColor} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 

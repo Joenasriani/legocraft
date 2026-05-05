@@ -59,14 +59,16 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   const handlePointerMove = (e: any) => {
     if (isGrabbed && rigidBodyRef.current) {
       e.stopPropagation();
-      // On move, we want the grabbed brick to follow the pointer/ray
-      // The `e.point` provides the 3D position where mouse/ray hits an imaginary plane/object
-      // This is dynamic, so we just set translation loosely towards the point
       if (e.point) {
+        // Snap while dragging for tactile feedback
+        const snappedX = Math.round(e.point.x / halfModule) * halfModule;
+        const snappedY = Math.max(0, Math.round(e.point.y / BRICK_HEIGHT) * BRICK_HEIGHT);
+        const snappedZ = Math.round(e.point.z / halfModule) * halfModule;
+        
         rigidBodyRef.current.setNextKinematicTranslation({
-          x: e.point.x,
-          y: e.point.y + BRICK_HEIGHT,
-          z: e.point.z
+          x: snappedX,
+          y: snappedY,
+          z: snappedZ
         });
       }
     }
@@ -170,13 +172,13 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
     >
       <RigidBody 
         ref={rigidBodyRef}
-        type={isGrabbed || isPlacementGhost ? "kinematicPosition" : "dynamic"}
+        type={isGrabbed || isPlacementGhost ? "kinematicPosition" : "fixed"}
         colliders={false}
         position={position}
         rotation={[0, (rotation * Math.PI) / 180, 0]}
         enabledRotations={[false, true, false]}
       >
-        <group>
+        <group position={[0, BRICK_HEIGHT / 2, 0]}>
           {/* Main Body */}
           <RoundedBox
             args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]}
@@ -218,7 +220,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
         </group>
         
         {/* Simplified Collider */}
-        <CuboidCollider args={[width / 2, BRICK_HEIGHT / 2, depth / 2]} />
+        <CuboidCollider args={[width / 2, BRICK_HEIGHT / 2, depth / 2]} position={[0, BRICK_HEIGHT / 2, 0]} />
       </RigidBody>
     </group>
   );
