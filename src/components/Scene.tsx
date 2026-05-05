@@ -81,6 +81,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
   const handleClick = (e: any) => {
     e.stopPropagation();
+    if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
+    
     if (activePreset) {
       commitPreset(ghostPosition);
       return;
@@ -137,7 +139,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
           
           <Suspense fallback={null}>
-            <group onPointerMove={handlePointerMove} onPointerDown={handleClick}>
+            <group onPointerMove={handlePointerMove} onPointerDown={handleClick} onContextMenu={(e) => { e.stopPropagation(); }}>
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {
                 const [type, color] = key.split('_');
@@ -201,7 +203,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
           
           <Suspense fallback={null}>
-            <group onPointerMove={handlePointerMove} onPointerDown={handleClick}>
+            <group onPointerMove={handlePointerMove} onPointerDown={handleClick} onContextMenu={(e) => { e.stopPropagation(); }}>
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {
                 const [type, color] = key.split('_');

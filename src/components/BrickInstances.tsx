@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { getBrickDimensions } from '../Store';
+import { getBrickDimensions, useLegoStore } from '../Store';
 
 interface BrickInstancesProps {
   type: any;
@@ -17,6 +17,22 @@ const STUD_HEIGHT = 0.016;
 
 export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bricks, isGhost }) => {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const removeBrick = useLegoStore(state => state.removeBrick);
+  const mode = useLegoStore(state => state.mode);
+
+  const handlePointerDown = (e: any) => {
+    if (isGhost) return;
+    
+    // Deletion: either Delete mode (left click) or Squeeze/Right-Click (button === 2)
+    const isSqueeze = e.button === 2 || e.nativeEvent?.type === 'contextmenu';
+    if (mode === 'Delete' || isSqueeze) {
+      e.stopPropagation();
+      const instanceId = e.instanceId;
+      if (instanceId !== undefined && bricks[instanceId]) {
+        removeBrick(bricks[instanceId].id);
+      }
+    }
+  };
   
   const geometry = useMemo(() => {
     try {
@@ -109,6 +125,9 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
       args={[geometry, material, 5000]} 
       castShadow={!isGhost} 
       receiveShadow={!isGhost}
+      onPointerDown={handlePointerDown}
+      onContextMenu={handlePointerDown}
+      raycast={isGhost ? () => null : undefined}
     />
   );
 };

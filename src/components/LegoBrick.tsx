@@ -57,24 +57,26 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
     }
   };
 
+  const ghostRaycast = isPlacementGhost ? () => null : undefined;
+
   return (
     <group 
       position={position}
       rotation={[0, (rotation * Math.PI) / 180, 0]}
-      onPointerDown={handleSelectStart} 
-      onPointerUp={handleSelectEnd}
-      onPointerMove={handlePointerMove}
-      onContextMenu={handleRotate}
+      onPointerDown={isPlacementGhost ? undefined : handleSelectStart} 
+      onPointerUp={isPlacementGhost ? undefined : handleSelectEnd}
+      onPointerMove={isPlacementGhost ? undefined : handlePointerMove}
+      onContextMenu={isPlacementGhost ? undefined : handleRotate}
     >
       <group position={[0, BRICK_HEIGHT / 2, 0]}>
         {hideMesh ? (
-          <mesh>
+          <mesh raycast={ghostRaycast}>
             <boxGeometry args={[width, BRICK_HEIGHT, depth]} />
             <meshBasicMaterial transparent opacity={0} depthWrite={false} />
           </mesh>
         ) : (
           <>
-            <mesh>
+            <mesh raycast={ghostRaycast}>
               <boxGeometry args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]} />
               <meshStandardMaterial 
                 color={color} 
@@ -89,6 +91,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
               Array.from({ length: d }).map((_, j) => (
                 <mesh 
                   key={`${i}-${j}`} 
+                  raycast={ghostRaycast}
                   position={[
                     (i - (w - 1) / 2) * MODULE_SIZE,
                     BRICK_HEIGHT / 2 + STUD_HEIGHT / 2,

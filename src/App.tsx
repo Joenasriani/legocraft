@@ -12,7 +12,13 @@ import { createXRStore } from '@react-three/xr';
 
 const xrStore = createXRStore({
   hand: true,
-  controller: true,
+  controller: {
+    rayPointer: {
+      rayModel: {
+        color: '#ff0000',
+      }
+    }
+  },
 });
 
 const BRICK_TYPES: BrickType[] = ['1x1', '1x2', '2x2', '2x3', '2x4'];
