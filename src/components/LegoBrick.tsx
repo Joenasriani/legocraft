@@ -48,8 +48,6 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
     }
   };
 
-  const handlePointerMove = (e: any) => {};
-
   const handleRotate = (e: any) => {
     e.stopPropagation();
     if (isGrabbed && !isPlacementGhost) {
@@ -65,7 +63,6 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
       rotation={[0, (rotation * Math.PI) / 180, 0]}
       onPointerDown={isPlacementGhost ? undefined : handleSelectStart} 
       onPointerUp={isPlacementGhost ? undefined : handleSelectEnd}
-      onPointerMove={isPlacementGhost ? undefined : handlePointerMove}
       onContextMenu={isPlacementGhost ? undefined : handleRotate}
     >
       <group position={[0, BRICK_HEIGHT / 2, 0]}>

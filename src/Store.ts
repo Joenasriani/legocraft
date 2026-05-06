@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export type BrickType = '1x1' | '1x2' | '2x2' | '2x3' | '2x4';
+export const BRICK_TYPES: BrickType[] = ['1x1', '1x2', '2x2', '2x3', '2x4'];
 
 export interface BrickData {
   id: string;
@@ -9,6 +10,16 @@ export interface BrickData {
   position: [number, number, number];
   rotation: number; // Y-axis rotation in degrees
 }
+
+export const isValidBrickData = (item: any): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  if (typeof item.id !== 'string') return false;
+  if (!BRICK_TYPES.includes(item.type)) return false;
+  if (typeof item.color !== 'string') return false;
+  if (!Array.isArray(item.position) || item.position.length !== 3 || !item.position.every((n: any) => typeof n === 'number' && Number.isFinite(n))) return false;
+  if (typeof item.rotation !== 'number' || !Number.isFinite(item.rotation)) return false;
+  return true;
+};
 
 export const getBrickDimensions = (type: BrickType) => {
   switch (type) {
@@ -51,13 +62,14 @@ export const checkPlacementValid = (
   ghostData: Omit<BrickData, 'color'>, 
   moduleSize: number, 
   brickHeight: number, 
-  epsilon: number = 0.01
+  epsilon: number = 0.01,
+  ignoreBrickId?: string
 ) => {
   const ghostCells = getOccupiedCells(ghostData, moduleSize);
 
   // MUST NOT OVERLAP
   const isOverlap = bricks.some(b => {
-    if (b.id === ghostData.id) return false;
+    if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId)) return false;
     if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
     const bCells = getOccupiedCells(b, moduleSize);
     return ghostCells.some(gc => 
@@ -74,25 +86,21 @@ export const checkPlacementValid = (
   if (ghostData.position[1] <= epsilon) return { valid: true, reason: 'grounded' };
 
   // Connection check (Support from below)
-  const isSupported = bricks.some(b => {
-    if (b.id === ghostData.id) return false;
-    
-    // The brick below must be exactly `brickHeight` below the ghost brick.
-    // The ghost is at y, the supporting brick is at y - brickHeight.
-    // So ghostData.position[1] - b.position[1] should be roughly brickHeight.
-    const dy = ghostData.position[1] - b.position[1];
-    
-    if (Math.abs(dy - brickHeight) < epsilon) {
-      const bCells = getOccupiedCells(b, moduleSize);
-      return ghostCells.some(gc => 
-        bCells.some(bc => 
+  // EVERY occupied footprint cell MUST be supported by at least one brick below
+  const isSupported = ghostCells.every(gc => {
+    return bricks.some(b => {
+      if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId)) return false;
+      
+      const dy = ghostData.position[1] - b.position[1];
+      if (Math.abs(dy - brickHeight) < epsilon) {
+        const bCells = getOccupiedCells(b, moduleSize);
+        return bCells.some(bc => 
           Math.abs(gc.x - bc.x) < epsilon && 
           Math.abs(gc.z - bc.z) < epsilon
-        )
-      );
-    }
-    
-    return false;
+        );
+      }
+      return false;
+    });
   });
 
   return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
@@ -105,55 +113,18 @@ export const hasBrickAbove = (
   brickHeight: number,
   epsilon: number = 0.01
 ) => {
-  const myCells = getOccupiedCells(brick, moduleSize);
-
-  return bricks.some(b => {
-    if (b.id === brick.id) return false;
-    const dy = b.position[1] - brick.position[1];
-    if (Math.abs(dy - brickHeight) < epsilon) {
-      const bCells = getOccupiedCells(b, moduleSize);
-      return myCells.some(mc => 
-        bCells.some(bc => 
-          Math.abs(mc.x - bc.x) < epsilon && 
-          Math.abs(mc.z - bc.z) < epsilon
-        )
-      );
-    }
-    return false;
-  });
-};
-
-export const checkPresetInternalSupport = (
-  presetBricks: Omit<BrickData, 'color'>[],
-  moduleSize: number,
-  brickHeight: number,
-  epsilon: number = 0.01
-) => {
-  for (const brick of presetBricks) {
-    if (brick.position[1] <= epsilon) continue;
-
-    const myCells = getOccupiedCells(brick, moduleSize);
-
-    const hasSupport = presetBricks.some(b => {
-      if (b.id === brick.id) return false;
-      const dy = brick.position[1] - b.position[1];
-      if (Math.abs(dy - brickHeight) < epsilon) {
-        const bCells = getOccupiedCells(b, moduleSize);
-        return myCells.some(mc => 
-          bCells.some(bc => 
-            Math.abs(mc.x - bc.x) < epsilon && 
-            Math.abs(mc.z - bc.z) < epsilon
-          )
-        );
-      }
-      return false;
-    });
-
-    if (!hasSupport) {
-      return false;
+  // A brick can be deleted/moved ONLY if every brick above remains valid after removal.
+  // We check all bricks above this one. If removing this brick makes ANY of them float, we block it.
+  const bricksAbove = bricks.filter(b => b.position[1] > brick.position[1] + epsilon);
+  
+  for (const b of bricksAbove) {
+    const check = checkPlacementValid(bricks, b, moduleSize, brickHeight, epsilon, brick.id);
+    if (!check.valid) {
+      return true; // Removing `brick` leaves this brick above unsupported -> act as "hasBrickAbove" (cannot delete/move)
     }
   }
-  return true;
+  
+  return false;
 };
 
 export const checkStructureValid = (
@@ -163,13 +134,8 @@ export const checkStructureValid = (
   brickHeight: number,
   epsilon: number = 0.01,
   presetName?: string
-) => {
-  if (presetBricks.length === 0) return false;
-
-  if (!checkPresetInternalSupport(presetBricks, moduleSize, brickHeight, epsilon)) {
-    if (presetName) console.warn(`Preset ${presetName} failed internal support validation.`);
-    return false;
-  }
+): { valid: boolean, reason?: string } => {
+  if (presetBricks.length === 0) return { valid: false, reason: 'empty preset' };
 
   const minY = Math.min(...presetBricks.map(b => b.position[1]));
   const baseBricks = presetBricks.filter(b => b.position[1] === minY);
@@ -178,23 +144,22 @@ export const checkStructureValid = (
   if (minY <= epsilon) {
     isValidPlacement = true;
   } else {
-    for (const baseBrick of baseBricks) {
+    isValidPlacement = baseBricks.every(baseBrick => {
       const dummyValid = checkPlacementValid(bricks, baseBrick, moduleSize, brickHeight, epsilon);
-      if (dummyValid.valid) {
-        isValidPlacement = true;
-        break;
-      }
-    }
+      return dummyValid.valid;
+    });
   }
 
-  if (!isValidPlacement) return false;
+  if (!isValidPlacement) return { valid: false, reason: 'unsupported' };
 
   const hasOverlap = presetBricks.some(pb => {
     const dummyValid = checkPlacementValid(bricks, pb, moduleSize, brickHeight, epsilon);
     return !dummyValid.valid && dummyValid.reason === 'overlap';
   });
 
-  return !hasOverlap;
+  if (hasOverlap) return { valid: false, reason: 'overlap' };
+
+  return { valid: true };
 };
 
 export type PresetName = 'tree' | 'cabin' | 'round_water_well' | 'pine_tree' | 'walk_in_castle';
@@ -698,7 +663,13 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const { activePreset, bricks, undoStack } = get();
     if (!activePreset) return;
 
-    const presetBricks = PRESETS[activePreset].map(b => ({
+    const validPresetBricks = PRESETS[activePreset].filter(b => {
+      const valid = isValidBrickData(b);
+      if (!valid) console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+      return valid;
+    });
+
+    const presetBricks = validPresetBricks.map(b => ({
       ...b,
       id: crypto.randomUUID(),
       position: [
@@ -709,7 +680,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }));
 
     // STRUCTURE PLACEMENT VALIDATION
-    if (!checkStructureValid(bricks, presetBricks, ms, bh, 0.01, activePreset)) {
+    const check = checkStructureValid(bricks, presetBricks, ms, bh, 0.01, activePreset);
+    if (!check.valid) {
+      console.warn('Preset placement blocked:', check.reason);
       return;
     }
 

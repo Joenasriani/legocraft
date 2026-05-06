@@ -127,10 +127,18 @@ export default function App() {
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(true);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [vrStatus, setVrStatus] = useState<'pending' | 'ready' | 'unsupported'>('pending');
 
   useEffect(() => {
+    if (navigator.xr && navigator.xr.isSessionSupported) {
+      navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+        setVrStatus(supported ? 'ready' : 'unsupported');
+      });
+    } else {
+      setVrStatus('unsupported');
+    }
     const handleGlobalClick = () => setShowPresetMenu(false);
     window.addEventListener('pointerdown', handleGlobalClick);
     return () => window.removeEventListener('pointerdown', handleGlobalClick);
@@ -141,9 +149,30 @@ export default function App() {
     const saved = localStorage.getItem('brickxr-save');
     if (saved) {
       try {
-        setBricks(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) throw new Error('Not an array');
+        
+        let isValid = true;
+        for (const item of parsed) {
+          if (!item || typeof item !== 'object') isValid = false;
+          else if (typeof item.id !== 'string') isValid = false;
+          else if (!BRICK_TYPES.includes(item.type)) isValid = false;
+          else if (typeof item.color !== 'string') isValid = false;
+          else if (!Array.isArray(item.position) || item.position.length !== 3 || !item.position.every((n: any) => typeof n === 'number' && Number.isFinite(n))) isValid = false;
+          else if (typeof item.rotation !== 'number' || !Number.isFinite(item.rotation)) isValid = false;
+          
+          if (!isValid) break;
+        }
+
+        if (isValid) {
+          setBricks(parsed);
+        } else {
+          throw new Error('Invalid save data format');
+        }
       } catch (e) {
         console.error("Failed to load save", e);
+        useLegoStore.getState().setToastMessage("Saved build could not be loaded, so a fresh scene was started.");
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 4000);
       }
     }
   }, []);
@@ -158,25 +187,11 @@ export default function App() {
     }
   };
 
-  const handleExportSTL = () => {
-    // This is a simplified export. A real one would need to traverse the scene 
-    // and extract meshes. Since we're in a browser app, we'll try to find 
-    // all mesh objects in the scene.
-    // In React Three Fiber, we'd ideally use a ref to the scene.
-    // For this demo, we'll show the intent.
-    alert("Exporting STL... (In a full app, this would merge geometries)");
-  };
-
-  const handlePunchAll = () => {
-    // Signal to bricks to apply an impulse
-    window.dispatchEvent(new CustomEvent('punch-all'));
-  };
-
   return (
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
-        <Canvas shadows camera={{ position: [0.5, 0.5, 0.5], fov: 60 }}>
+        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }} gl={{ preserveDrawingBuffer: true }}>
           <Scene xrStore={xrStore} />
         </Canvas>
       </div>
@@ -196,24 +211,31 @@ export default function App() {
             BRICK <span className="font-light opacity-60">XR</span>
           </div>
           <div className="flex gap-4">
-            <button 
-              onClick={() => {
-                const xrErrorMsg = "VR not supported or no hardware found.";
-                try {
-                  const p = xrStore.enterVR();
-                  if (p && p.catch) {
-                    p.catch(() => alert(xrErrorMsg));
+            {vrStatus === 'ready' && (
+              <button 
+                onClick={() => {
+                  const xrErrorMsg = "VR not supported or no hardware found.";
+                  try {
+                    const p = xrStore.enterVR();
+                    if (p && p.catch) {
+                      p.catch(() => alert(xrErrorMsg));
+                    }
+                  } catch (e) {
+                    alert(xrErrorMsg);
                   }
-                } catch (e) {
-                  alert(xrErrorMsg);
-                }
-              }} 
-              className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
-            >
-              Enter VR
-            </button>
-            <div className="bg-green-500/20 border border-green-500/40 text-green-400 px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center">
-              WebXR Ready
+                }} 
+                className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
+                title="Enter VR Session"
+              >
+                Enter VR
+              </button>
+            )}
+            <div className={`px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center border ${
+              vrStatus === 'ready' ? 'bg-green-500/20 border-green-500/40 text-green-400' :
+              vrStatus === 'pending' ? 'bg-gray-500/20 border-gray-500/40 text-gray-400' :
+              'bg-red-500/20 border-red-500/40 text-red-400'
+            }`}>
+              {vrStatus === 'ready' ? 'VR Ready' : vrStatus === 'pending' ? 'Checking VR...' : 'Open in Quest Browser for VR'}
             </div>
           </div>
         </div>
@@ -221,26 +243,30 @@ export default function App() {
         {/* Center UI (Sidebars) */}
         <div className="flex justify-between items-center h-full sm:px-4 pointer-events-none">
           {/* Left Tools */}
-          <div className="glass-panel w-16 p-3 rounded-2xl flex flex-col gap-4 pointer-events-auto">
+          <div className="glass-panel w-20 p-3 rounded-2xl flex flex-col items-center gap-3 pointer-events-auto">
             <ToolIconButton 
               icon={<BuildIcon size={24} />} 
               active={mode === 'Build'} 
               onClick={() => setMode('Build')} 
+              title="Build Mode"
             />
             <ToolIconButton 
               icon={<MoveIcon size={24} />} 
               active={mode === 'Move'} 
               onClick={() => setMode('Move')} 
-            />
-            <ToolIconButton 
-              icon={<DeleteIcon size={24} />} 
-              active={mode === 'Delete'} 
-              onClick={() => setMode('Delete')} 
+              title="Move Mode"
             />
             <ToolIconButton 
               icon={<RotateIcon size={24} />} 
               active={false} 
               onClick={() => window.dispatchEvent(new CustomEvent('rotate-ghost'))} 
+              title="Rotate Brick"
+            />
+            <ToolIconButton 
+              icon={<DeleteIcon size={24} />} 
+              active={mode === 'Delete'} 
+              onClick={() => setMode('Delete')} 
+              title="Delete Mode"
             />
           </div>
 
@@ -250,10 +276,12 @@ export default function App() {
               <button
                 key={color}
                 onClick={() => setSelectedColor(color)}
-                className={`w-6 h-6 rounded-md border-2 transition-all hover:scale-110 ${
-                  selectedColor === color ? 'border-white scale-110' : 'border-transparent'
+                className={`w-10 h-10 rounded-full border-2 transition-all shadow-sm ${
+                  selectedColor === color ? 'border-white scale-110 shadow-md ring-2 ring-white/20' : 'border-white/10 opacity-80 hover:opacity-100 hover:scale-105'
                 }`}
                 style={{ backgroundColor: color }}
+                title={`Select color: ${color}`}
+                aria-label={`Select color: ${color}`}
               />
             ))}
           </div>
@@ -279,6 +307,7 @@ export default function App() {
                         ? 'bg-accent text-white' 
                         : 'text-white/60 hover:bg-white/5 hover:text-white'
                     }`}
+                    title={`Select brick type: ${type}`}
                   >
                     {type}
                   </button>
@@ -290,19 +319,26 @@ export default function App() {
           {/* Core Actions */}
           <div className="glass-panel w-full max-w-3xl p-4 rounded-[20px] flex justify-between items-center pointer-events-auto shadow-2xl">
             <div className="flex gap-3">
-              <button onClick={undo} className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
+              <button onClick={undo} title="Undo" className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
                 Undo
               </button>
-              <button onClick={redo} className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
+              <button onClick={redo} title="Redo" className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
                 Redo
               </button>
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handlePunchAll} className="text-orange-400 hover:text-orange-300 px-3 py-2 text-[13px] font-semibold transition-colors">
-                Punch
-              </button>
-              <button onClick={clearAll} className="text-red-400 hover:text-red-300 px-3 py-2 text-[13px] font-semibold transition-colors">
+              <button 
+                onClick={() => {
+                  if (bricks.length === 0) {
+                    useLegoStore.getState().setToastMessage("Nothing to clear.");
+                  } else {
+                    setShowClearConfirm(true);
+                  }
+                }} 
+                title="Clear all bricks" 
+                className="text-red-400 hover:text-red-300 px-3 py-2 text-[13px] font-semibold transition-colors"
+              >
                 Clear
               </button>
               <div className="w-px h-6 bg-glass-border self-center" />
@@ -313,6 +349,7 @@ export default function App() {
                     setShowPresetMenu(!showPresetMenu);
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
+                  title="Toggle Presets Menu"
                   className="text-emerald-400 hover:text-emerald-300 px-3 py-2 text-[13px] font-semibold transition-colors flex items-center gap-1"
                 >
                   <PresetsIcon size={16} /> Presets
@@ -333,6 +370,7 @@ export default function App() {
                             useLegoStore.getState().loadPreset(preset.id);
                             setShowPresetMenu(false);
                           }}
+                          title={`Place ${preset.name} Preset`}
                           className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
                         >
                           <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">{preset.icon}</span>
@@ -347,13 +385,10 @@ export default function App() {
                 </AnimatePresence>
               </div>
               <div className="w-px h-6 bg-glass-border self-center" />
-              <button onClick={handleScreenshot} className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
+              <button onClick={handleScreenshot} title="Capture Screenshot" className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
                 Screenshot
               </button>
-              <button onClick={handleExportSTL} className="bg-accent border border-white/20 px-6 py-2.5 rounded-xl text-[13px] font-semibold hover:brightness-110 transition-all shadow-xl">
-                Export STL
-              </button>
-              <button onClick={() => setShowHelp(true)} className="p-2 text-white/40 hover:text-white transition-colors">
+              <button onClick={() => setShowHelp(true)} title="Show Help" className="p-2 text-white/40 hover:text-white transition-colors">
                 <HelpIcon size={20} />
               </button>
             </div>
@@ -377,11 +412,12 @@ export default function App() {
             >
               <h2 className="text-4xl font-light mb-3">Immersive Building</h2>
               <p className="text-white/60 mb-8 leading-relaxed text-[15px]">
-                Pinch to grab and snap bricks to the spatial grid. Use your left hand to select colors and right hand to change building tools.
+                Welcome to Brick XR. Build, move, and rotate your bricks using the UI tools. VR mode allows you to explore your creations immersively.
               </p>
               
               <button 
                 onClick={() => setShowHelp(false)}
+                title="Enter Workspace"
                 className="w-full bg-white text-black font-bold py-4 rounded-2xl transition-transform active:scale-[0.98] shadow-2xl"
               >
                 Enter Workspace
@@ -390,19 +426,60 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {showClearConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[100] flex items-center justify-center bg-black/60 pointer-events-auto backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: -10 }}
+              className="glass-panel p-6 rounded-2xl max-w-sm w-[90%] flex flex-col items-center text-center shadow-2xl"
+            >
+              <h3 className="text-xl font-bold mb-2">Clear all bricks?</h3>
+              <p className="text-white/70 text-sm mb-6">This can be undone.</p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    clearAll();
+                    setShowClearConfirm(false);
+                    useLegoStore.getState().setToastMessage("Build cleared.");
+                  }}
+                  className="flex-1 bg-red-500/20 text-red-300 border border-red-500/50 hover:bg-red-500/30 hover:text-red-200 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ToolIconButton({ icon, active, onClick }: any) {
+function ToolIconButton({ icon, active, onClick, title }: any) {
   return (
     <button 
       onClick={onClick}
-      className={`w-10 h-10 rounded-lg flex items-center justify-center transition-all cursor-pointer border ${
-        active ? 'bg-accent border-white/40 shadow-lg' : 'border-transparent text-white/70 hover:bg-white/5'
+      title={title}
+      className={`w-[60px] h-14 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
+        active ? 'bg-accent border-white/40 shadow-lg text-white' : 'border-transparent text-white/60 hover:bg-white/5 hover:text-white'
       }`}
     >
-      {React.cloneElement(icon, { size: 20 })}
+      {React.cloneElement(icon, { size: 22 })}
+      <span className="text-[10px] mt-1 font-semibold">{title.replace(' Mode', '').replace(' Brick', '')}</span>
     </button>
   );
 }

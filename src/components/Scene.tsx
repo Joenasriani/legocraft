@@ -1,11 +1,11 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Sky } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { XR } from '@react-three/xr';
 import * as THREE from 'three';
 import { LegoBrick } from './LegoBrick';
 import { BrickInstances } from './BrickInstances';
-import { useLegoStore, checkPlacementValid, checkStructureValid, getBrickDimensions, PRESETS } from '../Store';
+import { useLegoStore, checkPlacementValid, checkStructureValid, getBrickDimensions, PRESETS, isValidBrickData, BrickData } from '../Store';
 
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const bricks = useLegoStore((state) => state.bricks);
@@ -55,21 +55,9 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     };
   };
 
-  const handlePointerMove = (e: any) => {
-    const isBuilding = mode === 'Build';
-    const isMoving = mode === 'Move' && movingBrickId !== null;
-    if (!isBuilding && !isMoving) return;
-    
-    e.stopPropagation();
-    const point = e.point;
-    if (!point) return;
-    
-    const normal = e.face?.normal || new THREE.Vector3(0, 1, 0);
-    const nudge = 0.001;
-    const hitX = point.x + normal.x * nudge;
-    const hitY = point.y + normal.y * nudge;
-    const hitZ = point.z + normal.z * nudge;
+  const lastPointerHit = useRef<{ point: THREE.Vector3, normal: THREE.Vector3 } | null>(null);
 
+  const updateGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3) => {
     const activeType = movingBrick ? movingBrick.type : selectedType;
     const { w, d } = getBrickDimensions(activeType);
     const rot = Math.round(ghostRotation / 90) % 4;
@@ -85,6 +73,20 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       }
     };
 
+    const nudge = 0.001;
+    const hitX = point.x + normal.x * nudge;
+    let hitY = point.y;
+    // On the top surface of a brick, shift up to the top surface
+    if (normal.y > 0.5) hitY += nudge;
+    else if (normal.y < -0.5) hitY -= nudge;
+    else hitY += 0; // If hitting horizontal walls
+    
+    // We want the hit point's Y exactly where the normal pushed it OR from point
+    // but the brick's position[1] is its bottom face!
+    // So if normal.y > 0.5, we hit the top face. We should snap 'up' to Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT
+    // Wait, if point.y is 0.096, hitY is 0.097. floor(0.097 / 0.096) = 1. 1 * 0.096 = 0.096! That is exactly correct.
+    const hitZ = point.z + normal.z * nudge;
+
     let targetX = alignSnap(hitX, effW, MODULE_SIZE);
     let targetZ = alignSnap(hitZ, effD, MODULE_SIZE);
     let targetY;
@@ -92,15 +94,47 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     if (Math.abs(normal.y) > 0.5) {
       targetY = Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
     } else {
+      // Side hit. Center of the brick vertically
       targetY = Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) * BRICK_HEIGHT;
     }
     
     setGhostPosition([targetX, Math.max(0, targetY), targetZ]);
   };
 
-  const isValidPlacement = useMemo(() => {
-    if ((mode !== 'Build' && mode !== 'Move') || activePreset) return false;
-    if (mode === 'Move' && !movingBrickId) return false;
+  useEffect(() => {
+    if (lastPointerHit.current) {
+      updateGhostPosition(lastPointerHit.current.point, lastPointerHit.current.normal);
+    }
+  }, [selectedType, ghostRotation, mode, movingBrickId, activePreset]);
+
+  const handlePointerMove = (e: any) => {
+    const isBuilding = mode === 'Build';
+    const isMoving = mode === 'Move' && movingBrickId !== null;
+    if (!isBuilding && !isMoving) return;
+    
+    e.stopPropagation();
+    const point = e.point;
+    if (!point) return;
+    
+    // Convert to Three Vector3 just in case
+    const p3 = new THREE.Vector3(point.x, point.y, point.z);
+    const normal = e.face?.normal ? new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z) : new THREE.Vector3(0, 1, 0);
+    
+    // Multiply by object scale/rotation if intersected object has them?
+    // R3F gives e.face.normal in local space usually, but e.normal might be world space?
+    // Wait, e.intersections[0]?.normal is usually world space but let's just use point + normal.
+    // e.face.normal is local... wait! If e.object.rotation is applied, normal needs to be transformed.
+    // Drei's events provide e.normal as world space usually, wait no, they don't?
+    // Let's stick to e.face.normal, but just transform it!
+    const worldNormal = normal.clone().transformDirection(e.object.matrixWorld).normalize();
+    
+    lastPointerHit.current = { point: p3, normal: worldNormal };
+    updateGhostPosition(p3, worldNormal);
+  };
+
+  const placementStatus = useMemo(() => {
+    if ((mode !== 'Build' && mode !== 'Move') || activePreset) return { valid: false, reason: 'inactive' };
+    if (mode === 'Move' && !movingBrickId) return { valid: false, reason: 'no-selection' };
     
     const activeType = movingBrick ? movingBrick.type : selectedType;
     const ghostBrickData = {
@@ -109,13 +143,19 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       position: ghostPosition,
       rotation: ghostRotation
     };
-    const status = checkPlacementValid(bricks, ghostBrickData, MODULE_SIZE, BRICK_HEIGHT);
-    return status.valid;
-  }, [bricks, ghostPosition, ghostRotation, selectedType, mode, movingBrickId, movingBrick]);
+    return checkPlacementValid(bricks, ghostBrickData, MODULE_SIZE, BRICK_HEIGHT);
+  }, [bricks, ghostPosition, ghostRotation, selectedType, mode, movingBrickId, movingBrick, activePreset]);
 
   const presetBricks = useMemo(() => {
     if (!activePreset || !PRESETS[activePreset]) return [];
-    return PRESETS[activePreset].map(b => ({
+    
+    const validPresetBricks = PRESETS[activePreset].filter(b => {
+      const valid = isValidBrickData(b);
+      if (!valid) console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+      return valid;
+    });
+
+    return validPresetBricks.map(b => ({
       ...b,
       position: [
         b.position[0] + ghostPosition[0],
@@ -125,19 +165,33 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     }));
   }, [activePreset, ghostPosition]);
 
-  const isValidStructurePlacement = useMemo(() => {
-    if (mode !== 'Build' || !activePreset) return false;
+  const presetPlacementStatus = useMemo(() => {
+    if (mode !== 'Build' || !activePreset) return { valid: false, reason: 'inactive' };
     return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
   }, [bricks, presetBricks, activePreset, mode]);
 
-  const pointerDownPos = useRef<{ x: number, y: number } | null>(null);
+  const pointerDownPos = useRef<{ x: number, y: number, isTouch: boolean } | null>(null);
+
+  const getPointerCoords = (e: any) => {
+    if (typeof e.clientX === 'number') return { x: e.clientX, y: e.clientY };
+    if (e.nativeEvent) {
+      if (typeof e.nativeEvent.clientX === 'number') return { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+      if (e.nativeEvent.changedTouches && e.nativeEvent.changedTouches.length > 0) {
+        return { x: e.nativeEvent.changedTouches[0].clientX, y: e.nativeEvent.changedTouches[0].clientY };
+      }
+      if (e.nativeEvent.touches && e.nativeEvent.touches.length > 0) {
+        return { x: e.nativeEvent.touches[0].clientX, y: e.nativeEvent.touches[0].clientY };
+      }
+    }
+    return { x: 0, y: 0 };
+  };
 
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
     if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
-    const clientX = e.clientX ?? e.nativeEvent?.clientX ?? 0;
-    const clientY = e.clientY ?? e.nativeEvent?.clientY ?? 0;
-    pointerDownPos.current = { x: clientX, y: clientY };
+    const coords = getPointerCoords(e);
+    const isTouch = e.pointerType === 'touch' || e.nativeEvent?.pointerType === 'touch' || e.nativeEvent?.type?.includes('touch') || false;
+    pointerDownPos.current = { x: coords.x, y: coords.y, isTouch };
   };
 
   const handlePointerUp = (e: any) => {
@@ -145,38 +199,58 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     if (e.button === 2 || e.nativeEvent?.type === 'contextmenu') return;
     
     if (pointerDownPos.current) {
-      const clientX = e.clientX ?? e.nativeEvent?.clientX ?? 0;
-      const clientY = e.clientY ?? e.nativeEvent?.clientY ?? 0;
-      const dx = clientX - pointerDownPos.current.x;
-      const dy = clientY - pointerDownPos.current.y;
+      const coords = getPointerCoords(e);
+      const dx = coords.x - pointerDownPos.current.x;
+      const dy = coords.y - pointerDownPos.current.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       
+      const threshold = pointerDownPos.current.isTouch ? 20 : 5;
       pointerDownPos.current = null;
       
-      if (distance > 5) {
+      if (distance > threshold) {
         return; // It was a drag
       }
     }
     
-    if (activePreset && isValidStructurePlacement) {
-      commitPreset(ghostPosition);
+    if (activePreset) {
+      if (presetPlacementStatus.valid) {
+        commitPreset(ghostPosition);
+      } else {
+        useLegoStore.getState().setToastMessage(`Preset cannot be placed here. Move it to open supported space.`);
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+      }
       return;
     }
-    if (mode === 'Build' && !activePreset && isValidPlacement) {
-      addBrick({
-        type: selectedType,
-        color: selectedColor,
-        position: ghostPosition,
-        rotation: ghostRotation
-      });
+
+    if (mode === 'Build' && !activePreset) {
+      if (placementStatus.valid) {
+        addBrick({
+          type: selectedType,
+          color: selectedColor,
+          position: ghostPosition,
+          rotation: ghostRotation
+        });
+      } else {
+        let msg = `Cannot place: ${placementStatus.reason}`;
+        if (placementStatus.reason === 'overlap') {
+          msg = 'Blocked: overlaps another brick.';
+        } else if (placementStatus.reason === 'floating') {
+          msg = 'Blocked: floating unsupported.';
+        }
+        useLegoStore.getState().setToastMessage(msg);
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+      }
     } else if (mode === 'Move' && movingBrick) {
-      if (isValidPlacement) {
+      if (placementStatus.valid) {
         updateBrick(movingBrick.id, {
           position: ghostPosition,
           rotation: ghostRotation
         });
+        setMovingBrickId(null);
+      } else {
+        useLegoStore.getState().setToastMessage(`Cannot move: ${placementStatus.reason}`);
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
       }
-      setMovingBrickId(null);
     }
   };
 
@@ -267,7 +341,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               </mesh>
             </group>
           </Suspense>
-          <OrbitControls makeDefault />
+          <OrbitControls makeDefault target={[0, 0.2, 0]} />
         </XR>
       ) : (
         <>
@@ -332,7 +406,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               </mesh>
             </group>
           </Suspense>
-          <OrbitControls makeDefault />
+          <OrbitControls makeDefault target={[0, 0.2, 0]} />
         </>
       )}
     </>
