@@ -73,6 +73,9 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
     };
   }, [type]);
 
+  const bodyCapacity = Math.max(1, bricks.length);
+  const studCapacity = Math.max(1, bricks.length * w * d);
+
   const bodyGeom = useMemo(() => {
     const geom = new THREE.BoxGeometry(width - 0.002, BRICK_HEIGHT, depth - 0.002);
     geom.translate(0, BRICK_HEIGHT / 2, 0);
@@ -113,14 +116,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
     const studPos = new THREE.Vector3();
     
     const count = bricks.length;
-    const capacity = 5000;
-    const numStuds = w * d;
-    const studCapacity = capacity * numStuds;
     
     let studIndex = 0;
     
-    for (let i = 0; i < capacity; i++) {
-      if (i < count) {
+    for (let i = 0; i < count; i++) {
         const brick = bricks[i];
         if (brick && brick.position) {
           const [px, py, pz] = brick.position;
@@ -150,27 +149,19 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
             }
           }
         }
-      } else {
-        scale.set(0, 0, 0);
-        matrix.makeScale(0, 0, 0);
-        bodyMesh.setMatrixAt(i, matrix);
-        
-        for (let s = 0; s < numStuds; s++) {
-          studMesh.setMatrixAt(studIndex, matrix);
-          studIndex++;
-        }
-      }
     }
     
     if (bodyMesh.instanceMatrix) bodyMesh.instanceMatrix.needsUpdate = true;
     if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
+    bodyMesh.count = count;
+    studMesh.count = Math.max(0, count * w * d);
   }, [bricks, w, d]);
 
   return (
     <group>
       <instancedMesh 
         ref={bodyMeshRef} 
-        args={[bodyGeom, material, 5000]} 
+        args={[bodyGeom, material, bodyCapacity]} 
         castShadow={!isGhost} 
         receiveShadow={!isGhost}
         onPointerDown={handlePointerDown}
@@ -179,7 +170,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
       />
       <instancedMesh 
         ref={studMeshRef} 
-        args={[studGeom, material, 5000 * w * d]} 
+        args={[studGeom, material, studCapacity]} 
         castShadow={!isGhost} 
         receiveShadow={!isGhost}
         onPointerDown={handlePointerDown}

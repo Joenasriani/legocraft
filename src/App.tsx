@@ -6,9 +6,17 @@ import {
   Trash, Zap, Camera, Download, HelpCircle, 
   X, Save, FileJson, Info
 } from 'lucide-react';
-import { useLegoStore, LEGO_COLORS, BrickType } from './Store';
+import { useLegoStore, LEGO_COLORS, BrickType, PresetName } from './Store';
 import { Scene } from './components/Scene';
 import { createXRStore } from '@react-three/xr';
+
+const PRESET_OPTIONS: { id: PresetName, icon: string, name: string, desc: string }[] = [
+  { id: 'tree', icon: '🌳', name: 'Tree', desc: 'Classic oak' },
+  { id: 'cabin', icon: '🏕️', name: 'Cabin', desc: 'Small house' },
+  { id: 'round_water_well', icon: '🪣', name: 'Water Well', desc: 'Round stone' },
+  { id: 'pine_tree', icon: '🌲', name: 'Pine Tree', desc: 'Tall evergreen' },
+  { id: 'walk_in_castle', icon: '🏰', name: 'Castle', desc: 'Walk-in fort' },
+];
 
 const xrStore = createXRStore({
   hand: true,
@@ -34,6 +42,13 @@ export default function App() {
 
   const [showHelp, setShowHelp] = useState(true);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
+  const [showPresetMenu, setShowPresetMenu] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalClick = () => setShowPresetMenu(false);
+    window.addEventListener('pointerdown', handleGlobalClick);
+    return () => window.removeEventListener('pointerdown', handleGlobalClick);
+  }, []);
 
   // Load save on startup
   useEffect(() => {
@@ -207,12 +222,46 @@ export default function App() {
                 Clear
               </button>
               <div className="w-px h-6 bg-glass-border self-center" />
-              <button onClick={() => useLegoStore.getState().loadPreset('tree')} className="text-green-400 hover:text-green-300 px-3 py-2 text-[13px] font-semibold transition-colors">
-                + Tree
-              </button>
-              <button onClick={() => useLegoStore.getState().loadPreset('cabin')} className="text-amber-600 hover:text-amber-500 px-3 py-2 text-[13px] font-semibold transition-colors">
-                + Cabin
-              </button>
+              <div className="relative flex items-center">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowPresetMenu(!showPresetMenu);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="text-emerald-400 hover:text-emerald-300 px-3 py-2 text-[13px] font-semibold transition-colors flex items-center gap-1"
+                >
+                  <Plus size={16} /> Presets
+                </button>
+                <AnimatePresence>
+                  {showPresetMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, x: '-50%' }}
+                      animate={{ opacity: 1, y: 0, x: '-50%' }}
+                      exit={{ opacity: 0, y: 10, x: '-50%' }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="absolute bottom-[calc(100%+16px)] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl z-50 flex gap-3 pointer-events-auto overflow-x-auto min-w-max max-w-[90vw]"
+                    >
+                      {PRESET_OPTIONS.map(preset => (
+                        <button
+                          key={preset.id}
+                          onClick={() => {
+                            useLegoStore.getState().loadPreset(preset.id);
+                            setShowPresetMenu(false);
+                          }}
+                          className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+                        >
+                          <span className="text-3xl">{preset.icon}</span>
+                          <div className="text-center w-full">
+                            <div className="text-[12px] font-bold text-white leading-tight truncate">{preset.name}</div>
+                            <div className="text-[10px] text-white/50 leading-tight mt-1 px-1">{preset.desc}</div>
+                          </div>
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               <div className="w-px h-6 bg-glass-border self-center" />
               <button onClick={handleScreenshot} className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors">
                 Screenshot

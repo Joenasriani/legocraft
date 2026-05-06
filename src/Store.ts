@@ -123,14 +123,54 @@ export const hasBrickAbove = (
   });
 };
 
-export const checkStructureValid = (
-  bricks: Omit<BrickData, 'color'>[],
+export const checkPresetInternalSupport = (
   presetBricks: Omit<BrickData, 'color'>[],
   moduleSize: number,
   brickHeight: number,
   epsilon: number = 0.01
 ) => {
+  for (const brick of presetBricks) {
+    if (brick.position[1] <= epsilon) continue;
+
+    const myCells = getOccupiedCells(brick, moduleSize);
+
+    const hasSupport = presetBricks.some(b => {
+      if (b.id === brick.id) return false;
+      const dy = brick.position[1] - b.position[1];
+      if (Math.abs(dy - brickHeight) < epsilon) {
+        const bCells = getOccupiedCells(b, moduleSize);
+        return myCells.some(mc => 
+          bCells.some(bc => 
+            Math.abs(mc.x - bc.x) < epsilon && 
+            Math.abs(mc.z - bc.z) < epsilon
+          )
+        );
+      }
+      return false;
+    });
+
+    if (!hasSupport) {
+      return false;
+    }
+  }
+  return true;
+};
+
+export const checkStructureValid = (
+  bricks: Omit<BrickData, 'color'>[],
+  presetBricks: Omit<BrickData, 'color'>[],
+  moduleSize: number,
+  brickHeight: number,
+  epsilon: number = 0.01,
+  presetName?: string
+) => {
   if (presetBricks.length === 0) return false;
+
+  if (!checkPresetInternalSupport(presetBricks, moduleSize, brickHeight, epsilon)) {
+    if (presetName) console.warn(`Preset ${presetName} failed internal support validation.`);
+    return false;
+  }
+
   const minY = Math.min(...presetBricks.map(b => b.position[1]));
   const baseBricks = presetBricks.filter(b => b.position[1] === minY);
   
@@ -157,6 +197,7 @@ export const checkStructureValid = (
   return !hasOverlap;
 };
 
+export type PresetName = 'tree' | 'cabin' | 'round_water_well' | 'pine_tree' | 'walk_in_castle';
 export type AppMode = 'Build' | 'Move' | 'Delete';
 
 interface HistoryState {
@@ -170,6 +211,7 @@ interface LegoStore {
   selectedColor: string;
   undoStack: HistoryState[];
   redoStack: HistoryState[];
+  toastMessage: string | null;
   movingBrickId: string | null;
   
   // Actions
@@ -185,9 +227,9 @@ interface LegoStore {
   redo: () => void;
   clearAll: () => void;
   setBricks: (bricks: BrickData[]) => void;
-  loadPreset: (presetName: 'tree' | 'cabin' | null) => void;
+  loadPreset: (presetName: PresetName | null) => void;
   commitPreset: (position: [number, number, number]) => void;
-  activePreset: 'tree' | 'cabin' | null;
+  activePreset: PresetName | null;
 }
 
 const COLORS = [
@@ -317,9 +359,214 @@ const generateLifeSizedCabin = (): BrickData[] => {
   return cabin;
 };
 
-export const PRESETS = {
+const generateRoundWaterWell = (): BrickData[] => {
+  const well: BrickData[] = [];
+  const stone = '#A0A0A0';
+  const darkStone = '#707070';
+  const blue = '#0055BF';
+  const brown = '#8B4513';
+
+  for (let y = 0; y < 6; y++) {
+    well.push(createBrick('2x4', stone, -4, y, 0, 90));
+    well.push(createBrick('2x4', stone, 4, y, 0, 90));
+    well.push(createBrick('2x4', stone, 0, y, -4, 0));
+    well.push(createBrick('2x4', stone, 0, y, 4, 0));
+
+    const activeStone = y % 2 === 0 ? darkStone : stone;
+    well.push(createBrick('2x2', activeStone, -4, y, -4, 0));
+    well.push(createBrick('2x2', activeStone, 4, y, -4, 0));
+    well.push(createBrick('2x2', activeStone, -4, y, 4, 0));
+    well.push(createBrick('2x2', activeStone, 4, y, 4, 0));
+  }
+
+  for (let x = -2; x <= 2; x += 2) {
+    for (let z = -2; z <= 2; z += 2) {
+      if (Math.abs(x) === 2 && Math.abs(z) === 2) continue;
+      well.push(createBrick('2x2', blue, x, 3, z, 0));
+    }
+  }
+  well.push(createBrick('2x2', blue, -2, 3, -2, 0));
+  well.push(createBrick('2x2', blue, 2, 3, -2, 0));
+  well.push(createBrick('2x2', blue, -2, 3, 2, 0));
+  well.push(createBrick('2x2', blue, 2, 3, 2, 0));
+
+  for (let y = 6; y < 14; y++) {
+    well.push(createBrick('2x2', brown, -4, y, 0, 0));
+    well.push(createBrick('2x2', brown, 4, y, 0, 0));
+  }
+
+  for (let x = -6; x <= 6; x += 2) {
+    well.push(createBrick('2x4', brown, x, 14, -2, 90));
+    well.push(createBrick('2x4', brown, x, 14, 2, 90));
+    if (x >= -4 && x <= 4) {
+      well.push(createBrick('2x2', brown, x, 15, 0, 0));
+    }
+  }
+
+  return well;
+};
+
+const generatePineTree = (): BrickData[] => {
+  const tree: BrickData[] = [];
+  const brown = '#8B4513';
+  const green = '#00AD3C';
+
+  for (let y = 0; y < 12; y++) {
+    tree.push(createBrick('2x2', brown, 0, y, 0, 0));
+  }
+
+  const layers = [
+    { startY: 8, radius: 8 },
+    { startY: 12, radius: 6 },
+    { startY: 17, radius: 4 },
+    { startY: 23, radius: 2 }
+  ];
+
+  for (let i = 0; i < layers.length; i++) {
+    const curLayer = layers[i];
+    const nextY = i < layers.length - 1 ? layers[i+1].startY : 28;
+    
+    let currentRadius = curLayer.radius;
+    for (let y = curLayer.startY; y < nextY; y++) {
+      for (let x = -currentRadius; x <= currentRadius; x += 2) {
+        for (let z = -currentRadius; z <= currentRadius; z += 2) {
+           if (Math.abs(x) + Math.abs(z) <= currentRadius * 1.3) {
+              if (Math.abs(x) <= 1 && Math.abs(z) <= 1 && y < 12) continue;
+              tree.push(createBrick('2x2', green, x, y, z, 0));
+           }
+        }
+      }
+      if (y % 2 === 1 && currentRadius > 2) {
+         currentRadius -= 2; 
+      }
+    }
+  }
+  
+  tree.push(createBrick('1x1', green, -1, 28, -1, 0));
+  tree.push(createBrick('1x1', green, 1, 28, -1, 0));
+  tree.push(createBrick('1x1', green, -1, 28, 1, 0));
+  tree.push(createBrick('1x1', green, 1, 28, 1, 0));
+
+  return tree;
+};
+
+const generateWalkInCastle = (): BrickData[] => {
+  const castle: BrickData[] = [];
+  const stone = '#A0A0A0';
+  const darkStone = '#707070';
+  const black = '#000000';
+  
+  // Left Wall: px = -13, pz = -10, -6, -2, 2, 6, 10
+  // Right Wall: px = 13, pz = -10, -6, -2, 2, 6, 10
+  for (let y = 0; y <= 9; y++) {
+    for (const pz of [-10, -6, -2, 2, 6, 10]) {
+      castle.push(createBrick('2x4', stone, -13, y, pz, 0));
+      castle.push(createBrick('2x4', stone, 13, y, pz, 0));
+    }
+  }
+
+  // Back Wall: pz = -13
+  for (let y = 0; y <= 9; y++) {
+    for (const px of [-10, -6, -2, 2, 6, 10]) {
+      castle.push(createBrick('2x4', stone, px, y, -13, 90));
+    }
+  }
+
+  // Front Wall: pz = 13
+  for (let y = 0; y <= 5; y++) {
+    for (const px of [-10, -6, 6, 10]) {
+      castle.push(createBrick('2x4', stone, px, y, 13, 90));
+    }
+    // Gap [-2, 2]. Use 2x2 at -3 and 3
+    castle.push(createBrick('2x2', stone, -3, y, 13, 0));
+    castle.push(createBrick('2x2', stone, 3, y, 13, 0));
+  }
+  castle.push(createBrick('2x4', stone, -10, 6, 13, 90));
+  castle.push(createBrick('2x2', stone, -7, 6, 13, 0));
+  castle.push(createBrick('2x4', stone, -4, 6, 13, 90));
+  castle.push(createBrick('2x4', stone, 4, 6, 13, 90));
+  castle.push(createBrick('2x2', stone, 7, 6, 13, 0));
+  castle.push(createBrick('2x4', stone, 10, 6, 13, 90));
+  
+  for (let y = 7; y <= 9; y++) {
+    for (const px of [-10, -6, -2, 2, 6, 10]) {
+      castle.push(createBrick('2x4', stone, px, y, 13, 90));
+    }
+  }
+
+  // Divider Wall: pz = 0
+  for (let y = 0; y <= 5; y++) {
+    for (const px of [-9, -5, -1, 7]) {
+      castle.push(createBrick('2x4', stone, px, y, 0, 90));
+    }
+    castle.push(createBrick('2x2', stone, 10, y, 0, 0));
+  }
+  castle.push(createBrick('2x4', stone, -9, 6, 0, 90));
+  castle.push(createBrick('2x4', stone, -5, 6, 0, 90));
+  castle.push(createBrick('2x2', stone, -2, 6, 0, 0));
+  castle.push(createBrick('2x4', stone, 1, 6, 0, 90));
+  castle.push(createBrick('2x4', stone, 5, 6, 0, 90));
+  castle.push(createBrick('2x4', stone, 9, 6, 0, 90));
+  
+  for (let y = 7; y <= 9; y++) {
+    for (const px of [-9, -5, -1, 3, 7]) {
+      castle.push(createBrick('2x4', stone, px, y, 0, 90));
+    }
+    castle.push(createBrick('2x2', stone, 10, y, 0, 0));
+  }
+
+  // Roof / Ceiling Strips on top of all walls (y = 10)
+  for (const pz of [-10, -6, -2, 2, 6, 10]) {
+    castle.push(createBrick('2x4', stone, -13, 10, pz, 0));
+    castle.push(createBrick('2x4', stone, 13, 10, pz, 0));
+  }
+  for (const px of [-10, -6, -2, 2, 6, 10]) {
+    castle.push(createBrick('2x4', stone, px, 10, -13, 90));
+    castle.push(createBrick('2x4', stone, px, 10, 13, 90));
+  }
+  for (const px of [-9, -5, -1, 3, 7]) {
+    castle.push(createBrick('2x4', stone, px, 10, 0, 90));
+  }
+  castle.push(createBrick('2x2', stone, 10, 10, 0, 0));
+  
+  // Battlements on Top of outer walls (y = 11) using 2x2 bricks
+  // Alternating blocks create a crenellated zigzag pattern
+  for (const pz of [-10, -6, -2, 2, 6, 10]) {
+    castle.push(createBrick('2x2', stone, -13, 11, pz, 0));
+    castle.push(createBrick('2x2', stone, 13, 11, pz, 0));
+  }
+  for (const px of [-10, -6, -2, 2, 6, 10]) {
+    castle.push(createBrick('2x2', stone, px, 11, -13, 0));
+    castle.push(createBrick('2x2', stone, px, 11, 13, 0));
+  }
+
+  // Corners / Towers
+  const corners = [
+    [-13, -13], [-13, 13], [13, -13], [13, 13]
+  ];
+  for (const [cx, cz] of corners) {
+    // Fill the empty corner spaces for the walls!
+    for (let y = 0; y <= 9; y++) {
+      castle.push(createBrick('2x2', stone, cx, y, cz, 0));
+    }
+    // Build the taller tower up (y=10 to y=14)
+    for (let y = 10; y <= 14; y++) {
+      castle.push(createBrick('2x2', stone, cx, y, cz, 0));
+    }
+    // Add small crenellated tops to corners using 1x1 bricks
+    castle.push(createBrick('1x1', stone, cx - 0.5, 15, cz - 0.5, 0));
+    castle.push(createBrick('1x1', stone, cx + 0.5, 15, cz + 0.5, 0));
+  }
+
+  return castle;
+};
+
+export const PRESETS: Record<PresetName, BrickData[]> = {
   tree: generateLifeSizedTree(),
-  cabin: generateLifeSizedCabin()
+  cabin: generateLifeSizedCabin(),
+  round_water_well: generateRoundWaterWell(),
+  pine_tree: generatePineTree(),
+  walk_in_castle: generateWalkInCastle()
 };
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
@@ -462,7 +709,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }));
 
     // STRUCTURE PLACEMENT VALIDATION
-    if (!checkStructureValid(bricks, presetBricks, ms, bh)) {
+    if (!checkStructureValid(bricks, presetBricks, ms, bh, 0.01, activePreset)) {
       return;
     }
 
