@@ -83,7 +83,10 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                 roughness={0.1} 
                 metalness={0.1}
                 transparent={isPlacementGhost}
-                opacity={isPlacementGhost ? 0.5 : 1}
+                opacity={isPlacementGhost ? 0.3 : 1}
+                depthWrite={!isPlacementGhost}
+                depthTest={true}
+                toneMapped={!isPlacementGhost}
                 envMapIntensity={1.5}
               />
             </mesh>
@@ -104,7 +107,10 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                     roughness={0.1} 
                     metalness={0.1}
                     transparent={isPlacementGhost}
-                    opacity={isPlacementGhost ? 0.5 : 1}
+                    opacity={isPlacementGhost ? 0.3 : 1}
+                    depthWrite={!isPlacementGhost}
+                    depthTest={true}
+                    toneMapped={!isPlacementGhost}
                   />
                 </mesh>
               ))

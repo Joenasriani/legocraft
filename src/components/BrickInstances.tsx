@@ -18,13 +18,16 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
   const bodyMeshRef = useRef<THREE.InstancedMesh>(null);
   const studMeshRef = useRef<THREE.InstancedMesh>(null);
   const removeBrick = useLegoStore(state => state.removeBrick);
+  const setMovingBrickId = useLegoStore(state => state.setMovingBrickId);
+  const setToastMessage = useLegoStore(state => state.setToastMessage);
   const mode = useLegoStore(state => state.mode);
+  const allBricks = useLegoStore(state => state.bricks);
 
   const handlePointerDown = (e: any) => {
     if (isGhost) return;
     
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === 'contextmenu';
-    if (mode === 'Delete' || isSqueeze) {
+    if (mode === 'Delete' || mode === 'Move' || isSqueeze) {
       e.stopPropagation();
       const instanceId = e.instanceId;
       if (instanceId !== undefined) {
@@ -39,8 +42,22 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
           brickIndex = Math.floor(instanceId / (w * d));
         }
 
-        if (bricks[brickIndex]) {
-          removeBrick(bricks[brickIndex].id);
+        const brick = bricks[brickIndex];
+        if (brick) {
+          if (mode === 'Delete' || isSqueeze) {
+            removeBrick(brick.id);
+          } else if (mode === 'Move') {
+            import('../Store').then(({ hasBrickAbove }) => {
+              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+                setToastMessage("Cannot move: brick has another brick above it.");
+                setTimeout(() => setToastMessage(null), 3000);
+              } else {
+                setMovingBrickId(brick.id);
+                // Dispatch a custom event to update ghost rotation to match the selected brick
+                window.dispatchEvent(new CustomEvent('set-ghost-rotation', { detail: brick.rotation }));
+              }
+            });
+          }
         }
       }
     }
@@ -74,8 +91,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
       roughness: 0.1, 
       metalness: 0.1,
       transparent: !!isGhost,
-      opacity: isGhost ? 0.5 : 1,
-      depthWrite: !isGhost
+      opacity: isGhost ? 0.3 : 1,
+      depthWrite: !isGhost,
+      depthTest: true,
+      toneMapped: !isGhost
     });
   }, [color, isGhost]);
 

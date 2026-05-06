@@ -15,14 +15,26 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const addBrick = useLegoStore((state) => state.addBrick);
   const activePreset = useLegoStore((state) => state.activePreset);
   const commitPreset = useLegoStore((state) => state.commitPreset);
+  const movingBrickId = useLegoStore((state) => state.movingBrickId);
+  const setMovingBrickId = useLegoStore((state) => state.setMovingBrickId);
+  const updateBrick = useLegoStore((state) => state.updateBrick);
   
+  const movingBrick = useMemo(() => {
+    return bricks.find(b => b.id === movingBrickId) || null;
+  }, [bricks, movingBrickId]);
+
   const [ghostPosition, setGhostPosition] = useState<[number, number, number]>([0, 0, 0]);
   const [ghostRotation, setGhostRotation] = useState<number>(0);
 
   useEffect(() => {
     const handleRotate = () => setGhostRotation(r => (r + 90) % 360);
+    const handleSetRotation = (e: any) => setGhostRotation(e.detail);
     window.addEventListener('rotate-ghost', handleRotate);
-    return () => window.removeEventListener('rotate-ghost', handleRotate);
+    window.addEventListener('set-ghost-rotation', handleSetRotation);
+    return () => {
+      window.removeEventListener('rotate-ghost', handleRotate);
+      window.removeEventListener('set-ghost-rotation', handleSetRotation);
+    };
   }, []);
 
   const MODULE_SIZE = 0.08;
@@ -44,7 +56,10 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   };
 
   const handlePointerMove = (e: any) => {
-    if (mode !== 'Build') return;
+    const isBuilding = mode === 'Build';
+    const isMoving = mode === 'Move' && movingBrickId !== null;
+    if (!isBuilding && !isMoving) return;
+    
     e.stopPropagation();
     const point = e.point;
     if (!point) return;
@@ -55,7 +70,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     const hitY = point.y + normal.y * nudge;
     const hitZ = point.z + normal.z * nudge;
 
-    const { w, d } = getBrickDimensions(selectedType);
+    const activeType = movingBrick ? movingBrick.type : selectedType;
+    const { w, d } = getBrickDimensions(activeType);
     const rot = Math.round(ghostRotation / 90) % 4;
     const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
     const effW = isRot ? d : w;
@@ -83,16 +99,19 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   };
 
   const isValidPlacement = useMemo(() => {
-    if (mode !== 'Build' || activePreset) return false;
+    if ((mode !== 'Build' && mode !== 'Move') || activePreset) return false;
+    if (mode === 'Move' && !movingBrickId) return false;
+    
+    const activeType = movingBrick ? movingBrick.type : selectedType;
     const ghostBrickData = {
-      id: 'ghost',
-      type: selectedType,
+      id: movingBrickId || 'ghost',
+      type: activeType,
       position: ghostPosition,
       rotation: ghostRotation
     };
     const status = checkPlacementValid(bricks, ghostBrickData, MODULE_SIZE, BRICK_HEIGHT);
     return status.valid;
-  }, [bricks, ghostPosition, ghostRotation, selectedType, mode]);
+  }, [bricks, ghostPosition, ghostRotation, selectedType, mode, movingBrickId, movingBrick]);
 
   const presetBricks = useMemo(() => {
     if (!activePreset || !PRESETS[activePreset]) return [];
@@ -150,6 +169,14 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
         position: ghostPosition,
         rotation: ghostRotation
       });
+    } else if (mode === 'Move' && movingBrick) {
+      if (isValidPlacement) {
+        updateBrick(movingBrick.id, {
+          position: ghostPosition,
+          rotation: ghostRotation
+        });
+      }
+      setMovingBrickId(null);
     }
   };
 
@@ -157,12 +184,13 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const groupedBricks = useMemo(() => {
     const groups: Record<string, typeof bricks> = {};
     bricks.forEach(brick => {
+      if (mode === 'Move' && movingBrickId === brick.id) return;
       const key = `${brick.type}_${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
     });
     return groups;
-  }, [bricks]);
+  }, [bricks, mode, movingBrickId]);
 
   const groupedPresetBricks = useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -199,11 +227,11 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {mode === 'Build' && !activePreset && isValidPlacement && (
+              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && isValidPlacement && (
                 <LegoBrick 
                   id="ghost" 
-                  type={selectedType} 
-                  color={selectedColor} 
+                  type={movingBrick ? movingBrick.type : selectedType} 
+                  color={movingBrick ? movingBrick.color : selectedColor} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 
@@ -264,11 +292,11 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {mode === 'Build' && !activePreset && isValidPlacement && (
+              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && isValidPlacement && (
                 <LegoBrick 
                   id="ghost" 
-                  type={selectedType} 
-                  color={selectedColor} 
+                  type={movingBrick ? movingBrick.type : selectedType} 
+                  color={movingBrick ? movingBrick.color : selectedColor} 
                   position={ghostPosition} 
                   rotation={ghostRotation} 
                   isPlacementGhost 
@@ -310,5 +338,6 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     </>
   );
 };
+
 
 

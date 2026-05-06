@@ -98,6 +98,31 @@ export const checkPlacementValid = (
   return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
 };
 
+export const hasBrickAbove = (
+  brick: Omit<BrickData, 'color'>,
+  bricks: Omit<BrickData, 'color'>[],
+  moduleSize: number,
+  brickHeight: number,
+  epsilon: number = 0.01
+) => {
+  const myCells = getOccupiedCells(brick, moduleSize);
+
+  return bricks.some(b => {
+    if (b.id === brick.id) return false;
+    const dy = b.position[1] - brick.position[1];
+    if (Math.abs(dy - brickHeight) < epsilon) {
+      const bCells = getOccupiedCells(b, moduleSize);
+      return myCells.some(mc => 
+        bCells.some(bc => 
+          Math.abs(mc.x - bc.x) < epsilon && 
+          Math.abs(mc.z - bc.z) < epsilon
+        )
+      );
+    }
+    return false;
+  });
+};
+
 export const checkStructureValid = (
   bricks: Omit<BrickData, 'color'>[],
   presetBricks: Omit<BrickData, 'color'>[],
@@ -145,7 +170,7 @@ interface LegoStore {
   selectedColor: string;
   undoStack: HistoryState[];
   redoStack: HistoryState[];
-  toastMessage: string | null;
+  movingBrickId: string | null;
   
   // Actions
   addBrick: (brick: Omit<BrickData, 'id'>) => void;
@@ -155,6 +180,7 @@ interface LegoStore {
   setSelectedType: (type: BrickType) => void;
   setSelectedColor: (color: string) => void;
   setToastMessage: (msg: string | null) => void;
+  setMovingBrickId: (id: string | null) => void;
   undo: () => void;
   redo: () => void;
   clearAll: () => void;
@@ -305,8 +331,10 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   undoStack: [],
   redoStack: [],
   toastMessage: null,
+  movingBrickId: null,
 
   setToastMessage: (msg) => set({ toastMessage: msg }),
+  setMovingBrickId: (id) => set({ movingBrickId: id }),
 
   addBrick: (newBrickData) => {
     const { bricks, undoStack } = get();
@@ -328,28 +356,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const brickToRemove = bricks.find(b => b.id === id);
     if (!brickToRemove) return;
 
-    // Check if there's any brick directly above it
-    const epsilon = 0.01;
-    const ms = 0.08;
-    const bh = 0.096;
-    const myCells = getOccupiedCells(brickToRemove, ms);
-
-    const hasBrickAbove = bricks.some(b => {
-      if (b.id === id) return false;
-      const dy = b.position[1] - brickToRemove.position[1];
-      if (Math.abs(dy - bh) < epsilon) {
-        const bCells = getOccupiedCells(b, ms);
-        return myCells.some(mc => 
-          bCells.some(bc => 
-            Math.abs(mc.x - bc.x) < epsilon && 
-            Math.abs(mc.z - bc.z) < epsilon
-          )
-        );
-      }
-      return false;
-    });
-
-    if (hasBrickAbove) {
+    if (hasBrickAbove(brickToRemove, bricks, 0.08, 0.096)) {
       if (typeof window !== 'undefined') {
         get().setToastMessage("Cannot delete: brick has another brick above it.");
         setTimeout(() => {
@@ -385,8 +392,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
   },
 
-  setMode: (mode) => set({ mode, activePreset: null }),
-  setSelectedType: (selectedType) => set({ selectedType, activePreset: null }),
+  setMode: (mode) => set({ mode, activePreset: null, movingBrickId: null }),
+  setSelectedType: (selectedType) => set({ selectedType, activePreset: null, movingBrickId: null }),
   setSelectedColor: (selectedColor) => set({ selectedColor }),
 
   undo: () => {

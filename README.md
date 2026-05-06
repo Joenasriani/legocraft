@@ -1,20 +1,10 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Brick XR Builder
 
-# Run and deploy your AI Studio app
+Browser-based Lego-style 3D builder optimized for AI Studio development.
 
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/2a0d2864-1b74-415e-b842-bc36ad500fcb
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Features
+- Built with Vite, React, React Three Fiber, Three.js, Zustand, and WebXR
+- Supports brick placement, rotation, and deletion
+- Preset structures (Tree, Cabin)
+- Save and load your creations
+- Enter VR mode for an immersive experience
