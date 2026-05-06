@@ -227,7 +227,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && isValidPlacement && (
+              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && (
                 <LegoBrick 
                   id="ghost" 
                   type={movingBrick ? movingBrick.type : selectedType} 
@@ -238,7 +238,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 />
               )}
 
-              {activePreset && isValidStructurePlacement && (
+              {activePreset && (
                 <>
                   {Object.entries(groupedPresetBricks).map(([key, group]) => {
                     const [type, color] = key.split('_');
@@ -292,7 +292,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && isValidPlacement && (
+              {((mode === 'Build' && !activePreset) || (mode === 'Move' && movingBrick)) && (
                 <LegoBrick 
                   id="ghost" 
                   type={movingBrick ? movingBrick.type : selectedType} 
@@ -303,7 +303,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 />
               )}
 
-              {activePreset && isValidStructurePlacement && (
+              {activePreset && (
                 <>
                   {Object.entries(groupedPresetBricks).map(([key, group]) => {
                     const [type, color] = key.split('_');

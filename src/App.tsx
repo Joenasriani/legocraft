@@ -1,21 +1,107 @@
 import React, { useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  Plus, Move, Trash2, Undo2, Redo2, 
-  Trash, Zap, Camera, Download, HelpCircle, 
-  X, Save, FileJson, Info
-} from 'lucide-react';
 import { useLegoStore, LEGO_COLORS, BrickType, PresetName } from './Store';
 import { Scene } from './components/Scene';
 import { createXRStore } from '@react-three/xr';
 
-const PRESET_OPTIONS: { id: PresetName, icon: string, name: string, desc: string }[] = [
-  { id: 'tree', icon: '🌳', name: 'Tree', desc: 'Classic oak' },
-  { id: 'cabin', icon: '🏕️', name: 'Cabin', desc: 'Small house' },
-  { id: 'round_water_well', icon: '🪣', name: 'Water Well', desc: 'Round stone' },
-  { id: 'pine_tree', icon: '🌲', name: 'Pine Tree', desc: 'Tall evergreen' },
-  { id: 'walk_in_castle', icon: '🏰', name: 'Castle', desc: 'Walk-in fort' },
+const BuildIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 5v14m-7-7h14"/>
+  </svg>
+);
+
+const MoveIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 9l-3 3 3 3M9 5l3-3 3 3M19 9l3 3-3 3M9 19l3 3 3-3M2 12h20M12 2v20"/>
+  </svg>
+);
+
+const DeleteIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
+  </svg>
+);
+
+const RotateIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+    <path d="M3 3v5h5"/>
+  </svg>
+);
+
+const PresetsIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <path d="M3 14h7v7H3z" />
+  </svg>
+);
+
+const TreeIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22v-8" />
+    <path d="M7 14A6 6 0 0 1 12 4a6 6 0 0 1 5 10Z" />
+  </svg>
+);
+
+const CabinIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 10l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <path d="M9 22V12h6v10" />
+  </svg>
+);
+
+const WellIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 14v8h12v-8" />
+    <path d="M3 14h18" />
+    <path d="M6 14V4" />
+    <path d="M18 14V4" />
+    <path d="M6 4h12" />
+    <path d="M10 8l2 2 2-2" />
+  </svg>
+);
+
+const PineIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22v-6" />
+    <path d="M12 2L4 10h16z" />
+    <path d="M12 8L2 16h20z" />
+  </svg>
+);
+
+const CastleIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 20v-6h-2v4h-4v-4H8v4H4v-4H2v6h20z" />
+    <path d="M4 14V4h4v3h2V4h6v3h2V4h4v10" />
+    <path d="M10 20v-5h4v5" />
+  </svg>
+);
+
+const InfoIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 16v-4" />
+    <path d="M12 8h.01" />
+  </svg>
+);
+
+const HelpIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </svg>
+);
+
+const PRESET_OPTIONS: { id: PresetName, icon: React.ReactNode, name: string, desc: string }[] = [
+  { id: 'tree', icon: <TreeIcon size={32} />, name: 'Tree', desc: 'Classic oak' },
+  { id: 'cabin', icon: <CabinIcon size={32} />, name: 'Cabin', desc: 'Small house' },
+  { id: 'round_water_well', icon: <WellIcon size={32} />, name: 'Water Well', desc: 'Round stone' },
+  { id: 'pine_tree', icon: <PineIcon size={32} />, name: 'Pine Tree', desc: 'Tall evergreen' },
+  { id: 'walk_in_castle', icon: <CastleIcon size={32} />, name: 'Castle', desc: 'Walk-in fort' },
 ];
 
 const xrStore = createXRStore({
@@ -99,7 +185,7 @@ export default function App() {
       <div className="absolute inset-0 z-10 pointer-events-none p-6 flex flex-col justify-between">
         {toastMessage && (
           <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
-            <Info size={16} />
+            <InfoIcon size={16} />
             {toastMessage}
           </div>
         )}
@@ -137,19 +223,24 @@ export default function App() {
           {/* Left Tools */}
           <div className="glass-panel w-16 p-3 rounded-2xl flex flex-col gap-4 pointer-events-auto">
             <ToolIconButton 
-              icon={<Plus size={24} />} 
+              icon={<BuildIcon size={24} />} 
               active={mode === 'Build'} 
               onClick={() => setMode('Build')} 
             />
             <ToolIconButton 
-              icon={<Move size={24} />} 
+              icon={<MoveIcon size={24} />} 
               active={mode === 'Move'} 
               onClick={() => setMode('Move')} 
             />
             <ToolIconButton 
-              icon={<Trash2 size={24} />} 
+              icon={<DeleteIcon size={24} />} 
               active={mode === 'Delete'} 
               onClick={() => setMode('Delete')} 
+            />
+            <ToolIconButton 
+              icon={<RotateIcon size={24} />} 
+              active={false} 
+              onClick={() => window.dispatchEvent(new CustomEvent('rotate-ghost'))} 
             />
           </div>
 
@@ -208,13 +299,6 @@ export default function App() {
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => {
-                // simple 90deg rotation of the ghost brick by updating a local state
-                window.dispatchEvent(new CustomEvent('rotate-ghost'));
-              }} className="text-blue-400 hover:text-blue-300 px-3 py-2 text-[13px] font-semibold transition-colors">
-                Rotate Brick
-              </button>
-              <div className="w-px h-6 bg-glass-border self-center" />
               <button onClick={handlePunchAll} className="text-orange-400 hover:text-orange-300 px-3 py-2 text-[13px] font-semibold transition-colors">
                 Punch
               </button>
@@ -231,7 +315,7 @@ export default function App() {
                   onPointerDown={(e) => e.stopPropagation()}
                   className="text-emerald-400 hover:text-emerald-300 px-3 py-2 text-[13px] font-semibold transition-colors flex items-center gap-1"
                 >
-                  <Plus size={16} /> Presets
+                  <PresetsIcon size={16} /> Presets
                 </button>
                 <AnimatePresence>
                   {showPresetMenu && (
@@ -251,7 +335,7 @@ export default function App() {
                           }}
                           className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
                         >
-                          <span className="text-3xl">{preset.icon}</span>
+                          <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">{preset.icon}</span>
                           <div className="text-center w-full">
                             <div className="text-[12px] font-bold text-white leading-tight truncate">{preset.name}</div>
                             <div className="text-[10px] text-white/50 leading-tight mt-1 px-1">{preset.desc}</div>
@@ -270,7 +354,7 @@ export default function App() {
                 Export STL
               </button>
               <button onClick={() => setShowHelp(true)} className="p-2 text-white/40 hover:text-white transition-colors">
-                <HelpCircle size={20} />
+                <HelpIcon size={20} />
               </button>
             </div>
           </div>
