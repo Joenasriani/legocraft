@@ -8,6 +8,21 @@ import { BrickInstances } from './BrickInstances';
 import { useLegoStore, checkPlacementValid, checkStructureValid, getBrickDimensions, PRESETS, isValidBrickData, BrickData } from '../Store';
 
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
+  const { gl, scene, camera } = useThree();
+
+  useEffect(() => {
+    const onScreenshot = () => {
+      // Must render first to ensure canvas has content
+      gl.render(scene, camera);
+      const link = document.createElement('a');
+      link.download = 'brickxr-screenshot.png';
+      link.href = gl.domElement.toDataURL('image/png');
+      link.click();
+    };
+    window.addEventListener('take-screenshot', onScreenshot);
+    return () => window.removeEventListener('take-screenshot', onScreenshot);
+  }, [gl, scene, camera]);
+
   const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
   const selectedType = useLegoStore((state) => state.selectedType);
@@ -98,7 +113,95 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       targetY = Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) * BRICK_HEIGHT;
     }
     
-    setGhostPosition([targetX, Math.max(0, targetY), targetZ]);
+    let finalX = targetX;
+    let finalY = Math.max(0, targetY);
+    let finalZ = targetZ;
+
+    const checkPos = (x: number, y: number, z: number) => {
+      if (activePreset) {
+        if (!PRESETS[activePreset]) return { valid: false, reason: 'invalid-preset' };
+        const testPresetBricks = PRESETS[activePreset].filter(isValidBrickData).map(b => ({
+          ...b,
+          position: [b.position[0] + x, b.position[1] + y, b.position[2] + z] as [number, number, number]
+        }));
+        return checkStructureValid(bricks, testPresetBricks, MODULE_SIZE, BRICK_HEIGHT);
+      } else {
+        const testBrickData = {
+          id: movingBrickId || 'ghost',
+          type: activeType,
+          position: [x, y, z] as [number, number, number],
+          rotation: ghostRotation
+        };
+        return checkPlacementValid(bricks, testBrickData, MODULE_SIZE, BRICK_HEIGHT);
+      }
+    };
+
+    let res = checkPos(finalX, finalY, finalZ);
+    
+    // Smart surface snapping
+    // First, try jumping up on Y
+    if (!res.valid && res.reason === 'overlap') {
+      let testY = finalY;
+      while (testY < finalY + BRICK_HEIGHT * 10) { // search up to 10 bricks up
+        testY += BRICK_HEIGHT;
+        const upRes = checkPos(finalX, testY, finalZ);
+        if (upRes.valid || upRes.reason !== 'overlap') {
+           finalY = testY;
+           res = upRes;
+           break;
+        }
+      }
+    }
+
+    // If still invalid, try nudging X/Z adjacent
+    if (!res.valid && res.reason === 'overlap') {
+      const offsets = [
+        [MODULE_SIZE * 2, 0], [-MODULE_SIZE * 2, 0], [0, MODULE_SIZE * 2], [0, -MODULE_SIZE * 2],
+        [MODULE_SIZE * 4, 0], [-MODULE_SIZE * 4, 0], [0, MODULE_SIZE * 4], [0, -MODULE_SIZE * 4],
+      ];
+      let bestX = finalX;
+      let bestZ = finalZ;
+      let bestY = finalY;
+      let found = false;
+
+      for (const [ox, oz] of offsets) {
+        let tx = finalX + ox;
+        let tz = finalZ + oz;
+        let ty = finalY;
+        
+        let subRes = checkPos(tx, ty, tz);
+        
+        if (!subRes.valid && subRes.reason === 'overlap') {
+          // search up
+          let testY = ty;
+          while (testY < ty + BRICK_HEIGHT * 6) {
+            testY += BRICK_HEIGHT;
+            const upRes = checkPos(tx, testY, tz);
+            if (upRes.valid || upRes.reason !== 'overlap') {
+              subRes = upRes;
+              ty = testY;
+              break;
+            }
+          }
+        }
+
+        if (subRes.valid || subRes.reason !== 'overlap') {
+          bestX = tx;
+          bestY = ty;
+          bestZ = tz;
+          found = true;
+          break;
+        }
+      }
+      
+      if (found) {
+        finalX = bestX;
+        finalY = bestY;
+        finalZ = bestZ;
+      }
+    }
+
+    setGhostPosition([finalX, finalY, finalZ]);
   };
 
   useEffect(() => {

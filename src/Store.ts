@@ -86,8 +86,8 @@ export const checkPlacementValid = (
   if (ghostData.position[1] <= epsilon) return { valid: true, reason: 'grounded' };
 
   // Connection check (Support from below)
-  // EVERY occupied footprint cell MUST be supported by at least one brick below
-  const isSupported = ghostCells.every(gc => {
+  // AT LEAST ONE occupied footprint cell MUST be supported by a brick below
+  const isSupported = ghostCells.some(gc => {
     return bricks.some(b => {
       if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId)) return false;
       
@@ -113,14 +113,50 @@ export const hasBrickAbove = (
   brickHeight: number,
   epsilon: number = 0.01
 ) => {
-  // A brick can be deleted/moved ONLY if every brick above remains valid after removal.
-  // We check all bricks above this one. If removing this brick makes ANY of them float, we block it.
-  const bricksAbove = bricks.filter(b => b.position[1] > brick.position[1] + epsilon);
+  const targetTopY = brick.position[1] + brickHeight;
   
-  for (const b of bricksAbove) {
-    const check = checkPlacementValid(bricks, b, moduleSize, brickHeight, epsilon, brick.id);
-    if (!check.valid) {
-      return true; // Removing `brick` leaves this brick above unsupported -> act as "hasBrickAbove" (cannot delete/move)
+  // 1. Find bricks exactly one layer above the selected brick
+  const bricksDirectlyAbove = bricks.filter(b => Math.abs(b.position[1] - targetTopY) < epsilon);
+  
+  const targetCells = getOccupiedCells(brick, moduleSize);
+
+  for (const b of bricksDirectlyAbove) {
+    const bCells = getOccupiedCells(b, moduleSize);
+
+    // 2. X/Z occupied cells truly overlap
+    const overlappingCells = bCells.filter(bc => 
+      targetCells.some(tc => Math.abs(bc.x - tc.x) < epsilon && Math.abs(bc.z - tc.z) < epsilon)
+    );
+
+    if (overlappingCells.length > 0) {
+      // 3. Check if removing selected brick removes the other brick's valid support
+      // Find if `b` is supported by ANY OTHER brick exactly on the same layer as `brick`
+      const otherSupports = bricks.filter(other => 
+        other.id !== brick.id && 
+        other.id !== b.id && 
+        Math.abs(other.position[1] - brick.position[1]) < epsilon
+      );
+
+      let hasAlternateSupport = false;
+      for (const other of otherSupports) {
+        const otherCells = getOccupiedCells(other, moduleSize);
+        const overlapWithOther = bCells.some(bc => 
+          otherCells.some(oc => Math.abs(bc.x - oc.x) < epsilon && Math.abs(bc.z - oc.z) < epsilon)
+        );
+        if (overlapWithOther) {
+          hasAlternateSupport = true;
+          break;
+        }
+      }
+
+      console.log(`[Delete Audit] Selected: ${brick.id}, Above: ${b.id}`);
+      console.log(`- Overlap cells found: ${overlappingCells.length}`);
+      console.log(`- Selected Top Y: ${targetTopY.toFixed(3)}, Above Bottom Y: ${b.position[1].toFixed(3)}`);
+      console.log(`- Has Alternate Support: ${hasAlternateSupport}`);
+
+      if (!hasAlternateSupport) {
+        return true; 
+      }
     }
   }
   

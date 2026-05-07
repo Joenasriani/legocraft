@@ -178,20 +178,14 @@ export default function App() {
   }, []);
 
   const handleScreenshot = () => {
-    const canvas = document.querySelector('canvas');
-    if (canvas) {
-      const link = document.createElement('a');
-      link.download = 'brickxr-screenshot.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
-    }
+    window.dispatchEvent(new CustomEvent('take-screenshot'));
   };
 
   return (
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
-        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }} gl={{ preserveDrawingBuffer: true }}>
+        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}>
           <Scene xrStore={xrStore} />
         </Canvas>
       </div>
