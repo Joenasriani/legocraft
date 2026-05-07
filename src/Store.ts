@@ -291,7 +291,7 @@ interface LegoStore {
   clearAll: () => void;
   setBricks: (bricks: BrickData[]) => void;
   loadPreset: (presetName: PresetName | null) => void;
-  commitPreset: (position: [number, number, number]) => void;
+  commitPreset: (position: [number, number, number], rotation: number) => void;
   activePreset: PresetName | null;
 }
 
@@ -937,7 +937,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     set({ activePreset: presetName, mode: "Build" });
   },
 
-  commitPreset: (position) => {
+  commitPreset: (position, rotation = 0) => {
     const { activePreset, bricks, undoStack } = get();
     if (!activePreset) return;
 
@@ -948,15 +948,35 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       return valid;
     });
 
-    const presetBricks = validPresetBricks.map((b) => ({
-      ...b,
-      id: crypto.randomUUID(),
-      position: [
-        b.position[0] + position[0],
-        b.position[1] + position[1],
-        b.position[2] + position[2],
-      ] as [number, number, number],
-    }));
+    const presetBricks = validPresetBricks.map((b) => {
+      let ox = b.position[0];
+      let oz = b.position[2];
+      let nx = ox,
+        nz = oz;
+
+      const rotMod = (Math.round(rotation / 90) * 90) % 360;
+      if (rotMod === 90 || rotMod === -270) {
+        nx = -oz;
+        nz = ox;
+      } else if (Math.abs(rotMod) === 180) {
+        nx = -ox;
+        nz = -oz;
+      } else if (rotMod === 270 || rotMod === -90) {
+        nx = oz;
+        nz = -ox;
+      }
+
+      return {
+        ...b,
+        id: crypto.randomUUID(),
+        rotation: ((b.rotation || 0) + rotMod) % 360,
+        position: [
+          nx + position[0],
+          b.position[1] + position[1],
+          nz + position[2],
+        ] as [number, number, number],
+      };
+    });
 
     // STRUCTURE PLACEMENT VALIDATION
     const check = checkStructureValid(
@@ -977,7 +997,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
-      activePreset: null,
     });
     localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },

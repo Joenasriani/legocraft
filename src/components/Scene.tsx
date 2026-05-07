@@ -339,21 +339,58 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       return valid;
     });
 
-    return validPresetBricks.map((b) => ({
-      ...b,
-      position: [
-        b.position[0] + ghostPosition[0],
-        b.position[1] + ghostPosition[1],
-        b.position[2] + ghostPosition[2],
-      ] as [number, number, number],
-    }));
-  }, [activePreset, ghostPosition]);
+    return validPresetBricks.map((b) => {
+      let ox = b.position[0];
+      let oz = b.position[2];
+      let nx = ox,
+        nz = oz;
+
+      const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+      if (rotMod === 90 || rotMod === -270) {
+        nx = -oz;
+        nz = ox;
+      } else if (Math.abs(rotMod) === 180) {
+        nx = -ox;
+        nz = -oz;
+      } else if (rotMod === 270 || rotMod === -90) {
+        nx = oz;
+        nz = -ox;
+      }
+
+      return {
+        ...b,
+        rotation: ((b.rotation || 0) + rotMod) % 360,
+        position: [
+          nx + ghostPosition[0],
+          b.position[1] + ghostPosition[1],
+          nz + ghostPosition[2],
+        ] as [number, number, number],
+      };
+    });
+  }, [activePreset, ghostPosition, ghostRotation]);
 
   const presetPlacementStatus = useMemo(() => {
     if (mode !== "Build" || !activePreset)
       return { valid: false, reason: "inactive" };
     return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
   }, [bricks, presetBricks, activePreset, mode]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && useLegoStore.getState().activePreset) {
+        useLegoStore.getState().loadPreset(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const handleContextMenu = (e: any) => {
+    e.stopPropagation();
+    if (useLegoStore.getState().activePreset) {
+      useLegoStore.getState().loadPreset(null);
+    }
+  };
 
   const pointerDownPos = useRef<{
     x: number;
@@ -420,7 +457,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
     if (activePreset) {
       if (presetPlacementStatus.valid) {
-        commitPreset(ghostPosition);
+        commitPreset(ghostPosition, ghostRotation);
       } else {
         useLegoStore
           .getState()
@@ -545,9 +582,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               onPointerMove={handlePointerMove}
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUp}
-              onContextMenu={(e) => {
-                e.stopPropagation();
-              }}
+              onContextMenu={handleContextMenu}
             >
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {
@@ -635,9 +670,7 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
               onPointerMove={handlePointerMove}
               onPointerDown={handlePointerDown}
               onPointerUp={handlePointerUp}
-              onContextMenu={(e) => {
-                e.stopPropagation();
-              }}
+              onContextMenu={handleContextMenu}
             >
               {/* Visualized Bricks using InstancedMesh */}
               {Object.entries(groupedBricks).map(([key, group]) => {

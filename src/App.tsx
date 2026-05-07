@@ -437,6 +437,8 @@ export default function App() {
     clearAll,
     setBricks,
     toastMessage,
+    activePreset,
+    loadPreset,
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(true);
@@ -652,7 +654,7 @@ export default function App() {
         <div className="flex flex-col items-center gap-6 pointer-events-none">
           {/* Brick Type Selector (Build Mode Only) */}
           <AnimatePresence>
-            {mode === "Build" && (
+            {mode === "Build" && !activePreset && (
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
@@ -673,6 +675,31 @@ export default function App() {
                     {type}
                   </button>
                 ))}
+              </motion.div>
+            )}
+
+            {mode === "Build" && activePreset && (
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 20, opacity: 0 }}
+                className="glass-panel p-2 rounded-2xl pointer-events-auto flex items-center gap-4 shadow-2xl px-6 py-3"
+              >
+                <div className="flex flex-col">
+                  <span className="text-sm font-bold text-emerald-400">
+                    Placing Preset
+                  </span>
+                  <span className="text-xs text-white/60">
+                    Click to stamp, drag to position
+                  </span>
+                </div>
+                <div className="w-px h-8 bg-white/10" />
+                <button
+                  onClick={() => loadPreset(null)}
+                  className="bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all border border-red-500/30"
+                >
+                  Cancel Preset
+                </button>
               </motion.div>
             )}
           </AnimatePresence>
@@ -738,7 +765,13 @@ export default function App() {
                         <button
                           key={preset.id}
                           onClick={() => {
-                            useLegoStore.getState().loadPreset(preset.id);
+                            if (
+                              useLegoStore.getState().activePreset === preset.id
+                            ) {
+                              useLegoStore.getState().loadPreset(null);
+                            } else {
+                              useLegoStore.getState().loadPreset(preset.id);
+                            }
                             setShowPresetMenu(false);
                           }}
                           title={`Place ${preset.name} Preset`}
