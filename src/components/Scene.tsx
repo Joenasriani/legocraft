@@ -13,6 +13,7 @@ import {
   PRESETS,
   isValidBrickData,
   BrickData,
+  getGroupBricks,
 } from "../Store";
 
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
@@ -58,9 +59,41 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
   const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
 
+  const selectionMode = useLegoStore((state) => state.selectionMode);
+
   const movingBrick = useMemo(() => {
     return bricks.find((b) => b.id === movingBrickId) || null;
   }, [bricks, movingBrickId]);
+
+  const movingGroupOriginalBricks = useMemo(() => {
+    if (!movingBrick) return [];
+    if (selectionMode === "Single") return [movingBrick];
+    return getGroupBricks(movingBrick, bricks);
+  }, [movingBrick, bricks, selectionMode]);
+
+  const movingGroupPivot = useMemo(() => {
+    if (movingGroupOriginalBricks.length === 0) return [0, 0, 0];
+    let minX = Infinity,
+      maxX = -Infinity;
+    let minZ = Infinity,
+      maxZ = -Infinity;
+    let minY = Infinity;
+    movingGroupOriginalBricks.forEach((b) => {
+      const dim = getBrickDimensions(b.type as any);
+      const rot = (b.rotation || 0) % 360;
+      const w = rot === 90 || rot === 270 ? dim.d : dim.w;
+      const d = rot === 90 || rot === 270 ? dim.w : dim.d;
+      minX = Math.min(minX, b.position[0]);
+      maxX = Math.max(maxX, b.position[0] + w * 0.08);
+      minZ = Math.min(minZ, b.position[2]);
+      maxZ = Math.max(maxZ, b.position[2] + d * 0.08);
+      minY = Math.min(minY, b.position[1]);
+    });
+
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    return [cx, minY, cz];
+  }, [movingGroupOriginalBricks]);
 
   const [ghostPosition, setGhostPosition] = useState<[number, number, number]>([
     0, 0, 0,
@@ -166,6 +199,65 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
         return checkStructureValid(
           bricks,
           testPresetBricks,
+          MODULE_SIZE,
+          BRICK_HEIGHT,
+        );
+      } else if (mode === "Move" && movingBrick) {
+        // validate the whole group
+        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+        const oxA = movingBrick.position[0] - movingGroupPivot[0];
+        const ozA = movingBrick.position[2] - movingGroupPivot[2];
+        let rotatedOxA = oxA,
+          rotatedOzA = ozA;
+        if (rotMod === 90 || rotMod === -270) {
+          rotatedOxA = -ozA;
+          rotatedOzA = oxA;
+        } else if (Math.abs(rotMod) === 180) {
+          rotatedOxA = -oxA;
+          rotatedOzA = -ozA;
+        } else if (rotMod === 270 || rotMod === -90) {
+          rotatedOxA = ozA;
+          rotatedOzA = -oxA;
+        }
+
+        const currentPivotX = x - rotatedOxA;
+        const currentPivotZ = z - rotatedOzA;
+        const currentPivotY =
+          y - (movingBrick.position[1] - movingGroupPivot[1]);
+
+        const testGroupBricks = movingGroupOriginalBricks.map((b) => {
+          const ox = b.position[0] - movingGroupPivot[0];
+          const oz = b.position[2] - movingGroupPivot[2];
+          let nx = ox,
+            nz = oz;
+          if (rotMod === 90 || rotMod === -270) {
+            nx = -oz;
+            nz = ox;
+          } else if (Math.abs(rotMod) === 180) {
+            nx = -ox;
+            nz = -oz;
+          } else if (rotMod === 270 || rotMod === -90) {
+            nx = oz;
+            nz = -ox;
+          }
+
+          return {
+            ...b,
+            rotation: ((b.rotation || 0) + rotMod) % 360,
+            position: [
+              currentPivotX + nx,
+              currentPivotY + (b.position[1] - movingGroupPivot[1]),
+              currentPivotZ + nz,
+            ] as [number, number, number],
+          };
+        });
+
+        const otherBricks = bricks.filter(
+          (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
+        );
+        return checkStructureValid(
+          otherBricks,
+          testGroupBricks,
           MODULE_SIZE,
           BRICK_HEIGHT,
         );
@@ -299,11 +391,81 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     updateGhostPosition(p3, worldNormal);
   };
 
+  const ghostGroupBricks = useMemo(() => {
+    if (mode !== "Move" || !movingBrick) return [];
+    const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+    const oxA = movingBrick.position[0] - movingGroupPivot[0];
+    const ozA = movingBrick.position[2] - movingGroupPivot[2];
+    let rotatedOxA = oxA,
+      rotatedOzA = ozA;
+    if (rotMod === 90 || rotMod === -270) {
+      rotatedOxA = -ozA;
+      rotatedOzA = oxA;
+    } else if (Math.abs(rotMod) === 180) {
+      rotatedOxA = -oxA;
+      rotatedOzA = -ozA;
+    } else if (rotMod === 270 || rotMod === -90) {
+      rotatedOxA = ozA;
+      rotatedOzA = -oxA;
+    }
+
+    const currentPivotX = ghostPosition[0] - rotatedOxA;
+    const currentPivotZ = ghostPosition[2] - rotatedOzA;
+    const currentPivotY =
+      ghostPosition[1] - (movingBrick.position[1] - movingGroupPivot[1]);
+
+    return movingGroupOriginalBricks.map((b) => {
+      const ox = b.position[0] - movingGroupPivot[0];
+      const oz = b.position[2] - movingGroupPivot[2];
+      let nx = ox,
+        nz = oz;
+      if (rotMod === 90 || rotMod === -270) {
+        nx = -oz;
+        nz = ox;
+      } else if (Math.abs(rotMod) === 180) {
+        nx = -ox;
+        nz = -oz;
+      } else if (rotMod === 270 || rotMod === -90) {
+        nx = oz;
+        nz = -ox;
+      }
+
+      return {
+        ...b,
+        rotation: ((b.rotation || 0) + rotMod) % 360,
+        position: [
+          currentPivotX + nx,
+          currentPivotY + (b.position[1] - movingGroupPivot[1]),
+          currentPivotZ + nz,
+        ] as [number, number, number],
+      };
+    });
+  }, [
+    movingGroupOriginalBricks,
+    movingGroupPivot,
+    ghostPosition,
+    ghostRotation,
+    mode,
+    movingBrick,
+  ]);
+
   const placementStatus = useMemo(() => {
     if ((mode !== "Build" && mode !== "Move") || activePreset)
       return { valid: false, reason: "inactive" };
     if (mode === "Move" && !movingBrickId)
       return { valid: false, reason: "no-selection" };
+
+    if (mode === "Move") {
+      const otherBricks = bricks.filter(
+        (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
+      );
+      return checkStructureValid(
+        otherBricks,
+        ghostGroupBricks,
+        MODULE_SIZE,
+        BRICK_HEIGHT,
+      );
+    }
 
     const activeType = movingBrick ? movingBrick.type : selectedType;
     const ghostBrickData = {
@@ -327,6 +489,8 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     movingBrickId,
     movingBrick,
     activePreset,
+    ghostGroupBricks,
+    movingGroupOriginalBricks,
   ]);
 
   const presetBricks = useMemo(() => {
@@ -489,10 +653,22 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
       }
     } else if (mode === "Move" && movingBrick) {
       if (placementStatus.valid) {
-        updateBrick(movingBrick.id, {
-          position: ghostPosition,
-          rotation: ghostRotation,
-        });
+        if (movingGroupOriginalBricks.length > 1) {
+          useLegoStore.getState().updateBricks(
+            ghostGroupBricks.map((b) => ({
+              id: b.id,
+              updates: {
+                position: b.position as [number, number, number],
+                rotation: b.rotation,
+              },
+            })),
+          );
+        } else {
+          useLegoStore.getState().updateBrick(movingBrick.id, {
+            position: ghostPosition,
+            rotation: ghostRotation,
+          });
+        }
         setMovingBrickId(null);
       } else {
         useLegoStore
@@ -506,14 +682,15 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
   // Optimization: Group bricks by [type, color] for InstancedMesh rendering
   const groupedBricks = useMemo(() => {
     const groups: Record<string, typeof bricks> = {};
+    const movingIds = new Set(movingGroupOriginalBricks.map((b) => b.id));
     bricks.forEach((brick) => {
-      if (mode === "Move" && movingBrickId === brick.id) return;
+      if (mode === "Move" && movingIds.has(brick.id)) return;
       const key = `${brick.type}_${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
     });
     return groups;
-  }, [bricks, mode, movingBrickId]);
+  }, [bricks, mode, movingGroupOriginalBricks]);
 
   const groupedPresetBricks = useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -524,6 +701,16 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     });
     return groups;
   }, [presetBricks]);
+
+  const groupedGhostGroupBricks = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+    ghostGroupBricks.forEach((brick) => {
+      const key = `${brick.type}_${brick.color}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(brick);
+    });
+    return groups;
+  }, [ghostGroupBricks]);
 
   const mouseButtons = useMemo(() => {
     switch (cameraMode) {
@@ -597,16 +784,34 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {((mode === "Build" && !activePreset) ||
-                (mode === "Move" && movingBrick)) && (
+              {mode === "Build" && !activePreset && (
                 <LegoBrick
                   id="ghost"
-                  type={movingBrick ? movingBrick.type : selectedType}
-                  color={movingBrick ? movingBrick.color : selectedColor}
+                  type={selectedType}
+                  color={selectedColor}
                   position={ghostPosition}
                   rotation={ghostRotation}
                   isPlacementGhost
                 />
+              )}
+
+              {mode === "Move" && movingBrick && (
+                <>
+                  {Object.entries(groupedGhostGroupBricks).map(
+                    ([key, group]) => {
+                      const [type, color] = key.split("_");
+                      return (
+                        <BrickInstances
+                          key={`moving-ghost-${key}`}
+                          type={type as any}
+                          color={color}
+                          bricks={group}
+                          isGhost
+                        />
+                      );
+                    },
+                  )}
+                </>
               )}
 
               {activePreset && (
@@ -685,16 +890,34 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
 
-              {((mode === "Build" && !activePreset) ||
-                (mode === "Move" && movingBrick)) && (
+              {mode === "Build" && !activePreset && (
                 <LegoBrick
                   id="ghost"
-                  type={movingBrick ? movingBrick.type : selectedType}
-                  color={movingBrick ? movingBrick.color : selectedColor}
+                  type={selectedType}
+                  color={selectedColor}
                   position={ghostPosition}
                   rotation={ghostRotation}
                   isPlacementGhost
                 />
+              )}
+
+              {mode === "Move" && movingBrick && (
+                <>
+                  {Object.entries(groupedGhostGroupBricks).map(
+                    ([key, group]) => {
+                      const [type, color] = key.split("_");
+                      return (
+                        <BrickInstances
+                          key={`moving-ghost-${key}`}
+                          type={type as any}
+                          color={color}
+                          bricks={group}
+                          isGhost
+                        />
+                      );
+                    },
+                  )}
+                </>
               )}
 
               {activePreset && (

@@ -439,6 +439,8 @@ export default function App() {
     toastMessage,
     activePreset,
     loadPreset,
+    selectionMode,
+    setSelectionMode,
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(true);
@@ -629,6 +631,30 @@ export default function App() {
               onClick={() => setMode("Delete")}
               title="Delete Mode"
             />
+
+            {(mode === "Move" || mode === "Delete") && (
+              <>
+                <div className="w-10 h-px bg-white/10 my-1" />
+                <button
+                  onClick={() =>
+                    setSelectionMode(
+                      selectionMode === "Single" ? "Group" : "Single",
+                    )
+                  }
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
+                    selectionMode === "Group"
+                      ? "bg-white/20 text-white"
+                      : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                  }`}
+                  title="Toggle Group Selection Mode"
+                >
+                  <div className="text-[10px] uppercase font-bold tracking-wider leading-tight">
+                    {selectionMode}
+                  </div>
+                  <div className="text-[9px] opacity-70">Mode</div>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Right Colors */}

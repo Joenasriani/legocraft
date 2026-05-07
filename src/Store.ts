@@ -9,7 +9,88 @@ export interface BrickData {
   color: string;
   position: [number, number, number];
   rotation: number; // Y-axis rotation in degrees
+  groupId?: string;
 }
+
+export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
+  const dim1 = getBrickDimensions(b1.type);
+  const dim2 = getBrickDimensions(b2.type);
+  const rot1 = (b1.rotation || 0) % 360;
+  const rot2 = (b2.rotation || 0) % 360;
+
+  const w1 = rot1 === 90 || rot1 === 270 ? dim1.d : dim1.w;
+  const d1 = rot1 === 90 || rot1 === 270 ? dim1.w : dim1.d;
+
+  const w2 = rot2 === 90 || rot2 === 270 ? dim2.d : dim2.w;
+  const d2 = rot2 === 90 || rot2 === 270 ? dim2.w : dim2.d;
+
+  const x1 = b1.position[0];
+  const z1 = b1.position[2];
+  const x2 = b2.position[0];
+  const z2 = b2.position[2];
+
+  const dy = Math.abs(b1.position[1] - b2.position[1]);
+  if (dy > 0.096 + 0.001) return false; // BRICK_HEIGHT
+
+  const left1 = x1,
+    right1 = x1 + w1 * 0.08,
+    top1 = z1,
+    bottom1 = z1 + d1 * 0.08;
+  const left2 = x2,
+    right2 = x2 + w2 * 0.08,
+    top2 = z2,
+    bottom2 = z2 + d2 * 0.08;
+
+  const overlapX = Math.max(
+    0,
+    Math.min(right1, right2) - Math.max(left1, left2),
+  );
+  const overlapZ = Math.max(
+    0,
+    Math.min(bottom1, bottom2) - Math.max(top1, top2),
+  );
+
+  if (dy < 0.001) {
+    const touchX =
+      Math.abs(right1 - left2) < 0.001 || Math.abs(right2 - left1) < 0.001;
+    const touchZ =
+      Math.abs(bottom1 - top2) < 0.001 || Math.abs(bottom2 - top1) < 0.001;
+    return (
+      (overlapX > 0.001 && touchZ) ||
+      (overlapZ > 0.001 && touchX) ||
+      (overlapX > 0.001 && overlapZ > 0.001)
+    );
+  } else {
+    return overlapX > 0.001 && overlapZ > 0.001;
+  }
+};
+
+export const getGroupBricks = (
+  startBrick: BrickData,
+  allBricks: BrickData[],
+): BrickData[] => {
+  if (startBrick.groupId) {
+    return allBricks.filter((b) => b.groupId === startBrick.groupId);
+  }
+
+  const visited = new Set<string>();
+  const queue = [startBrick];
+  visited.add(startBrick.id);
+
+  const group: BrickData[] = [];
+  while (queue.length > 0) {
+    const curr = queue.shift()!;
+    group.push(curr);
+
+    for (const b of allBricks) {
+      if (!visited.has(b.id) && areBricksConnected(curr, b)) {
+        visited.add(b.id);
+        queue.push(b);
+      }
+    }
+  }
+  return group;
+};
 
 export const isValidBrickData = (item: any): boolean => {
   if (!item || typeof item !== "object") return false;
@@ -275,10 +356,16 @@ interface LegoStore {
   movingBrickId: string | null;
   isDraggingBrick: boolean;
 
+  selectionMode: "Single" | "Group";
+  setSelectionMode: (mode: "Single" | "Group") => void;
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
+  removeBricks: (ids: string[]) => void;
   updateBrick: (id: string, updates: Partial<BrickData>) => void;
+  updateBricks: (
+    updates: { id: string; updates: Partial<BrickData> }[],
+  ) => void;
   setMode: (mode: AppMode) => void;
   setCameraMode: (mode: CameraMode) => void;
   setSelectedType: (type: BrickType) => void;
@@ -776,17 +863,64 @@ const generateMountain = (): BrickData[] => {
 
   return mtn;
 };
+const repairPreset = (bricks: BrickData[]): BrickData[] => {
+  let allBricks = [...bricks];
+  let hasFloating = true;
+  let iterations = 0;
+  while (hasFloating && iterations < 1000) {
+    hasFloating = false;
+    iterations++;
+    allBricks.sort((a, b) => a.position[1] - b.position[1]);
+    
+    for (let i = 0; i < allBricks.length; i++) {
+      const b = allBricks[i];
+      if (b.position[1] <= 0.01) continue; // grounded
+      
+      let isSupported = false;
+      const bCells = getOccupiedCells(b, ms);
+      
+      for (let j = 0; j < allBricks.length; j++) {
+        if (i === j) continue;
+        const other = allBricks[j];
+        if (Math.abs((b.position[1] - bh) - other.position[1]) < 0.01) {
+          const oCells = getOccupiedCells(other, ms);
+          const overlap = bCells.some(bc => 
+            oCells.some(oc => Math.abs(bc.x - oc.x) < 0.01 && Math.abs(bc.z - oc.z) < 0.01)
+          );
+          if (overlap) {
+            isSupported = true;
+            break;
+          }
+        }
+      }
+      
+      if (!isSupported) {
+        hasFloating = true;
+        // pick center cell
+        const cell = bCells[Math.floor(bCells.length / 2)];
+        const gridX = Math.round(cell.x / ms);
+        const gridZ = Math.round(cell.z / ms);
+        const gridY = Math.round((b.position[1] - bh) / bh);
+        
+        allBricks.push(createBrick("1x1", b.color, gridX, gridY, gridZ, 0));
+        break; // break the for loop and restart while loop
+      }
+    }
+  }
+  return allBricks;
+};
+
 export const PRESETS: Record<PresetName, BrickData[]> = {
-  horse: generateHorse(),
-  sheep: generateSheep(),
-  car: generateCar(),
-  road: generateRoad(),
-  mountain: generateMountain(),
-  tree: generateLifeSizedTree(),
-  cabin: generateLifeSizedCabin(),
-  round_water_well: generateRoundWaterWell(),
-  pine_tree: generatePineTree(),
-  walk_in_castle: generateWalkInCastle(),
+  horse: repairPreset(generateHorse()),
+  sheep: repairPreset(generateSheep()),
+  car: repairPreset(generateCar()),
+  road: repairPreset(generateRoad()),
+  mountain: repairPreset(generateMountain()),
+  tree: repairPreset(generateLifeSizedTree()),
+  cabin: repairPreset(generateLifeSizedCabin()),
+  round_water_well: repairPreset(generateRoundWaterWell()),
+  pine_tree: repairPreset(generatePineTree()),
+  walk_in_castle: repairPreset(generateWalkInCastle()),
 };
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
@@ -844,6 +978,59 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }
 
     const newBricks = bricks.filter((b) => b.id !== id);
+
+    set({
+      undoStack: [...undoStack, { bricks: [...bricks] }],
+      redoStack: [],
+      bricks: newBricks,
+    });
+
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+  },
+
+  selectionMode: "Single",
+  setSelectionMode: (mode) => set({ selectionMode: mode }),
+
+  removeBricks: (ids) => {
+    const { bricks, undoStack } = get();
+    // Validate if any brick has something above it that isn't also being removed
+    const someInvalid = ids.some((id) => {
+      const b = bricks.find((x) => x.id === id);
+      if (!b) return false;
+      return hasBrickAbove(
+        b,
+        bricks.filter((x) => !ids.includes(x.id)),
+        0.08,
+        0.096,
+      );
+    });
+
+    if (someInvalid) {
+      if (typeof window !== "undefined") {
+        get().setToastMessage(
+          "Cannot delete: some bricks have others above them.",
+        );
+        setTimeout(() => get().setToastMessage(null), 3000);
+      }
+      return;
+    }
+
+    const newBricks = bricks.filter((b) => !ids.includes(b.id));
+    set({
+      undoStack: [...undoStack, { bricks: [...bricks] }],
+      redoStack: [],
+      bricks: newBricks,
+    });
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+  },
+
+  updateBricks: (updates) => {
+    const { bricks, undoStack } = get();
+    const updateMap = new Map(updates.map((u) => [u.id, u.updates]));
+    const newBricks = bricks.map((b) => {
+      const up = updateMap.get(b.id);
+      return up ? { ...b, ...up } : b;
+    });
 
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
@@ -948,6 +1135,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       return valid;
     });
 
+    const groupId = crypto.randomUUID();
     const presetBricks = validPresetBricks.map((b) => {
       let ox = b.position[0];
       let oz = b.position[2];
@@ -969,6 +1157,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       return {
         ...b,
         id: crypto.randomUUID(),
+        groupId,
         rotation: ((b.rotation || 0) + rotMod) % 360,
         position: [
           nx + position[0],
