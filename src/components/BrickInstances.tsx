@@ -53,6 +53,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({ type, color, bri
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
                 setMovingBrickId(brick.id);
+                useLegoStore.getState().setIsDraggingBrick(true);
                 // Dispatch a custom event to update ghost rotation to match the selected brick
                 window.dispatchEvent(new CustomEvent('set-ghost-rotation', { detail: brick.rotation }));
               }

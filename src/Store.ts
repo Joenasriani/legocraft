@@ -1,7 +1,7 @@
-import { create } from 'zustand';
+import { create } from "zustand";
 
-export type BrickType = '1x1' | '1x2' | '2x2' | '2x3' | '2x4';
-export const BRICK_TYPES: BrickType[] = ['1x1', '1x2', '2x2', '2x3', '2x4'];
+export type BrickType = "1x1" | "1x2" | "2x2" | "2x3" | "2x4";
+export const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
 
 export interface BrickData {
   id: string;
@@ -12,30 +12,47 @@ export interface BrickData {
 }
 
 export const isValidBrickData = (item: any): boolean => {
-  if (!item || typeof item !== 'object') return false;
-  if (typeof item.id !== 'string') return false;
+  if (!item || typeof item !== "object") return false;
+  if (typeof item.id !== "string") return false;
   if (!BRICK_TYPES.includes(item.type)) return false;
-  if (typeof item.color !== 'string') return false;
-  if (!Array.isArray(item.position) || item.position.length !== 3 || !item.position.every((n: any) => typeof n === 'number' && Number.isFinite(n))) return false;
-  if (typeof item.rotation !== 'number' || !Number.isFinite(item.rotation)) return false;
+  if (typeof item.color !== "string") return false;
+  if (
+    !Array.isArray(item.position) ||
+    item.position.length !== 3 ||
+    !item.position.every(
+      (n: any) => typeof n === "number" && Number.isFinite(n),
+    )
+  )
+    return false;
+  if (typeof item.rotation !== "number" || !Number.isFinite(item.rotation))
+    return false;
   return true;
 };
 
 export const getBrickDimensions = (type: BrickType) => {
   switch (type) {
-    case '1x1': return { w: 1, d: 1 };
-    case '1x2': return { w: 1, d: 2 };
-    case '2x2': return { w: 2, d: 2 };
-    case '2x3': return { w: 2, d: 3 };
-    case '2x4': return { w: 2, d: 4 };
-    default: return { w: 1, d: 1 };
+    case "1x1":
+      return { w: 1, d: 1 };
+    case "1x2":
+      return { w: 1, d: 2 };
+    case "2x2":
+      return { w: 2, d: 2 };
+    case "2x3":
+      return { w: 2, d: 3 };
+    case "2x4":
+      return { w: 2, d: 4 };
+    default:
+      return { w: 1, d: 1 };
   }
 };
 
-export const getOccupiedCells = (brick: Omit<BrickData, 'color'>, moduleSize: number) => {
+export const getOccupiedCells = (
+  brick: Omit<BrickData, "color">,
+  moduleSize: number,
+) => {
   const { w, d } = getBrickDimensions(brick.type);
   const rot = Math.round(brick.rotation / 90) % 4; // 0, 1, 2, 3
-  
+
   // Effective width and depth based on rotation
   const isRotated = rot === 1 || rot === 3 || rot === -1 || rot === -3;
   const ew = isRotated ? d : w;
@@ -58,90 +75,105 @@ export const getOccupiedCells = (brick: Omit<BrickData, 'color'>, moduleSize: nu
 };
 
 export const checkPlacementValid = (
-  bricks: Omit<BrickData, 'color'>[], 
-  ghostData: Omit<BrickData, 'color'>, 
-  moduleSize: number, 
-  brickHeight: number, 
+  bricks: Omit<BrickData, "color">[],
+  ghostData: Omit<BrickData, "color">,
+  moduleSize: number,
+  brickHeight: number,
   epsilon: number = 0.01,
-  ignoreBrickId?: string
+  ignoreBrickId?: string,
 ) => {
   const ghostCells = getOccupiedCells(ghostData, moduleSize);
 
   // MUST NOT OVERLAP
-  const isOverlap = bricks.some(b => {
-    if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId)) return false;
+  const isOverlap = bricks.some((b) => {
+    if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
+      return false;
     if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
     const bCells = getOccupiedCells(b, moduleSize);
-    return ghostCells.some(gc => 
-      bCells.some(bc => 
-        Math.abs(gc.x - bc.x) < epsilon && 
-        Math.abs(gc.z - bc.z) < epsilon
-      )
+    return ghostCells.some((gc) =>
+      bCells.some(
+        (bc) =>
+          Math.abs(gc.x - bc.x) < epsilon && Math.abs(gc.z - bc.z) < epsilon,
+      ),
     );
   });
 
-  if (isOverlap) return { valid: false, reason: 'overlap' };
+  if (isOverlap) return { valid: false, reason: "overlap" };
 
   // Ground check
-  if (ghostData.position[1] <= epsilon) return { valid: true, reason: 'grounded' };
+  if (ghostData.position[1] <= epsilon)
+    return { valid: true, reason: "grounded" };
 
   // Connection check (Support from below)
   // AT LEAST ONE occupied footprint cell MUST be supported by a brick below
-  const isSupported = ghostCells.some(gc => {
-    return bricks.some(b => {
-      if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId)) return false;
-      
+  const isSupported = ghostCells.some((gc) => {
+    return bricks.some((b) => {
+      if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
+        return false;
+
       const dy = ghostData.position[1] - b.position[1];
       if (Math.abs(dy - brickHeight) < epsilon) {
         const bCells = getOccupiedCells(b, moduleSize);
-        return bCells.some(bc => 
-          Math.abs(gc.x - bc.x) < epsilon && 
-          Math.abs(gc.z - bc.z) < epsilon
+        return bCells.some(
+          (bc) =>
+            Math.abs(gc.x - bc.x) < epsilon && Math.abs(gc.z - bc.z) < epsilon,
         );
       }
       return false;
     });
   });
 
-  return isSupported ? { valid: true, reason: 'supported' } : { valid: false, reason: 'floating' };
+  return isSupported
+    ? { valid: true, reason: "supported" }
+    : { valid: false, reason: "floating" };
 };
 
 export const hasBrickAbove = (
-  brick: Omit<BrickData, 'color'>,
-  bricks: Omit<BrickData, 'color'>[],
+  brick: Omit<BrickData, "color">,
+  bricks: Omit<BrickData, "color">[],
   moduleSize: number,
   brickHeight: number,
-  epsilon: number = 0.01
+  epsilon: number = 0.01,
 ) => {
   const targetTopY = brick.position[1] + brickHeight;
-  
+
   // 1. Find bricks exactly one layer above the selected brick
-  const bricksDirectlyAbove = bricks.filter(b => Math.abs(b.position[1] - targetTopY) < epsilon);
-  
+  const bricksDirectlyAbove = bricks.filter(
+    (b) => Math.abs(b.position[1] - targetTopY) < epsilon,
+  );
+
   const targetCells = getOccupiedCells(brick, moduleSize);
 
   for (const b of bricksDirectlyAbove) {
     const bCells = getOccupiedCells(b, moduleSize);
 
     // 2. X/Z occupied cells truly overlap
-    const overlappingCells = bCells.filter(bc => 
-      targetCells.some(tc => Math.abs(bc.x - tc.x) < epsilon && Math.abs(bc.z - tc.z) < epsilon)
+    const overlappingCells = bCells.filter((bc) =>
+      targetCells.some(
+        (tc) =>
+          Math.abs(bc.x - tc.x) < epsilon && Math.abs(bc.z - tc.z) < epsilon,
+      ),
     );
 
     if (overlappingCells.length > 0) {
       // 3. Check if removing selected brick removes the other brick's valid support
       // Find if `b` is supported by ANY OTHER brick exactly on the same layer as `brick`
-      const otherSupports = bricks.filter(other => 
-        other.id !== brick.id && 
-        other.id !== b.id && 
-        Math.abs(other.position[1] - brick.position[1]) < epsilon
+      const otherSupports = bricks.filter(
+        (other) =>
+          other.id !== brick.id &&
+          other.id !== b.id &&
+          Math.abs(other.position[1] - brick.position[1]) < epsilon,
       );
 
       let hasAlternateSupport = false;
       for (const other of otherSupports) {
         const otherCells = getOccupiedCells(other, moduleSize);
-        const overlapWithOther = bCells.some(bc => 
-          otherCells.some(oc => Math.abs(bc.x - oc.x) < epsilon && Math.abs(bc.z - oc.z) < epsilon)
+        const overlapWithOther = bCells.some((bc) =>
+          otherCells.some(
+            (oc) =>
+              Math.abs(bc.x - oc.x) < epsilon &&
+              Math.abs(bc.z - oc.z) < epsilon,
+          ),
         );
         if (overlapWithOther) {
           hasAlternateSupport = true;
@@ -151,55 +183,81 @@ export const hasBrickAbove = (
 
       console.log(`[Delete Audit] Selected: ${brick.id}, Above: ${b.id}`);
       console.log(`- Overlap cells found: ${overlappingCells.length}`);
-      console.log(`- Selected Top Y: ${targetTopY.toFixed(3)}, Above Bottom Y: ${b.position[1].toFixed(3)}`);
+      console.log(
+        `- Selected Top Y: ${targetTopY.toFixed(3)}, Above Bottom Y: ${b.position[1].toFixed(3)}`,
+      );
       console.log(`- Has Alternate Support: ${hasAlternateSupport}`);
 
       if (!hasAlternateSupport) {
-        return true; 
+        return true;
       }
     }
   }
-  
+
   return false;
 };
 
 export const checkStructureValid = (
-  bricks: Omit<BrickData, 'color'>[],
-  presetBricks: Omit<BrickData, 'color'>[],
+  bricks: Omit<BrickData, "color">[],
+  presetBricks: Omit<BrickData, "color">[],
   moduleSize: number,
   brickHeight: number,
   epsilon: number = 0.01,
-  presetName?: string
-): { valid: boolean, reason?: string } => {
-  if (presetBricks.length === 0) return { valid: false, reason: 'empty preset' };
+  presetName?: string,
+): { valid: boolean; reason?: string } => {
+  if (presetBricks.length === 0)
+    return { valid: false, reason: "empty preset" };
 
-  const minY = Math.min(...presetBricks.map(b => b.position[1]));
-  const baseBricks = presetBricks.filter(b => b.position[1] === minY);
-  
+  const minY = Math.min(...presetBricks.map((b) => b.position[1]));
+  const baseBricks = presetBricks.filter((b) => b.position[1] === minY);
+
   let isValidPlacement = false;
   if (minY <= epsilon) {
     isValidPlacement = true;
   } else {
-    isValidPlacement = baseBricks.every(baseBrick => {
-      const dummyValid = checkPlacementValid(bricks, baseBrick, moduleSize, brickHeight, epsilon);
+    isValidPlacement = baseBricks.every((baseBrick) => {
+      const dummyValid = checkPlacementValid(
+        bricks,
+        baseBrick,
+        moduleSize,
+        brickHeight,
+        epsilon,
+      );
       return dummyValid.valid;
     });
   }
 
-  if (!isValidPlacement) return { valid: false, reason: 'unsupported' };
+  if (!isValidPlacement) return { valid: false, reason: "unsupported" };
 
-  const hasOverlap = presetBricks.some(pb => {
-    const dummyValid = checkPlacementValid(bricks, pb, moduleSize, brickHeight, epsilon);
-    return !dummyValid.valid && dummyValid.reason === 'overlap';
+  const hasOverlap = presetBricks.some((pb) => {
+    const dummyValid = checkPlacementValid(
+      bricks,
+      pb,
+      moduleSize,
+      brickHeight,
+      epsilon,
+    );
+    return !dummyValid.valid && dummyValid.reason === "overlap";
   });
 
-  if (hasOverlap) return { valid: false, reason: 'overlap' };
+  if (hasOverlap) return { valid: false, reason: "overlap" };
 
   return { valid: true };
 };
 
-export type PresetName = 'tree' | 'cabin' | 'round_water_well' | 'pine_tree' | 'walk_in_castle';
-export type AppMode = 'Build' | 'Move' | 'Delete';
+export type PresetName =
+  | "tree"
+  | "cabin"
+  | "round_water_well"
+  | "pine_tree"
+  | "walk_in_castle"
+  | "horse"
+  | "sheep"
+  | "car"
+  | "road"
+  | "mountain";
+export type AppMode = "Build" | "Move" | "Delete";
+export type CameraMode = "Orbit" | "Pan" | "Zoom";
 
 interface HistoryState {
   bricks: BrickData[];
@@ -208,22 +266,26 @@ interface HistoryState {
 interface LegoStore {
   bricks: BrickData[];
   mode: AppMode;
+  cameraMode: CameraMode;
   selectedType: BrickType;
   selectedColor: string;
   undoStack: HistoryState[];
   redoStack: HistoryState[];
   toastMessage: string | null;
   movingBrickId: string | null;
-  
+  isDraggingBrick: boolean;
+
   // Actions
-  addBrick: (brick: Omit<BrickData, 'id'>) => void;
+  addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
   updateBrick: (id: string, updates: Partial<BrickData>) => void;
   setMode: (mode: AppMode) => void;
+  setCameraMode: (mode: CameraMode) => void;
   setSelectedType: (type: BrickType) => void;
   setSelectedColor: (color: string) => void;
   setToastMessage: (msg: string | null) => void;
   setMovingBrickId: (id: string | null) => void;
+  setIsDraggingBrick: (val: boolean) => void;
   undo: () => void;
   redo: () => void;
   clearAll: () => void;
@@ -234,126 +296,120 @@ interface LegoStore {
 }
 
 const COLORS = [
-  '#E3000B', // Red
-  '#0055BF', // Blue
-  '#FFD500', // Yellow
-  '#FFFFFF', // White
-  '#000000', // Black
-  '#00AD3C', // Green
-  '#8B4513', // Wood/Brown
+  "#E3000B", // Red
+  "#0055BF", // Blue
+  "#FFD500", // Yellow
+  "#FFFFFF", // White
+  "#000000", // Black
+  "#00AD3C", // Green
+  "#8B4513", // Wood/Brown
 ];
 
 // Presets using accurate sizing
 const ms = 0.08; // MODULE_SIZE
 const bh = 0.096; // BRICK_HEIGHT
 
-const createBrick = (type: BrickType, color: string, px: number, py: number, pz: number, rotation: number = 0): BrickData => ({
+const createBrick = (
+  type: BrickType,
+  color: string,
+  px: number,
+  py: number,
+  pz: number,
+  rotation: number = 0,
+): BrickData => ({
   id: crypto.randomUUID(),
   type,
   color,
   position: [px * ms, py * bh, pz * ms],
-  rotation
+  rotation,
 });
 
 const generateLifeSizedTree = (): BrickData[] => {
   const tree: BrickData[] = [];
-  const trunkColor = '#8B4513'; // Standard Brown
-  const leafColor = '#00AD3C';  // Standard Green
-  
-  // Taller Trunk (Stacked 2x2)
-  // Height ~2.8m (30 bricks)
-  const trunkTopY = 28;
+  const trunkColor = "#8B4513";
+  const leafColor = "#00AD3C";
+
+  // Trunk: 2x2 centered at 0.5, 0.5
+  // Height: ~4m = 42 bricks
+  const trunkTopY = 42;
   for (let y = 0; y < trunkTopY; y++) {
-    tree.push(createBrick('2x2', trunkColor, 0, y, 0));
+    tree.push(createBrick("2x2", trunkColor, 0.5, y, 0.5));
   }
 
-  // Full Leaf Canopy Distribution
-  // Starts from mid-trunk (y=12) and goes above the trunk top (y=38)
-  for (let y = 12; y < 38; y++) {
-    let layerRadius = 0;
-    
-    if (y < 20) {
-      // Expanding base: 1 to 4
-      layerRadius = 1 + (y - 12) * 0.4;
-    } else if (y < 32) {
-      // Wide middle: 4 to 6
-      layerRadius = 4 + (y - 20) * 0.15;
-    } else {
-      // Rounded top taper: 6 down to 1
-      layerRadius = 6 - (y - 32) * 1;
-    }
+  // Canopy
+  for (let y = 20; y <= 55; y++) {
+    let radius = 0;
+    if (y < 30)
+      radius = 3 + (y - 20) * 0.5; // Expanding
+    else if (y <= 45)
+      radius = 8 - (y - 30) * 0.2; // Wide middle
+    else radius = 5 - (y - 45) * 0.5; // Tapering
 
-    const r = Math.max(1, layerRadius);
-    for (let x = -Math.floor(r); x <= Math.floor(r); x++) {
-      for (let z = -Math.floor(r); z <= Math.floor(r); z++) {
-        // Distance check for rounded layers
+    const rInt = Math.floor(radius / 2) * 2;
+    for (let xOffset = -rInt; xOffset <= rInt; xOffset += 2) {
+      for (let zOffset = -rInt; zOffset <= rInt; zOffset += 2) {
+        const x = xOffset + 0.5;
+        const z = zOffset + 0.5;
         const dist = Math.sqrt(x * x + z * z);
-        if (dist <= r) {
-          // Inner core density check (avoid overwriting trunk)
-          if (y < trunkTopY && dist < 1.1) continue;
-          
-          // Add some organic variation by skipping random internal bricks if wanted, 
-          // but for LEGO feel, solid is usually better.
-          tree.push(createBrick('2x2', leafColor, x, y, z));
+        if (dist <= radius) {
+          if (y < trunkTopY && Math.abs(x) < 1.5 && Math.abs(z) < 1.5) continue;
+          tree.push(createBrick("2x2", leafColor, x, y, z));
         }
       }
     }
   }
-  
   return tree;
 };
 
 const generateLifeSizedCabin = (): BrickData[] => {
   const cabin: BrickData[] = [];
-  const brown = '#8B4513'; // ONLY brown bricks as requested
+  const brown = "#8B4513";
+  const roof = "#3b2f2f";
 
-  // Base floor
-  for (let x = -5; x <= 5; x += 2) {
-    for (let z = -5; z <= 5; z += 4) {
-      cabin.push(createBrick('2x4', brown, x, 0, z));
+  // Interior: 40 x 32 modules (3.2m x 2.56m)
+  // X: -20.5 to 20.5
+  // Z: -16.5 to 16.5
+
+  // Floor (y=0)
+  for (let x = -19.5; x <= 19.5; x += 2) {
+    for (let z = -14.5; z <= 15.5; z += 4) {
+      cabin.push(createBrick("2x4", brown, x, 0, z, 0));
     }
   }
 
-  // Walls (Height 20 bricks)
-  for (let y = 1; y < 21; y++) {
+  // Walls (y=1 to 24) (2.3m tall)
+  for (let y = 1; y <= 24; y++) {
+    // Left and Right Walls
+    for (let z = -14.5; z <= 14.5; z += 4) {
+      // Windows
+      const isWindow = y >= 10 && y <= 16 && Math.abs(z) < 6;
+      if (!isWindow) cabin.push(createBrick("2x4", brown, -19.5, y, z, 0));
+      if (!isWindow) cabin.push(createBrick("2x4", brown, 19.5, y, z, 0));
+    }
     // Back Wall
-    cabin.push(createBrick('2x4', brown, -3, y, -5, 0));
-    cabin.push(createBrick('2x4', brown, 1, y, -5, 0));
-    cabin.push(createBrick('2x2', brown, 4, y, -5, 0));
-    
-    // Left Wall
-    cabin.push(createBrick('2x4', brown, -5, y, -3, 90));
-    cabin.push(createBrick('2x4', brown, -5, y, 1, 90));
-    cabin.push(createBrick('2x2', brown, -5, y, 4, 90));
-    
-    // Right Wall (with a window)
-    if (y < 12 || y > 16) {
-      cabin.push(createBrick('2x4', brown, 5, y, -3, 90));
-      cabin.push(createBrick('2x4', brown, 5, y, 1, 90));
-      cabin.push(createBrick('2x2', brown, 5, y, 4, 90));
-    } else {
-      // Window opening at height 12-16
-      cabin.push(createBrick('2x2', brown, 5, y, -4, 90));
-      cabin.push(createBrick('2x2', brown, 5, y, 4, 90));
+    for (let x = -17.5; x <= 17.5; x += 4) {
+      cabin.push(createBrick("2x4", brown, x, y, -16.5, 90));
     }
-    
-    // Front Wall (door opening)
-    if (y > 15) {
-      // Span above door
-      cabin.push(createBrick('2x4', brown, -3, y, 5, 0));
-      cabin.push(createBrick('2x4', brown, 1, y, 5, 0));
-      cabin.push(createBrick('2x2', brown, 4, y, 5, 0));
-    } else {
-      // Sides of door
-      cabin.push(createBrick('2x2', brown, -4, y, 5, 0));
-      cabin.push(createBrick('2x2', brown, 4, y, 5, 0));
+    // Front Wall (Door)
+    for (let x = -17.5; x <= 17.5; x += 4) {
+      // Door gap -5.5 to 5.5 = ~1m wide
+      const isDoor = y <= 20 && Math.abs(x) < 6;
+      if (!isDoor) cabin.push(createBrick("2x4", brown, x, y, 16.5, 90));
     }
   }
 
-  // Roof (Simple flat roof for now with some overhang)
-  for (let x = -6; x <= 6; x += 2) {
-    for (let z = -6; z <= 6; z += 4) {
-      cabin.push(createBrick('2x4', brown, x, 21, z));
+  // Roof (Pitched)
+  for (let y = 25; y <= 35; y++) {
+    const inset = (y - 24) * 2;
+    for (let x = -21.5; x <= 21.5; x += 4) {
+      const zOffset = 16.5 - inset;
+      if (zOffset > 0) {
+        cabin.push(createBrick("2x4", roof, x, y, zOffset, 90));
+        cabin.push(createBrick("2x4", roof, x, y, -zOffset, 90));
+      } else if (zOffset === 0.5) {
+        // Cap
+        cabin.push(createBrick("2x4", roof, x, y, 0.5, 90));
+      }
     }
   }
 
@@ -362,46 +418,52 @@ const generateLifeSizedCabin = (): BrickData[] => {
 
 const generateRoundWaterWell = (): BrickData[] => {
   const well: BrickData[] = [];
-  const stone = '#A0A0A0';
-  const darkStone = '#707070';
-  const blue = '#0055BF';
-  const brown = '#8B4513';
+  const stone = "#A0A0A0";
+  const darkStone = "#707070";
+  const blue = "#0055BF";
+  const brown = "#8B4513";
 
-  for (let y = 0; y < 6; y++) {
-    well.push(createBrick('2x4', stone, -4, y, 0, 90));
-    well.push(createBrick('2x4', stone, 4, y, 0, 90));
-    well.push(createBrick('2x4', stone, 0, y, -4, 0));
-    well.push(createBrick('2x4', stone, 0, y, 4, 0));
+  // Base
+  for (let y = 0; y <= 8; y++) {
+    const s = y % 2 === 0 ? darkStone : stone;
+    // X walls
+    well.push(createBrick("2x4", s, -5.5, y, -0.5, 90));
+    well.push(createBrick("2x4", s, -5.5, y, 3.5, 90));
+    well.push(createBrick("2x4", s, 6.5, y, -0.5, 90));
+    well.push(createBrick("2x4", s, 6.5, y, 3.5, 90));
+    // Z walls
+    well.push(createBrick("2x4", s, -0.5, y, -5.5, 0));
+    well.push(createBrick("2x4", s, 3.5, y, -5.5, 0));
+    well.push(createBrick("2x4", s, -0.5, y, 6.5, 0));
+    well.push(createBrick("2x4", s, 3.5, y, 6.5, 0));
 
-    const activeStone = y % 2 === 0 ? darkStone : stone;
-    well.push(createBrick('2x2', activeStone, -4, y, -4, 0));
-    well.push(createBrick('2x2', activeStone, 4, y, -4, 0));
-    well.push(createBrick('2x2', activeStone, -4, y, 4, 0));
-    well.push(createBrick('2x2', activeStone, 4, y, 4, 0));
+    // Corners
+    well.push(createBrick("2x2", s, -4.5, y, -4.5, 0));
+    well.push(createBrick("2x2", s, 5.5, y, -4.5, 0));
+    well.push(createBrick("2x2", s, -4.5, y, 5.5, 0));
+    well.push(createBrick("2x2", s, 5.5, y, 5.5, 0));
   }
 
-  for (let x = -2; x <= 2; x += 2) {
-    for (let z = -2; z <= 2; z += 2) {
-      if (Math.abs(x) === 2 && Math.abs(z) === 2) continue;
-      well.push(createBrick('2x2', blue, x, 3, z, 0));
+  // Water
+  for (let x = -2.5; x <= 3.5; x += 2) {
+    for (let z = -2.5; z <= 3.5; z += 2) {
+      if (Math.abs(x - 0.5) < 4 && Math.abs(z - 0.5) < 4) {
+        well.push(createBrick("2x2", blue, x, 6, z, 0));
+      }
     }
   }
-  well.push(createBrick('2x2', blue, -2, 3, -2, 0));
-  well.push(createBrick('2x2', blue, 2, 3, -2, 0));
-  well.push(createBrick('2x2', blue, -2, 3, 2, 0));
-  well.push(createBrick('2x2', blue, 2, 3, 2, 0));
 
-  for (let y = 6; y < 14; y++) {
-    well.push(createBrick('2x2', brown, -4, y, 0, 0));
-    well.push(createBrick('2x2', brown, 4, y, 0, 0));
+  // Pillars
+  for (let y = 9; y <= 20; y++) {
+    well.push(createBrick("2x2", brown, -5.5, y, 0.5, 0));
+    well.push(createBrick("2x2", brown, 6.5, y, 0.5, 0));
   }
 
-  for (let x = -6; x <= 6; x += 2) {
-    well.push(createBrick('2x4', brown, x, 14, -2, 90));
-    well.push(createBrick('2x4', brown, x, 14, 2, 90));
-    if (x >= -4 && x <= 4) {
-      well.push(createBrick('2x2', brown, x, 15, 0, 0));
-    }
+  // Roof
+  for (let x = -7.5; x <= 8.5; x += 2) {
+    well.push(createBrick("2x4", brown, x, 21, -1.5, 90));
+    well.push(createBrick("2x4", brown, x, 21, 2.5, 90));
+    well.push(createBrick("2x2", brown, x, 22, 0.5, 0));
   }
 
   return well;
@@ -409,206 +471,371 @@ const generateRoundWaterWell = (): BrickData[] => {
 
 const generatePineTree = (): BrickData[] => {
   const tree: BrickData[] = [];
-  const brown = '#8B4513';
-  const green = '#00AD3C';
+  const brown = "#8B4513";
+  const green = "#00AD3C";
 
-  for (let y = 0; y < 12; y++) {
-    tree.push(createBrick('2x2', brown, 0, y, 0, 0));
+  // Trunk
+  for (let y = 0; y <= 15; y++) {
+    tree.push(createBrick("2x2", brown, 0.5, y, 0.5, 0));
   }
 
   const layers = [
-    { startY: 8, radius: 8 },
-    { startY: 12, radius: 6 },
-    { startY: 17, radius: 4 },
-    { startY: 23, radius: 2 }
+    { startY: 10, radius: 10 },
+    { startY: 16, radius: 8 },
+    { startY: 22, radius: 6 },
+    { startY: 28, radius: 4 },
+    { startY: 34, radius: 2 },
   ];
 
   for (let i = 0; i < layers.length; i++) {
-    const curLayer = layers[i];
-    const nextY = i < layers.length - 1 ? layers[i+1].startY : 28;
-    
-    let currentRadius = curLayer.radius;
-    for (let y = curLayer.startY; y < nextY; y++) {
-      for (let x = -currentRadius; x <= currentRadius; x += 2) {
-        for (let z = -currentRadius; z <= currentRadius; z += 2) {
-           if (Math.abs(x) + Math.abs(z) <= currentRadius * 1.3) {
-              if (Math.abs(x) <= 1 && Math.abs(z) <= 1 && y < 12) continue;
-              tree.push(createBrick('2x2', green, x, y, z, 0));
-           }
+    const cur = layers[i];
+    const nextY = i < layers.length - 1 ? layers[i + 1].startY : 40;
+
+    let currentRadius = cur.radius;
+    for (let y = cur.startY; y < nextY; y++) {
+      const rInt = Math.floor(currentRadius / 2) * 2;
+      for (let xOffset = -rInt; xOffset <= rInt; xOffset += 2) {
+        for (let zOffset = -rInt; zOffset <= rInt; zOffset += 2) {
+          const x = xOffset + 0.5;
+          const z = zOffset + 0.5;
+          if (
+            Math.sqrt(xOffset * xOffset + zOffset * zOffset) <=
+            currentRadius + 1
+          ) {
+            if (Math.abs(x) <= 1.5 && Math.abs(z) <= 1.5 && y <= 15) continue;
+            tree.push(createBrick("2x2", green, x, y, z, 0));
+          }
         }
       }
       if (y % 2 === 1 && currentRadius > 2) {
-         currentRadius -= 2; 
+        currentRadius -= 1;
       }
     }
   }
-  
-  tree.push(createBrick('1x1', green, -1, 28, -1, 0));
-  tree.push(createBrick('1x1', green, 1, 28, -1, 0));
-  tree.push(createBrick('1x1', green, -1, 28, 1, 0));
-  tree.push(createBrick('1x1', green, 1, 28, 1, 0));
+
+  tree.push(createBrick("2x2", green, 0.5, 40, 0.5, 0));
 
   return tree;
 };
 
 const generateWalkInCastle = (): BrickData[] => {
   const castle: BrickData[] = [];
-  const stone = '#A0A0A0';
-  const darkStone = '#707070';
-  const black = '#000000';
-  
-  // Left Wall: px = -13, pz = -10, -6, -2, 2, 6, 10
-  // Right Wall: px = 13, pz = -10, -6, -2, 2, 6, 10
-  for (let y = 0; y <= 9; y++) {
-    for (const pz of [-10, -6, -2, 2, 6, 10]) {
-      castle.push(createBrick('2x4', stone, -13, y, pz, 0));
-      castle.push(createBrick('2x4', stone, 13, y, pz, 0));
+  const stone = "#A0A0A0";
+  const darkStone = "#707070";
+
+  // Size: 70 x 70 modules (5.6m x 5.6m)
+  // X: -35.5 to 35.5
+  // Z: -35.5 to 35.5
+
+  // Left and Right Walls (Z goes from -35.5 to 35.5)
+  // y = 0 to 30 (2.8m tall)
+  for (let y = 0; y <= 30; y++) {
+    for (let z = -30.5; z <= 30.5; z += 4) {
+      castle.push(createBrick("2x4", stone, -35.5, y, z, 0));
+      castle.push(createBrick("2x4", stone, 35.5, y, z, 0));
     }
   }
 
-  // Back Wall: pz = -13
-  for (let y = 0; y <= 9; y++) {
-    for (const px of [-10, -6, -2, 2, 6, 10]) {
-      castle.push(createBrick('2x4', stone, px, y, -13, 90));
+  // Back Wall
+  for (let y = 0; y <= 30; y++) {
+    for (let x = -30.5; x <= 30.5; x += 4) {
+      castle.push(createBrick("2x4", stone, x, y, -35.5, 90));
     }
   }
 
-  // Front Wall: pz = 13
-  for (let y = 0; y <= 5; y++) {
-    for (const px of [-10, -6, 6, 10]) {
-      castle.push(createBrick('2x4', stone, px, y, 13, 90));
-    }
-    // Gap [-2, 2]. Use 2x2 at -3 and 3
-    castle.push(createBrick('2x2', stone, -3, y, 13, 0));
-    castle.push(createBrick('2x2', stone, 3, y, 13, 0));
-  }
-  castle.push(createBrick('2x4', stone, -10, 6, 13, 90));
-  castle.push(createBrick('2x2', stone, -7, 6, 13, 0));
-  castle.push(createBrick('2x4', stone, -4, 6, 13, 90));
-  castle.push(createBrick('2x4', stone, 4, 6, 13, 90));
-  castle.push(createBrick('2x2', stone, 7, 6, 13, 0));
-  castle.push(createBrick('2x4', stone, 10, 6, 13, 90));
-  
-  for (let y = 7; y <= 9; y++) {
-    for (const px of [-10, -6, -2, 2, 6, 10]) {
-      castle.push(createBrick('2x4', stone, px, y, 13, 90));
+  // Front Wall (with door)
+  for (let y = 0; y <= 30; y++) {
+    for (let x = -30.5; x <= 30.5; x += 4) {
+      // Door gap: -6.5 to 6.5 (13 modules = ~1m wide, 21 bricks = 2m tall)
+      if (y <= 21 && Math.abs(x) < 8) continue;
+      castle.push(createBrick("2x4", stone, x, y, 35.5, 90));
     }
   }
 
-  // Divider Wall: pz = 0
-  for (let y = 0; y <= 5; y++) {
-    for (const px of [-9, -5, -1, 7]) {
-      castle.push(createBrick('2x4', stone, px, y, 0, 90));
-    }
-    castle.push(createBrick('2x2', stone, 10, y, 0, 0));
-  }
-  castle.push(createBrick('2x4', stone, -9, 6, 0, 90));
-  castle.push(createBrick('2x4', stone, -5, 6, 0, 90));
-  castle.push(createBrick('2x2', stone, -2, 6, 0, 0));
-  castle.push(createBrick('2x4', stone, 1, 6, 0, 90));
-  castle.push(createBrick('2x4', stone, 5, 6, 0, 90));
-  castle.push(createBrick('2x4', stone, 9, 6, 0, 90));
-  
-  for (let y = 7; y <= 9; y++) {
-    for (const px of [-9, -5, -1, 3, 7]) {
-      castle.push(createBrick('2x4', stone, px, y, 0, 90));
-    }
-    castle.push(createBrick('2x2', stone, 10, y, 0, 0));
-  }
-
-  // Roof / Ceiling Strips on top of all walls (y = 10)
-  for (const pz of [-10, -6, -2, 2, 6, 10]) {
-    castle.push(createBrick('2x4', stone, -13, 10, pz, 0));
-    castle.push(createBrick('2x4', stone, 13, 10, pz, 0));
-  }
-  for (const px of [-10, -6, -2, 2, 6, 10]) {
-    castle.push(createBrick('2x4', stone, px, 10, -13, 90));
-    castle.push(createBrick('2x4', stone, px, 10, 13, 90));
-  }
-  for (const px of [-9, -5, -1, 3, 7]) {
-    castle.push(createBrick('2x4', stone, px, 10, 0, 90));
-  }
-  castle.push(createBrick('2x2', stone, 10, 10, 0, 0));
-  
-  // Battlements on Top of outer walls (y = 11) using 2x2 bricks
-  // Alternating blocks create a crenellated zigzag pattern
-  for (const pz of [-10, -6, -2, 2, 6, 10]) {
-    castle.push(createBrick('2x2', stone, -13, 11, pz, 0));
-    castle.push(createBrick('2x2', stone, 13, 11, pz, 0));
-  }
-  for (const px of [-10, -6, -2, 2, 6, 10]) {
-    castle.push(createBrick('2x2', stone, px, 11, -13, 0));
-    castle.push(createBrick('2x2', stone, px, 11, 13, 0));
-  }
-
-  // Corners / Towers
+  // Towers at Corners
   const corners = [
-    [-13, -13], [-13, 13], [13, -13], [13, 13]
+    [-35.5, -35.5],
+    [-35.5, 35.5],
+    [35.5, -35.5],
+    [35.5, 35.5],
   ];
   for (const [cx, cz] of corners) {
-    // Fill the empty corner spaces for the walls!
-    for (let y = 0; y <= 9; y++) {
-      castle.push(createBrick('2x2', stone, cx, y, cz, 0));
+    for (let y = 0; y <= 40; y++) {
+      const c = y % 4 < 2 ? darkStone : stone;
+      castle.push(createBrick("2x2", c, cx - 1, y, cz - 1, 0));
+      castle.push(createBrick("2x2", c, cx + 1, y, cz - 1, 0));
+      castle.push(createBrick("2x2", c, cx - 1, y, cz + 1, 0));
+      castle.push(createBrick("2x2", c, cx + 1, y, cz + 1, 0));
     }
-    // Build the taller tower up (y=10 to y=14)
-    for (let y = 10; y <= 14; y++) {
-      castle.push(createBrick('2x2', stone, cx, y, cz, 0));
-    }
-    // Add small crenellated tops to corners using 1x1 bricks
-    castle.push(createBrick('1x1', stone, cx - 0.5, 15, cz - 0.5, 0));
-    castle.push(createBrick('1x1', stone, cx + 0.5, 15, cz + 0.5, 0));
+    // Crenellations for towers (y=41)
+    castle.push(createBrick("2x2", stone, cx - 1, 41, cz - 1, 0));
+    castle.push(createBrick("2x2", stone, cx + 1, 41, cz + 1, 0));
+  }
+
+  // Wall Battlements (y=31)
+  for (let z = -30.5; z <= 30.5; z += 4) {
+    castle.push(createBrick("2x2", stone, -35.5, 31, z, 0));
+    castle.push(createBrick("2x2", stone, 35.5, 31, z, 0));
+  }
+  for (let x = -30.5; x <= 30.5; x += 4) {
+    castle.push(createBrick("2x2", stone, x, 31, -35.5, 0));
+    castle.push(createBrick("2x2", stone, x, 31, 35.5, 0));
   }
 
   return castle;
 };
 
+const generateHorse = (): BrickData[] => {
+  const horse: BrickData[] = [];
+  const brown = "#8B4513";
+  const black = "#000000";
+
+  // Legs (y=0 to 9)
+  for (let y = 0; y < 10; y++) {
+    const c = y < 2 ? black : brown; // Hooves
+    horse.push(createBrick("2x2", c, -2.5, y, -5.5));
+    horse.push(createBrick("2x2", c, 2.5, y, -5.5));
+    horse.push(createBrick("2x2", c, -2.5, y, 5.5));
+    horse.push(createBrick("2x2", c, 2.5, y, 5.5));
+  }
+
+  // Body (y=10 to 14)
+  for (let y = 10; y <= 14; y++) {
+    for (let x = -2.5; x <= 2.5; x += 4) {
+      for (let z = -6.5; z <= 6.5; z += 2) {
+        horse.push(createBrick("2x4", brown, x, y, z, 90));
+      }
+    }
+    // Fill middle
+    horse.push(createBrick("2x4", brown, 0.5, y, -3.5, 90));
+    horse.push(createBrick("2x4", brown, 0.5, y, 0.5, 90));
+    horse.push(createBrick("2x4", brown, 0.5, y, 4.5, 90));
+  }
+
+  // Neck (y=15 to 20, z=5.5 to 7.5)
+  for (let y = 15; y <= 20; y++) {
+    horse.push(createBrick("2x4", brown, 0.5, y, 6.5, 90));
+  }
+
+  // Head (y=21 to 23)
+  for (let y = 21; y <= 23; y++) {
+    horse.push(createBrick("2x4", brown, 0.5, y, 6.5, 90));
+    horse.push(createBrick("2x4", brown, 0.5, y, 10.5, 90));
+  }
+
+  // Eyes and ears
+  horse.push(createBrick("1x1", black, -1.5, 22, 6.5));
+  horse.push(createBrick("1x1", black, 2.5, 22, 6.5));
+  horse.push(createBrick("1x1", brown, -0.5, 24, 5.5));
+  horse.push(createBrick("1x1", brown, 1.5, 24, 5.5));
+
+  return horse;
+};
+
+const generateSheep = (): BrickData[] => {
+  const sheep: BrickData[] = [];
+  const white = "#FFFFFF";
+  const black = "#000000";
+
+  // Legs (y=0 to 3)
+  for (let y = 0; y <= 3; y++) {
+    sheep.push(createBrick("1x1", black, -1.5, y, -2.5));
+    sheep.push(createBrick("1x1", black, 1.5, y, -2.5));
+    sheep.push(createBrick("1x1", black, -1.5, y, 2.5));
+    sheep.push(createBrick("1x1", black, 1.5, y, 2.5));
+  }
+
+  // Body (y=4 to 8)
+  for (let y = 4; y <= 8; y++) {
+    for (let x = -1.5; x <= 1.5; x += 2) {
+      sheep.push(createBrick("2x4", white, x, y, -1.5, 90));
+      sheep.push(createBrick("2x4", white, x, y, 2.5, 90));
+    }
+  }
+
+  // Head (y=6 to 9, z=4.5)
+  for (let y = 6; y <= 9; y++) {
+    sheep.push(createBrick("2x2", black, 0, y, 5.5));
+  }
+
+  // Fluff on top of head
+  sheep.push(createBrick("2x2", white, 0, 10, 5.5));
+
+  return sheep;
+};
+
+const generateCar = (): BrickData[] => {
+  const car: BrickData[] = [];
+  const red = "#E3000B";
+  const black = "#000000";
+  const white = "#FFFFFF"; // windows / lights
+  const gray = "#A0A0A0";
+
+  // Wheels (4 wheels, 2x2 each)
+  // front: z=8.5, back: z=-8.5
+  for (let y = 0; y <= 2; y++) {
+    car.push(createBrick("2x2", black, -5.5, y, -8.5));
+    car.push(createBrick("2x2", black, 5.5, y, -8.5));
+    car.push(createBrick("2x2", black, -5.5, y, 8.5));
+    car.push(createBrick("2x2", black, 5.5, y, 8.5));
+  }
+
+  // Chassis base (y=3, y=4)
+  for (let y = 3; y <= 5; y++) {
+    for (let x = -4.5; x <= 4.5; x += 2) {
+      for (let z = -12.5; z <= 12.5; z += 4) {
+        car.push(createBrick("2x4", red, x, y, z, 90));
+      }
+    }
+  }
+
+  // Lower body (y=6 to 8)
+  for (let y = 6; y <= 8; y++) {
+    for (let x = -4.5; x <= 4.5; x += 2) {
+      for (let z = -12.5; z <= 12.5; z += 4) {
+        car.push(createBrick("2x4", red, x, y, z, 90));
+      }
+    }
+  }
+
+  // Cabin / Windows (y=9 to 13) z from -6.5 to 4.5
+  for (let y = 9; y <= 13; y++) {
+    for (let x = -4.5; x <= 4.5; x += 2) {
+      for (let z = -4.5; z <= 4.5; z += 4) {
+        if (Math.abs(x) > 2.5 || z === 4.5 || z === -4.5) {
+          car.push(createBrick("2x4", white, x, y, z, 90));
+        }
+      }
+    }
+  }
+
+  // Roof (y=14)
+  for (let x = -4.5; x <= 4.5; x += 2) {
+    for (let z = -4.5; z <= 4.5; z += 4) {
+      car.push(createBrick("2x4", red, x, 14, z, 90));
+    }
+  }
+
+  // Lights
+  car.push(createBrick("1x2", white, -3.5, 7, 14.5, 0));
+  car.push(createBrick("1x2", white, 3.5, 7, 14.5, 0));
+
+  return car;
+};
+
+const generateRoad = (): BrickData[] => {
+  const road: BrickData[] = [];
+  const gray = "#707070";
+  const yellow = "#FFD500";
+
+  const y = 0;
+  for (let x = -29.5; x <= 29.5; x += 2) {
+    for (let z = -14.5; z <= 14.5; z += 4) {
+      if (Math.abs(z) <= 2 && Math.abs(x) % 10 < 4) {
+        road.push(createBrick("2x4", yellow, x, y, z, 0));
+      } else {
+        road.push(createBrick("2x4", gray, x, y, z, 0));
+      }
+    }
+  }
+  for (let x = -29.5; x <= 29.5; x += 4) {
+    for (let z = -15.5; z <= 15.5; z += 2) {
+      if (Math.abs(z) < 15.5) road.push(createBrick("2x4", gray, x, -1, z, 90));
+    }
+  }
+
+  return road;
+};
+
+const generateMountain = (): BrickData[] => {
+  const mtn: BrickData[] = [];
+  const green = "#00AD3C";
+  const gray = "#A0A0A0";
+  const white = "#FFFFFF";
+
+  const maxRadius = 30;
+  const height = 40;
+
+  for (let y = 0; y < height; y++) {
+    const curRadius = maxRadius * (1 - y / height);
+    if (curRadius < 1) continue;
+
+    const color = y > 30 ? white : y > 20 ? gray : green;
+
+    const rInt = Math.floor(curRadius / 2) * 2;
+    for (let xOffset = -rInt; xOffset <= rInt; xOffset += 4) {
+      for (let zOffset = -rInt; zOffset <= rInt; zOffset += 2) {
+        if (xOffset * xOffset + zOffset * zOffset <= curRadius * curRadius) {
+          mtn.push(
+            createBrick("2x4", color, xOffset + 0.5, y, zOffset + 0.5, 0),
+          );
+        }
+      }
+    }
+  }
+
+  return mtn;
+};
 export const PRESETS: Record<PresetName, BrickData[]> = {
+  horse: generateHorse(),
+  sheep: generateSheep(),
+  car: generateCar(),
+  road: generateRoad(),
+  mountain: generateMountain(),
   tree: generateLifeSizedTree(),
   cabin: generateLifeSizedCabin(),
   round_water_well: generateRoundWaterWell(),
   pine_tree: generatePineTree(),
-  walk_in_castle: generateWalkInCastle()
+  walk_in_castle: generateWalkInCastle(),
 };
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
   bricks: [],
-  mode: 'Build',
-  selectedType: '2x2',
+  mode: "Build",
+  cameraMode: "Orbit",
+  selectedType: "2x2",
   selectedColor: COLORS[0],
   activePreset: null,
   undoStack: [],
   redoStack: [],
   toastMessage: null,
   movingBrickId: null,
+  isDraggingBrick: false,
 
   setToastMessage: (msg) => set({ toastMessage: msg }),
   setMovingBrickId: (id) => set({ movingBrickId: id }),
+  setIsDraggingBrick: (val) => set({ isDraggingBrick: val }),
 
   addBrick: (newBrickData) => {
     const { bricks, undoStack } = get();
     const newBrick = { ...newBrickData, id: crypto.randomUUID() };
-    
+
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: [...bricks, newBrick],
     });
-    
+
     // Save to local storage
-    localStorage.setItem('brickxr-save', JSON.stringify([...bricks, newBrick]));
+    localStorage.setItem("brickxr-save", JSON.stringify([...bricks, newBrick]));
   },
 
   removeBrick: (id) => {
     const { bricks, undoStack } = get();
 
-    const brickToRemove = bricks.find(b => b.id === id);
+    const brickToRemove = bricks.find((b) => b.id === id);
     if (!brickToRemove) return;
 
     if (hasBrickAbove(brickToRemove, bricks, 0.08, 0.096)) {
-      if (typeof window !== 'undefined') {
-        get().setToastMessage("Cannot delete: brick has another brick above it.");
+      if (typeof window !== "undefined") {
+        get().setToastMessage(
+          "Cannot delete: brick has another brick above it.",
+        );
         setTimeout(() => {
-          if (get().toastMessage === "Cannot delete: brick has another brick above it.") {
+          if (
+            get().toastMessage ===
+            "Cannot delete: brick has another brick above it."
+          ) {
             get().setToastMessage(null);
           }
         }, 3000);
@@ -616,32 +843,47 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       return;
     }
 
-    const newBricks = bricks.filter(b => b.id !== id);
-    
+    const newBricks = bricks.filter((b) => b.id !== id);
+
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
     });
-    
-    localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
+
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 
   updateBrick: (id, updates) => {
     const { bricks, undoStack } = get();
-    const newBricks = bricks.map(b => b.id === id ? { ...b, ...updates } : b);
-    
+    const newBricks = bricks.map((b) =>
+      b.id === id ? { ...b, ...updates } : b,
+    );
+
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
     });
-    
-    localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
+
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 
-  setMode: (mode) => set({ mode, activePreset: null, movingBrickId: null }),
-  setSelectedType: (selectedType) => set({ selectedType, activePreset: null, movingBrickId: null }),
+  setMode: (mode) =>
+    set({
+      mode,
+      activePreset: null,
+      movingBrickId: null,
+      isDraggingBrick: false,
+    }),
+  setCameraMode: (cameraMode) => set({ cameraMode }),
+  setSelectedType: (selectedType) =>
+    set({
+      selectedType,
+      activePreset: null,
+      movingBrickId: null,
+      isDraggingBrick: false,
+    }),
   setSelectedColor: (selectedColor) => set({ selectedColor }),
 
   undo: () => {
@@ -650,14 +892,14 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const prevState = undoStack[undoStack.length - 1];
     const newUndoStack = undoStack.slice(0, -1);
-    
+
     set({
       undoStack: newUndoStack,
       redoStack: [...redoStack, { bricks: [...bricks] }],
       bricks: prevState.bricks,
     });
-    
-    localStorage.setItem('brickxr-save', JSON.stringify(prevState.bricks));
+
+    localStorage.setItem("brickxr-save", JSON.stringify(prevState.bricks));
   },
 
   redo: () => {
@@ -666,14 +908,14 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const nextState = redoStack[redoStack.length - 1];
     const newRedoStack = redoStack.slice(0, -1);
-    
+
     set({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: newRedoStack,
       bricks: nextState.bricks,
     });
-    
-    localStorage.setItem('brickxr-save', JSON.stringify(nextState.bricks));
+
+    localStorage.setItem("brickxr-save", JSON.stringify(nextState.bricks));
   },
 
   clearAll: () => {
@@ -683,42 +925,50 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: [],
     });
-    localStorage.removeItem('brickxr-save');
+    localStorage.removeItem("brickxr-save");
   },
 
   setBricks: (newBricks) => {
     set({ bricks: newBricks, undoStack: [], redoStack: [] });
-    localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 
   loadPreset: (presetName) => {
-    set({ activePreset: presetName, mode: 'Build' });
+    set({ activePreset: presetName, mode: "Build" });
   },
 
   commitPreset: (position) => {
     const { activePreset, bricks, undoStack } = get();
     if (!activePreset) return;
 
-    const validPresetBricks = PRESETS[activePreset].filter(b => {
+    const validPresetBricks = PRESETS[activePreset].filter((b) => {
       const valid = isValidBrickData(b);
-      if (!valid) console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+      if (!valid)
+        console.warn(`Malformed brick found in preset ${activePreset}:`, b);
       return valid;
     });
 
-    const presetBricks = validPresetBricks.map(b => ({
+    const presetBricks = validPresetBricks.map((b) => ({
       ...b,
       id: crypto.randomUUID(),
       position: [
         b.position[0] + position[0],
         b.position[1] + position[1],
-        b.position[2] + position[2]
-      ] as [number, number, number]
+        b.position[2] + position[2],
+      ] as [number, number, number],
     }));
 
     // STRUCTURE PLACEMENT VALIDATION
-    const check = checkStructureValid(bricks, presetBricks, ms, bh, 0.01, activePreset);
+    const check = checkStructureValid(
+      bricks,
+      presetBricks,
+      ms,
+      bh,
+      0.01,
+      activePreset,
+    );
     if (!check.valid) {
-      console.warn('Preset placement blocked:', check.reason);
+      console.warn("Preset placement blocked:", check.reason);
       return;
     }
 
@@ -727,9 +977,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
-      activePreset: null
+      activePreset: null,
     });
-    localStorage.setItem('brickxr-save', JSON.stringify(newBricks));
+    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 }));
 
