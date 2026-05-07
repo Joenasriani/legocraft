@@ -13,48 +13,18 @@ export interface BrickData {
 }
 
 export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
-  const dim1 = getBrickDimensions(b1.type);
-  const dim2 = getBrickDimensions(b2.type);
-  const rot1 = (b1.rotation || 0) % 360;
-  const rot2 = (b2.rotation || 0) % 360;
-
-  const w1 = rot1 === 90 || rot1 === 270 ? dim1.d : dim1.w;
-  const d1 = rot1 === 90 || rot1 === 270 ? dim1.w : dim1.d;
-
-  const w2 = rot2 === 90 || rot2 === 270 ? dim2.d : dim2.w;
-  const d2 = rot2 === 90 || rot2 === 270 ? dim2.w : dim2.d;
-
-  const x1 = b1.position[0];
-  const z1 = b1.position[2];
-  const x2 = b2.position[0];
-  const z2 = b2.position[2];
-
+  const a1 = getBrickAABB(b1);
+  const a2 = getBrickAABB(b2);
   const dy = Math.abs(b1.position[1] - b2.position[1]);
+  
+  const overlapX = Math.max(0, Math.min(a1.maxX, a2.maxX) - Math.max(a1.minX, a2.minX));
+  const overlapZ = Math.max(0, Math.min(a1.maxZ, a2.maxZ) - Math.max(a1.minZ, a2.minZ));
+
   if (dy > 0.096 + 0.001) return false; // BRICK_HEIGHT
 
-  const left1 = x1,
-    right1 = x1 + w1 * 0.08,
-    top1 = z1,
-    bottom1 = z1 + d1 * 0.08;
-  const left2 = x2,
-    right2 = x2 + w2 * 0.08,
-    top2 = z2,
-    bottom2 = z2 + d2 * 0.08;
-
-  const overlapX = Math.max(
-    0,
-    Math.min(right1, right2) - Math.max(left1, left2),
-  );
-  const overlapZ = Math.max(
-    0,
-    Math.min(bottom1, bottom2) - Math.max(top1, top2),
-  );
-
   if (dy < 0.001) {
-    const touchX =
-      Math.abs(right1 - left2) < 0.001 || Math.abs(right2 - left1) < 0.001;
-    const touchZ =
-      Math.abs(bottom1 - top2) < 0.001 || Math.abs(bottom2 - top1) < 0.001;
+    const touchX = Math.abs(a1.maxX - a2.minX) < 0.001 || Math.abs(a2.maxX - a1.minX) < 0.001;
+    const touchZ = Math.abs(a1.maxZ - a2.minZ) < 0.001 || Math.abs(a2.maxZ - a1.minZ) < 0.001;
     return (
       (overlapX > 0.001 && touchZ) ||
       (overlapZ > 0.001 && touchX) ||
@@ -127,32 +97,38 @@ export const getBrickDimensions = (type: BrickType) => {
   }
 };
 
-export const getOccupiedCells = (
-  brick: Omit<BrickData, "color">,
-  moduleSize: number,
-) => {
+export interface AABB {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+export const getBrickAABB = (brick: Omit<BrickData, "color">): AABB => {
   const { w, d } = getBrickDimensions(brick.type);
   const rot = Math.round(brick.rotation / 90) % 4; // 0, 1, 2, 3
-
-  // Effective width and depth based on rotation
   const isRotated = rot === 1 || rot === 3 || rot === -1 || rot === -3;
   const ew = isRotated ? d : w;
   const ed = isRotated ? w : d;
 
-  const cells = [];
-  const startX = brick.position[0] - (ew - 1) * (moduleSize / 2);
-  const startZ = brick.position[2] - (ed - 1) * (moduleSize / 2);
+  const w_size = ew * 0.08;
+  const d_size = ed * 0.08;
 
-  for (let i = 0; i < ew; i++) {
-    for (let j = 0; j < ed; j++) {
-      cells.push({
-        x: startX + i * moduleSize,
-        y: brick.position[1],
-        z: startZ + j * moduleSize,
-      });
-    }
-  }
-  return cells;
+  return {
+    minX: brick.position[0] - w_size / 2,
+    maxX: brick.position[0] + w_size / 2,
+    minZ: brick.position[2] - d_size / 2,
+    maxZ: brick.position[2] + d_size / 2,
+  };
+};
+
+export const doAABBsOverlap = (a: AABB, b: AABB, epsilon: number = 0.001) => {
+  return (
+    a.minX < b.maxX - epsilon &&
+    a.maxX > b.minX + epsilon &&
+    a.minZ < b.maxZ - epsilon &&
+    a.maxZ > b.minZ + epsilon
+  );
 };
 
 export const checkPlacementValid = (
@@ -163,20 +139,15 @@ export const checkPlacementValid = (
   epsilon: number = 0.01,
   ignoreBrickId?: string,
 ) => {
-  const ghostCells = getOccupiedCells(ghostData, moduleSize);
+  const ghostAABB = getBrickAABB(ghostData);
 
   // MUST NOT OVERLAP
   const isOverlap = bricks.some((b) => {
     if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
       return false;
     if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
-    const bCells = getOccupiedCells(b, moduleSize);
-    return ghostCells.some((gc) =>
-      bCells.some(
-        (bc) =>
-          Math.abs(gc.x - bc.x) < epsilon && Math.abs(gc.z - bc.z) < epsilon,
-      ),
-    );
+    const bAABB = getBrickAABB(b);
+    return doAABBsOverlap(ghostAABB, bAABB, 0.001);
   });
 
   if (isOverlap) return { valid: false, reason: "overlap" };
@@ -186,22 +157,16 @@ export const checkPlacementValid = (
     return { valid: true, reason: "grounded" };
 
   // Connection check (Support from below)
-  // AT LEAST ONE occupied footprint cell MUST be supported by a brick below
-  const isSupported = ghostCells.some((gc) => {
-    return bricks.some((b) => {
-      if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
-        return false;
-
-      const dy = ghostData.position[1] - b.position[1];
-      if (Math.abs(dy - brickHeight) < epsilon) {
-        const bCells = getOccupiedCells(b, moduleSize);
-        return bCells.some(
-          (bc) =>
-            Math.abs(gc.x - bc.x) < epsilon && Math.abs(gc.z - bc.z) < epsilon,
-        );
-      }
+  const isSupported = bricks.some((b) => {
+    if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
       return false;
-    });
+
+    const dy = ghostData.position[1] - b.position[1];
+    if (Math.abs(dy - brickHeight) < epsilon) {
+      const bAABB = getBrickAABB(b);
+      return doAABBsOverlap(ghostAABB, bAABB, 0.001);
+    }
+    return false;
   });
 
   return isSupported
@@ -223,22 +188,14 @@ export const hasBrickAbove = (
     (b) => Math.abs(b.position[1] - targetTopY) < epsilon,
   );
 
-  const targetCells = getOccupiedCells(brick, moduleSize);
+  const targetAABB = getBrickAABB(brick);
 
   for (const b of bricksDirectlyAbove) {
-    const bCells = getOccupiedCells(b, moduleSize);
+    const bAABB = getBrickAABB(b);
 
-    // 2. X/Z occupied cells truly overlap
-    const overlappingCells = bCells.filter((bc) =>
-      targetCells.some(
-        (tc) =>
-          Math.abs(bc.x - tc.x) < epsilon && Math.abs(bc.z - tc.z) < epsilon,
-      ),
-    );
-
-    if (overlappingCells.length > 0) {
+    // 2. Do they truly overlap?
+    if (doAABBsOverlap(targetAABB, bAABB, 0.001)) {
       // 3. Check if removing selected brick removes the other brick's valid support
-      // Find if `b` is supported by ANY OTHER brick exactly on the same layer as `brick`
       const otherSupports = bricks.filter(
         (other) =>
           other.id !== brick.id &&
@@ -248,26 +205,11 @@ export const hasBrickAbove = (
 
       let hasAlternateSupport = false;
       for (const other of otherSupports) {
-        const otherCells = getOccupiedCells(other, moduleSize);
-        const overlapWithOther = bCells.some((bc) =>
-          otherCells.some(
-            (oc) =>
-              Math.abs(bc.x - oc.x) < epsilon &&
-              Math.abs(bc.z - oc.z) < epsilon,
-          ),
-        );
-        if (overlapWithOther) {
+        if (doAABBsOverlap(bAABB, getBrickAABB(other), 0.001)) {
           hasAlternateSupport = true;
           break;
         }
       }
-
-      console.log(`[Delete Audit] Selected: ${brick.id}, Above: ${b.id}`);
-      console.log(`- Overlap cells found: ${overlappingCells.length}`);
-      console.log(
-        `- Selected Top Y: ${targetTopY.toFixed(3)}, Above Bottom Y: ${b.position[1].toFixed(3)}`,
-      );
-      console.log(`- Has Alternate Support: ${hasAlternateSupport}`);
 
       if (!hasAlternateSupport) {
         return true;
@@ -289,39 +231,43 @@ export const checkStructureValid = (
   if (presetBricks.length === 0)
     return { valid: false, reason: "empty preset" };
 
-  const minY = Math.min(...presetBricks.map((b) => b.position[1]));
-  const baseBricks = presetBricks.filter((b) => b.position[1] === minY);
+  for (const pb of presetBricks) {
+    const pbAABB = getBrickAABB(pb);
 
-  let isValidPlacement = false;
-  if (minY <= epsilon) {
-    isValidPlacement = true;
-  } else {
-    isValidPlacement = baseBricks.every((baseBrick) => {
-      const dummyValid = checkPlacementValid(
-        bricks,
-        baseBrick,
-        moduleSize,
-        brickHeight,
-        epsilon,
-      );
-      return dummyValid.valid;
-    });
-  }
-
-  if (!isValidPlacement) return { valid: false, reason: "unsupported" };
-
-  const hasOverlap = presetBricks.some((pb) => {
-    const dummyValid = checkPlacementValid(
-      bricks,
-      pb,
-      moduleSize,
-      brickHeight,
-      epsilon,
+    // Check overlap with existing bricks
+    const hasWorldOverlap = bricks.some(
+      (b) =>
+        Math.abs(b.position[1] - pb.position[1]) < epsilon &&
+        doAABBsOverlap(pbAABB, getBrickAABB(b), 0.001),
     );
-    return !dummyValid.valid && dummyValid.reason === "overlap";
-  });
+    if (hasWorldOverlap) return { valid: false, reason: "overlap" };
 
-  if (hasOverlap) return { valid: false, reason: "overlap" };
+    // Check overlap with other preset bricks
+    const hasInternalOverlap = presetBricks.some(
+      (otherPb) =>
+        otherPb.id !== pb.id &&
+        Math.abs(otherPb.position[1] - pb.position[1]) < epsilon &&
+        doAABBsOverlap(pbAABB, getBrickAABB(otherPb), 0.001),
+    );
+    if (hasInternalOverlap) {
+      return { valid: false, reason: "overlap" };
+    }
+
+    // Check support
+    if (pb.position[1] > epsilon) {
+      const isSupported = [...bricks, ...presetBricks].some((b) => {
+        if (b.id === pb.id) return false;
+        const dy = pb.position[1] - b.position[1];
+        if (Math.abs(dy - brickHeight) < epsilon) {
+          return doAABBsOverlap(pbAABB, getBrickAABB(b), 0.001);
+        }
+        return false;
+      });
+      if (!isSupported) {
+        return { valid: false, reason: "unsupported" };
+      }
+    }
+  }
 
   return { valid: true };
 };
