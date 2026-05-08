@@ -272,6 +272,34 @@ const HelpIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const UndoIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 7v6h6" />
+    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+  </svg>
+);
+
+const RedoIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 7v6h-6" />
+    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
+  </svg>
+);
+
+const ClearIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </svg>
+);
+
+const ScreenshotIcon = ({ size = 24 }: { size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+    <circle cx="12" cy="13" r="4" />
+  </svg>
+);
+
 const HorseIcon = ({ size = 24 }: { size?: number }) => (
   <svg
     width={size}
@@ -537,118 +565,115 @@ export default function App() {
       </div>
 
       {/* UI Overlay */}
-      <div className="absolute inset-0 z-10 pointer-events-none p-6 flex flex-col justify-between">
+      <div className="absolute inset-0 z-10 pointer-events-none p-3 sm:p-6 flex flex-col justify-between">
         {toastMessage && (
-          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-6 py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
+          <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-xs sm:text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
             <InfoIcon size={16} />
             {toastMessage}
           </div>
         )}
 
-        {/* Camera Modes */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 pointer-events-auto bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10">
+        {/* Top Area */}
+        <div className="flex flex-col gap-3 w-full pointer-events-none shrink-0">
+          {/* Top Bar */}
+          <div className="flex justify-between items-start sm:items-center pointer-events-auto flex-wrap gap-2">
+            <div className="text-base sm:text-xl font-extrabold tracking-[2px] flex items-center gap-1 sm:gap-2 shrink-0">
+              BRICK <span className="font-light opacity-60 hidden sm:inline">XR</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
+              {vrStatus === "ready" && (
+                <button
+                  onClick={() => {
+                    const xrErrorMsg = "VR not supported or no hardware found.";
+                    try {
+                      const p = xrStore.enterVR();
+                      if (p && p.catch) {
+                        p.catch(() => useLegoStore.getState().setToastMessage("VR failed to start."));
+                      }
+                    } catch (e) {
+                      useLegoStore.getState().setToastMessage("VR failed to start.");
+                    }
+                  }}
+                  className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
+                  title="Enter VR Session"
+                >
+                  Enter VR
+                </button>
+              )}
+              <div
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate ${
+                  vrStatus === "ready"
+                    ? "bg-green-500/20 border-green-500/40 text-green-400"
+                    : vrStatus === "pending"
+                      ? "bg-gray-500/20 border-gray-500/40 text-gray-400"
+                      : "bg-red-500/20 border-red-500/40 text-red-400"
+                }`}
+              >
+                {vrStatus === "ready"
+                  ? "VR Ready"
+                  : vrStatus === "pending"
+                    ? "Checking VR..."
+                    : "Open in Quest Browser for VR"}
+              </div>
+            </div>
+          </div>
+
+          {/* Camera Modes */}
+          <div className="flex justify-center pointer-events-auto w-full">
+            <div className="flex items-center gap-1 pointer-events-auto bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10">
           <button
             onClick={() => {
-              if (mode === "Build" || mode === "Delete") {
-                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
-                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-                return;
-              }
               setCameraMode("Pan");
               setIsCameraLocked(false);
             }}
-            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Pan Camera"
           >
             <PanIcon size={16} />
           </button>
           <button
             onClick={() => {
-              if (mode === "Build" || mode === "Delete") {
-                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
-                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-                return;
-              }
               setCameraMode("Zoom");
               setIsCameraLocked(false);
             }}
-            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Zoom Camera"
           >
             <ZoomIcon size={16} />
           </button>
           <button
             onClick={() => {
-              if (mode === "Build" || mode === "Delete") {
-                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
-                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-                return;
-              }
               setCameraMode("Orbit");
               setIsCameraLocked(false);
             }}
-            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Orbit Camera"
           >
             <OrbitCameraIcon size={16} />
           </button>
           <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
           <button
-            onClick={() => setIsCameraLocked(!isCameraLocked)}
-            className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+            onClick={() => {
+              if (isCameraLocked) {
+                setIsCameraLocked(false);
+                setCameraMode("Orbit");
+              } else {
+                setIsCameraLocked(true);
+              }
+            }}
+            className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
             title="Lock Camera"
           >
             <LockIcon size={16} />
           </button>
-        </div>
-
-        {/* Top Bar */}
-        <div className="flex justify-between items-center pointer-events-auto">
-          <div className="text-xl font-extrabold tracking-[2px] flex items-center gap-2">
-            BRICK <span className="font-light opacity-60">XR</span>
-          </div>
-          <div className="flex gap-4">
-            {vrStatus === "ready" && (
-              <button
-                onClick={() => {
-                  const xrErrorMsg = "VR not supported or no hardware found.";
-                  try {
-                    const p = xrStore.enterVR();
-                    if (p && p.catch) {
-                      p.catch(() => useLegoStore.getState().setToastMessage("VR failed to start."));
-                    }
-                  } catch (e) {
-                    useLegoStore.getState().setToastMessage("VR failed to start.");
-                  }
-                }}
-                className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
-                title="Enter VR Session"
-              >
-                Enter VR
-              </button>
-            )}
-            <div
-              className={`px-4 py-2 rounded-full text-[11px] font-bold uppercase tracking-wider flex items-center border ${
-                vrStatus === "ready"
-                  ? "bg-green-500/20 border-green-500/40 text-green-400"
-                  : vrStatus === "pending"
-                    ? "bg-gray-500/20 border-gray-500/40 text-gray-400"
-                    : "bg-red-500/20 border-red-500/40 text-red-400"
-              }`}
-            >
-              {vrStatus === "ready"
-                ? "VR Ready"
-                : vrStatus === "pending"
-                  ? "Checking VR..."
-                  : "Open in Quest Browser for VR"}
-            </div>
           </div>
         </div>
+        </div>
 
-        {/* Center UI (Sidebars) */}
-        <div className="flex justify-between items-center h-full sm:px-4 pointer-events-none">
-          {/* Left Tools */}
-          <div className="glass-panel w-20 p-3 rounded-2xl flex flex-col items-center gap-3 pointer-events-auto">
+        {/* Absolute Floating Docks (Anchored to middle) */}
+        {/* Left Tools */}
+        <div className="absolute left-2 sm:left-6 top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
+          <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar">
             <ToolIconButton
               icon={<BuildIcon size={24} />}
               active={mode === "Build"}
@@ -694,53 +719,74 @@ export default function App() {
               }}
               title="Delete Mode"
             />
-
-            {(mode === "Move" || mode === "Delete") && (
-              <>
-                <div className="w-10 h-px bg-white/10 my-1" />
-                <button
-                  onClick={() =>
-                    setSelectionMode(
-                      selectionMode === "Single" ? "Group" : "Single",
-                    )
-                  }
-                  className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${
-                    selectionMode === "Group"
-                      ? "bg-white/20 text-white"
-                      : "text-white/40 hover:text-white/80 hover:bg-white/5"
-                  }`}
-                  title="Toggle Group Selection Mode"
-                >
-                  <div className="text-[10px] uppercase font-bold tracking-wider leading-tight">
-                    {selectionMode}
-                  </div>
-                  <div className="text-[9px] opacity-70">Mode</div>
-                </button>
-              </>
-            )}
           </div>
 
-          {/* Right Colors */}
-          <div className="glass-panel w-16 p-3 rounded-2xl flex flex-col gap-3 items-center pointer-events-auto">
-            {LEGO_COLORS.map((color) => (
-              <button
-                key={color}
-                onClick={() => setSelectedColor(color)}
-                className={`w-10 h-10 rounded-full border-2 transition-all shadow-sm ${
-                  selectedColor === color
-                    ? "border-white scale-110 shadow-md ring-2 ring-white/20"
-                    : "border-white/10 opacity-80 hover:opacity-100 hover:scale-105"
-                }`}
-                style={{ backgroundColor: color }}
-                title={`Select color: ${color}`}
-                aria-label={`Select color: ${color}`}
-              />
-            ))}
+          <AnimatePresence>
+            {(mode === "Move" || mode === "Delete") && (
+              <motion.div 
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="glass-panel flex flex-col gap-1.5 p-1.5 sm:p-2 rounded-[14px] sm:rounded-2xl pointer-events-auto shrink-0"
+              >
+                <button
+                  onClick={() => setSelectionMode("Single")}
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all font-bold text-[9px] sm:text-[11px] uppercase tracking-wider ${
+                    selectionMode === "Single"
+                      ? "bg-white/20 text-white shadow-md ring-1 ring-white/30"
+                      : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                  }`}
+                  title="Select Single Brick"
+                >
+                  Solo
+                </button>
+                <button
+                  onClick={() => setSelectionMode("Group")}
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all font-bold text-[9px] sm:text-[11px] uppercase tracking-wider ${
+                    selectionMode === "Group"
+                      ? "bg-white/20 text-white shadow-md ring-1 ring-white/30"
+                      : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                  }`}
+                  title="Select Entire Group"
+                >
+                  Group
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Right Colors */}
+        <div className="absolute right-2 sm:right-6 top-[55%] -translate-y-1/2 pointer-events-none z-20">
+          <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl max-h-[85vh] overflow-y-auto no-scrollbar">
+            <div className="grid grid-cols-2 gap-1 sm:gap-2">
+              {LEGO_COLORS.map((color) => (
+                <button
+                  key={color}
+                  onClick={() => setSelectedColor(color)}
+                  className="w-[34px] h-[34px] sm:w-[46px] sm:h-[46px] flex items-center justify-center shrink-0"
+                  title={`Select color: ${color}`}
+                  aria-label={`Select color: ${color}`}
+                >
+                  <div
+                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 transition-all shadow-sm ${
+                      selectedColor === color
+                        ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)] ring-1 ring-white/50"
+                        : "border-white/10 opacity-80 hover:opacity-100 hover:scale-105"
+                    }`}
+                    style={{ backgroundColor: color }}
+                  />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
+        {/* Spacer to push Bottom Toolbar Area down since Center UI is absolute */}
+        <div className="flex-1" />
+
         {/* Bottom Toolbar Area */}
-        <div className="flex flex-col items-center gap-6 pointer-events-none">
+        <div className="flex flex-col items-center gap-2 sm:gap-6 w-full pointer-events-none shrink-0">
           {/* Brick Type Selector (Build Mode Only) */}
           <AnimatePresence>
             {mode === "Build" && !activePreset && (
@@ -748,13 +794,13 @@ export default function App() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 20, opacity: 0 }}
-                className="glass-panel p-2 rounded-2xl pointer-events-auto flex gap-1 shadow-2xl"
+                className="glass-panel p-1.5 sm:p-2 rounded-2xl pointer-events-auto flex gap-1 shadow-2xl flex-wrap justify-center"
               >
                 {BRICK_TYPES.map((type) => (
                   <button
                     key={type}
                     onClick={() => setSelectedType(type)}
-                    className={`px-4 py-2 rounded-xl text-[13px] font-semibold transition-all ${
+                    className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all ${
                       selectedType === type
                         ? "bg-accent text-white"
                         : "text-white/60 hover:bg-white/5 hover:text-white"
@@ -772,20 +818,20 @@ export default function App() {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 20, opacity: 0 }}
-                className="glass-panel p-2 rounded-2xl pointer-events-auto flex items-center gap-4 shadow-2xl px-6 py-3"
+                className="glass-panel p-2 rounded-2xl pointer-events-auto flex items-center gap-2 sm:gap-4 shadow-2xl px-4 py-2 sm:px-6 sm:py-3"
               >
                 <div className="flex flex-col">
-                  <span className="text-sm font-bold text-emerald-400">
+                  <span className="text-xs sm:text-sm font-bold text-emerald-400">
                     Placing Preset
                   </span>
-                  <span className="text-xs text-white/60">
+                  <span className="text-[10px] sm:text-xs text-white/60">
                     Click to stamp, drag to position
                   </span>
                 </div>
-                <div className="w-px h-8 bg-white/10" />
+                <div className="w-px h-6 sm:h-8 bg-white/10" />
                 <button
                   onClick={() => loadPreset(null)}
-                  className="bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 px-4 py-2 rounded-xl text-[13px] font-semibold transition-all border border-red-500/30"
+                  className="bg-red-500/20 text-red-300 hover:bg-red-500/30 hover:text-red-200 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[11px] sm:text-[13px] font-semibold transition-all border border-red-500/30"
                 >
                   Cancel Preset
                 </button>
@@ -794,25 +840,29 @@ export default function App() {
           </AnimatePresence>
 
           {/* Core Actions */}
-          <div className="glass-panel w-full max-w-3xl p-4 rounded-[20px] flex justify-between items-center pointer-events-auto shadow-2xl">
-            <div className="flex gap-3">
+          <div className="glass-panel w-full max-w-3xl p-2 sm:p-4 rounded-[16px] sm:rounded-[20px] flex justify-center items-center pointer-events-auto shadow-2xl gap-2 sm:gap-4 overflow-x-auto no-scrollbar">
+            <div className="flex gap-1.5 sm:gap-2 shrink-0">
               <button
                 onClick={undo}
                 title="Undo"
-                className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors"
+                className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
-                Undo
+                <UndoIcon size={18} />
+                <span className="hidden sm:inline text-[13px] font-semibold">Undo</span>
               </button>
               <button
                 onClick={redo}
                 title="Redo"
-                className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors"
+                className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
-                Redo
+                <RedoIcon size={18} />
+                <span className="hidden sm:inline text-[13px] font-semibold">Redo</span>
               </button>
             </div>
 
-            <div className="flex gap-3">
+            <div className="w-px h-6 bg-glass-border shrink-0" />
+
+            <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
               <button
                 onClick={() => {
                   if (bricks.length === 0) {
@@ -824,11 +874,12 @@ export default function App() {
                   }
                 }}
                 title="Clear all bricks"
-                className="text-red-400 hover:text-red-300 px-3 py-2 text-[13px] font-semibold transition-colors"
+                className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-red-400 hover:text-red-300"
               >
-                Clear
+                <ClearIcon size={18} />
+                <span className="hidden sm:inline text-[13px] font-semibold">Clear</span>
               </button>
-              <div className="w-px h-6 bg-glass-border self-center" />
+
               <div className="relative flex items-center">
                 <button
                   onClick={(e) => {
@@ -837,71 +888,76 @@ export default function App() {
                   }}
                   onPointerDown={(e) => e.stopPropagation()}
                   title="Toggle Presets Menu"
-                  className="text-emerald-400 hover:text-emerald-300 px-3 py-2 text-[13px] font-semibold transition-colors flex items-center gap-1"
+                  className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-colors text-emerald-400 hover:text-emerald-300"
                 >
-                  <PresetsIcon size={16} /> Presets
+                  <PresetsIcon size={18} />
+                  <span className="hidden sm:inline text-[13px] font-semibold">Presets</span>
                 </button>
-                <AnimatePresence>
-                  {showPresetMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, x: "-50%" }}
-                      animate={{ opacity: 1, y: 0, x: "-50%" }}
-                      exit={{ opacity: 0, y: 10, x: "-50%" }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      className="absolute bottom-[calc(100%+16px)] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-4 rounded-3xl shadow-2xl z-50 grid grid-cols-5 gap-3 pointer-events-auto overflow-x-auto min-w-max max-w-[90vw] sm:overflow-visible"
-                    >
-                      {PRESET_OPTIONS.map((preset) => (
-                        <button
-                          key={preset.id}
-                          onClick={() => {
-                            if (
-                              useLegoStore.getState().activePreset === preset.id
-                            ) {
-                              useLegoStore.getState().loadPreset(null);
-                            } else {
-                              useLegoStore.getState().loadPreset(preset.id);
-                            }
-                            setShowPresetMenu(false);
-                          }}
-                          title={`Place ${preset.name} Preset`}
-                          className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
-                        >
-                          <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
-                            {preset.icon}
-                          </span>
-                          <div className="text-center w-full">
-                            <div className="text-[12px] font-bold text-white leading-tight truncate">
-                              {preset.name}
-                            </div>
-                            <div className="text-[10px] text-white/50 leading-tight mt-1 px-1">
-                              {preset.desc}
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
               </div>
-              <div className="w-px h-6 bg-glass-border self-center" />
+
               <button
                 onClick={handleScreenshot}
                 title="Capture Screenshot"
-                className="bg-white/5 border border-glass-border px-5 py-2.5 rounded-xl text-[13px] font-semibold hover:bg-white/10 transition-colors"
+                className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
-                Screenshot
+                <ScreenshotIcon size={18} />
+                <span className="hidden sm:inline text-[13px] font-semibold">Capture</span>
               </button>
+
               <button
                 onClick={() => setShowHelp(true)}
                 title="Show Help"
-                className="p-2 text-white/40 hover:text-white transition-colors"
+                className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
-                <HelpIcon size={20} />
+                <HelpIcon size={18} />
+                <span className="hidden sm:inline text-[13px] font-semibold">Help</span>
               </button>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Preset Menu Overlay */}
+      <AnimatePresence>
+        {showPresetMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+            exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)]"
+          >
+            {PRESET_OPTIONS.map((preset) => (
+              <button
+                key={preset.id}
+                onClick={() => {
+                  if (useLegoStore.getState().activePreset === preset.id) {
+                    useLegoStore.getState().loadPreset(null);
+                  } else {
+                    useLegoStore.getState().loadPreset(preset.id);
+                  }
+                  setShowPresetMenu(false);
+                }}
+                title={`Place ${preset.name} Preset`}
+                className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+              >
+                <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
+                  {preset.icon}
+                </span>
+                <div className="text-center w-full">
+                  <div className="text-[12px] font-bold text-white leading-tight truncate">
+                    {preset.name}
+                  </div>
+                  <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
+                    {preset.desc}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Intro Modal */}
       <AnimatePresence>
@@ -983,14 +1039,16 @@ function ToolIconButton({ icon, active, onClick, title }: any) {
     <button
       onClick={onClick}
       title={title}
-      className={`w-[60px] h-14 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
+      className={`w-11 h-11 sm:w-[60px] sm:h-14 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
         active
           ? "bg-accent border-white/40 shadow-lg text-white"
           : "border-transparent text-white/60 hover:bg-white/5 hover:text-white"
       }`}
     >
-      {React.cloneElement(icon, { size: 22 })}
-      <span className="text-[10px] mt-1 font-semibold">
+      <div className="scale-75 sm:scale-100 flex items-center justify-center">
+        {React.cloneElement(icon, { size: 22 })}
+      </div>
+      <span className="text-[8px] sm:text-[10px] mt-0.5 sm:mt-1 font-semibold leading-none text-center">
         {title.replace(" Mode", "").replace(" Brick", "")}
       </span>
     </button>

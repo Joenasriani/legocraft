@@ -9,7 +9,6 @@ import {
   useLegoStore,
   checkPlacementValid,
   checkStructureValid,
-  checkPresetPlacementValid,
   getBrickDimensions,
   PRESETS,
   isValidBrickData,
@@ -61,6 +60,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const selectedType = useLegoStore((state) => state.selectedType);
   const selectedColor = useLegoStore((state) => state.selectedColor);
   const addBrick = useLegoStore((state) => state.addBrick);
+  const lastPlacementRef = useRef(0);
   const activePreset = useLegoStore((state) => state.activePreset);
   const commitPreset = useLegoStore((state) => state.commitPreset);
   const movingBrickId = useLegoStore((state) => state.movingBrickId);
@@ -297,7 +297,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               b.position[2] + z,
             ] as [number, number, number],
           }));
-        return checkPresetPlacementValid(
+        return checkStructureValid(
           bricks,
           testPresetBricks,
           MODULE_SIZE,
@@ -651,7 +651,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const presetPlacementStatus = useMemo(() => {
     if (mode !== "Build" || !activePreset)
       return { valid: false, reason: "inactive" };
-    return checkPresetPlacementValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
+    return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
   }, [bricks, presetBricks, activePreset, mode]);
 
   useEffect(() => {
@@ -704,6 +704,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const isMultiTouchRef = useRef(false);
 
   const handlePointerDown = (e: any) => {
+    // Only stop propagation if we don't want the camera to rotate.
+    // For now we allow camera to rotate even when interacting.
+    // OrbitControls ignores event if it's not handled.
     e.stopPropagation();
 
     // Check multi-touch
@@ -878,11 +881,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               ] as [number, number, number],
             };
           });
-        return checkPresetPlacementValid(bricks, testPresetBricks, MODULE_SIZE, BRICK_HEIGHT);
+        return checkStructureValid(bricks, testPresetBricks, MODULE_SIZE, BRICK_HEIGHT);
     };
 
     // If we're dragging a brick, we drop it now regardless of distance
     setIsDraggingBrick(false);
+
+    const now = Date.now();
+    if (now - lastPlacementRef.current < 50) return;
+    lastPlacementRef.current = now;
 
     if (activePreset) {
       if (checkCurrentPresetPlacement().valid) {
@@ -1017,42 +1024,40 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return groups;
   }, [ghostGroupBricks]);
 
-  const enableOneFingerCamera = mode !== "Build" && mode !== "Delete" && (!isDraggingBrick || mode !== "Move") && !activePreset;
-
   const mouseButtons = useMemo(() => {
     switch (cameraMode) {
       case "Orbit":
         return {
-          LEFT: enableOneFingerCamera ? THREE.MOUSE.ROTATE : undefined,
+          LEFT: THREE.MOUSE.ROTATE,
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.PAN,
         };
       case "Pan":
         return {
-          LEFT: enableOneFingerCamera ? THREE.MOUSE.PAN : undefined,
+          LEFT: THREE.MOUSE.PAN,
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.ROTATE,
         };
       case "Zoom":
         return {
-          LEFT: enableOneFingerCamera ? THREE.MOUSE.DOLLY : undefined,
+          LEFT: THREE.MOUSE.DOLLY,
           MIDDLE: THREE.MOUSE.PAN,
           RIGHT: THREE.MOUSE.ROTATE,
         };
     }
-  }, [cameraMode, enableOneFingerCamera]);
+  }, [cameraMode]);
 
   const touches = useMemo(() => {
     // We cast undefined as any to bypass Drei's strict typing if it doesn't allow undefined
     switch (cameraMode) {
       case "Orbit":
-        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.ROTATE : undefined) as any, TWO: THREE.TOUCH.DOLLY_PAN };
+        return { ONE: THREE.TOUCH.ROTATE as any, TWO: THREE.TOUCH.DOLLY_PAN };
       case "Pan":
-        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.PAN : undefined) as any, TWO: THREE.TOUCH.DOLLY_PAN };
+        return { ONE: THREE.TOUCH.PAN as any, TWO: THREE.TOUCH.DOLLY_PAN };
       case "Zoom":
-        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.DOLLY_PAN : undefined) as any, TWO: THREE.TOUCH.ROTATE };
+        return { ONE: THREE.TOUCH.DOLLY_PAN as any, TWO: THREE.TOUCH.ROTATE };
     }
-  }, [cameraMode, enableOneFingerCamera]);
+  }, [cameraMode]);
 
   const [isVR, setIsVR] = useState(false);
 
@@ -1184,9 +1189,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           <mesh
             receiveShadow
             rotation={[-Math.PI / 2, 0, 0]}
-            onPointerMove={handlePointerMove}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
           >
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#002D04" />

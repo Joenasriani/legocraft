@@ -34,11 +34,11 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   const allBricks = useLegoStore((state) => state.bricks);
 
   const handlePointerDown = (e: any) => {
-    e.stopPropagation();
     if (isGhost) return;
 
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === "contextmenu";
     if (mode === "Delete" || mode === "Move" || isSqueeze) {
+      e.stopPropagation();
       const instanceId = e.instanceId;
       if (instanceId !== undefined) {
         // If they click on body or stud, the IDs map predictably
