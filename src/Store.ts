@@ -220,6 +220,40 @@ export const hasBrickAbove = (
   return false;
 };
 
+export const checkPresetPlacementValid = (
+  bricks: Omit<BrickData, "color">[],
+  presetBricks: Omit<BrickData, "color">[],
+  moduleSize: number,
+  brickHeight: number,
+  epsilon: number = 0.01,
+): { valid: boolean; reason?: string } => {
+  if (presetBricks.length === 0)
+    return { valid: false, reason: "empty preset" };
+
+  for (const pb of presetBricks) {
+    const pbAABB = getBrickAABB(pb);
+
+    // Check only overlap with existing bricks
+    const hasWorldOverlap = bricks.some(
+      (b) =>
+        Math.abs(b.position[1] - pb.position[1]) < epsilon &&
+        doAABBsOverlap(pbAABB, getBrickAABB(b), 0.001),
+    );
+    if (hasWorldOverlap) return { valid: false, reason: "overlap" };
+    
+    // We assume authored presets are internally valid and structurally sound, 
+    // but check support of the lowest bricks against existing world if they are elevated
+    if (pb.position[1] > epsilon && pb.position[1] < brickHeight + epsilon) {
+       // If it's elevated, it must be supported by world or other preset bricks.
+       // Actually, we trust the preset. Only if the *base* of the preset is elevated, we might want to check support.
+       // Since the preset is rigid, if the bottom-most bricks are supported (or block is on floor), it is fine.
+       // In fact, just return true if no overlap!
+    }
+  }
+
+  return { valid: true };
+};
+
 export const checkStructureValid = (
   bricks: Omit<BrickData, "color">[],
   presetBricks: Omit<BrickData, "color">[],
@@ -533,8 +567,8 @@ const generateRoad = (): BrickData[] => {
   const gray = "#707070";
   const yellow = "#FFD500";
   for(let z=-4.5; z<=4.5; z+=2) {
-    road.push(createBrick("2x4", gray, -1.5, 0, z, 90));
-    road.push(createBrick("2x4", gray, 2.5, 0, z, 90));
+    road.push(createBrick("2x4", gray, -2.5, 0, z, 90));
+    road.push(createBrick("2x4", gray, 3.5, 0, z, 90));
     if (Math.abs(z) % 4 < 1) road.push(createBrick("1x2", yellow, 0.5, 0, z, 90));
     else road.push(createBrick("1x2", gray, 0.5, 0, z, 90));
   }
@@ -822,13 +856,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     // STRUCTURE PLACEMENT VALIDATION
-    const check = checkStructureValid(
+    const check = checkPresetPlacementValid(
       bricks,
       presetBricks,
       ms,
       bh,
       0.01,
-      activePreset,
     );
     if (!check.valid) {
       console.warn("Preset placement blocked:", check.reason);

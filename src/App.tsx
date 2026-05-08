@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { motion, AnimatePresence } from "motion/react";
-import { useLegoStore, LEGO_COLORS, BrickType, PresetName } from "./Store";
+import { useLegoStore, LEGO_COLORS, BrickType, PresetName, getGroupBricks } from "./Store";
 import { Scene } from "./components/Scene";
 import { createXRStore } from "@react-three/xr";
 
@@ -425,14 +425,8 @@ const PRESET_OPTIONS: {
 ];
 
 const xrStore = createXRStore({
-  hand: true,
-  controller: {
-    rayPointer: {
-      rayModel: {
-        color: "#ff0000",
-      },
-    },
-  },
+  hand: false,
+  controller: false,
 });
 
 const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
@@ -678,7 +672,26 @@ export default function App() {
             <ToolIconButton
               icon={<DeleteIcon size={24} />}
               active={mode === "Delete"}
-              onClick={() => setMode("Delete")}
+              onClick={() => {
+                const state = useLegoStore.getState();
+                if (state.mode === "Move" && state.movingBrickId) {
+                  // Delete currently selected brick(s)
+                  if (state.selectionMode === "Group") {
+                    const movingBrick = state.bricks.find(b => b.id === state.movingBrickId);
+                    if (movingBrick) {
+                      const allb = state.bricks;
+                      const g = getGroupBricks(movingBrick, allb);
+                      state.removeBricks(g.map((bz: any) => bz.id));
+                    }
+                  } else {
+                    state.removeBrick(state.movingBrickId);
+                  }
+                  state.setMovingBrickId(null);
+                  state.setIsDraggingBrick(false);
+                } else {
+                  setMode("Delete");
+                }
+              }}
               title="Delete Mode"
             />
 

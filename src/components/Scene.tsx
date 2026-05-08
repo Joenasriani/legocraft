@@ -9,6 +9,7 @@ import {
   useLegoStore,
   checkPlacementValid,
   checkStructureValid,
+  checkPresetPlacementValid,
   getBrickDimensions,
   PRESETS,
   isValidBrickData,
@@ -26,7 +27,7 @@ import { HumanViewLayer, MicroViewLayer } from "./VRViewLayers";
 export type VRScaleMode = 'human' | 'micro';
 
 const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
-  human: 0.4,
+  human: 1.0,
   micro: 17.5,
 };
 
@@ -40,9 +41,19 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!xrStore) return;
     return xrStore.subscribe((state: any) => {
       setXrSessionActive(!!state.session);
-      if (!state.session) setVrScale('human');
+      if (!state.session) {
+          setVrScale('human');
+      }
     });
   }, [xrStore]);
+
+  useEffect(() => {
+    if (xrSessionActive) {
+       // Push player back and up slightly so build is in front
+       // Give it a tiny delay to ensure session is active
+       setTimeout(() => teleportPlayer({ x: 0, y: 0.5, z: 0.8 }), 100);
+    }
+  }, [xrSessionActive]);
 
   const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
@@ -211,7 +222,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     normal: THREE.Vector3;
   } | null>(null);
 
-  const updateGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3) => {
+  const computeGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3): [number, number, number] => {
     const activeType = movingBrick ? movingBrick.type : selectedType;
     const { w, d } = getBrickDimensions(activeType);
     const rot = Math.round(ghostRotation / 90) % 4;
@@ -230,15 +241,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const nudge = 0.001;
     const hitX = point.x + normal.x * nudge;
     let hitY = point.y;
-    // On the top surface of a brick, shift up to the top surface
     if (normal.y > 0.5) hitY += nudge;
     else if (normal.y < -0.5) hitY -= nudge;
-    else hitY += 0; // If hitting horizontal walls
+    else hitY += 0;
 
-    // We want the hit point's Y exactly where the normal pushed it OR from point
-    // but the brick's position[1] is its bottom face!
-    // So if normal.y > 0.5, we hit the top face. We should snap 'up' to Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT
-    // Wait, if point.y is 0.096, hitY is 0.097. floor(0.097 / 0.096) = 1. 1 * 0.096 = 0.096! That is exactly correct.
     const hitZ = point.z + normal.z * nudge;
 
     let targetX = alignSnap(hitX, effW, MODULE_SIZE);
@@ -248,7 +254,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (Math.abs(normal.y) > 0.5) {
       targetY = Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
     } else {
-      // Side hit. Center of the brick vertically
       targetY =
         Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) *
         BRICK_HEIGHT;
@@ -257,6 +262,26 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     let finalX = targetX;
     let finalY = Math.max(0, targetY);
     let finalZ = targetZ;
+
+    // Floor clamp for moved groups or presets
+    if (mode === "Move" && movingBrick && movingGroupOriginalBricks.length > 0) {
+      let minGroupY = Infinity;
+      movingGroupOriginalBricks.forEach((b) => {
+        if (b.position[1] < minGroupY) minGroupY = b.position[1];
+      });
+      const minYRequired = movingBrick.position[1] - minGroupY;
+      if (finalY < minYRequired) {
+        finalY = minYRequired;
+      }
+    } else if (activePreset && PRESETS[activePreset]) {
+       let minGroupY = Infinity;
+       PRESETS[activePreset].filter(isValidBrickData).forEach((b) => {
+         if (b.position[1] < minGroupY) minGroupY = b.position[1];
+       });
+       if (finalY + minGroupY < 0) {
+         finalY = -minGroupY;
+       }
+    }
 
     const checkPos = (x: number, y: number, z: number) => {
       if (activePreset) {
@@ -272,14 +297,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               b.position[2] + z,
             ] as [number, number, number],
           }));
-        return checkStructureValid(
+        return checkPresetPlacementValid(
           bricks,
           testPresetBricks,
           MODULE_SIZE,
           BRICK_HEIGHT,
         );
       } else if (mode === "Move" && movingBrick) {
-        // validate the whole group
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const oxA = movingBrick.position[0] - movingGroupPivot[0];
         const ozA = movingBrick.position[2] - movingGroupPivot[2];
@@ -355,12 +379,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     let res = checkPos(finalX, finalY, finalZ);
 
-    // Smart surface snapping
-    // First, try jumping up on Y
     if (!res.valid && res.reason === "overlap") {
       let testY = finalY;
       while (testY < finalY + BRICK_HEIGHT * 10) {
-        // search up to 10 bricks up
         testY += BRICK_HEIGHT;
         const upRes = checkPos(finalX, testY, finalZ);
         if (upRes.valid || upRes.reason !== "overlap") {
@@ -371,7 +392,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
     }
 
-    // If still invalid, try nudging X/Z adjacent
     if (!res.valid && res.reason === "overlap") {
       const offsets = [
         [MODULE_SIZE * 2, 0],
@@ -396,7 +416,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         let subRes = checkPos(tx, ty, tz);
 
         if (!subRes.valid && subRes.reason === "overlap") {
-          // search up
           let testY = ty;
           while (testY < ty + BRICK_HEIGHT * 6) {
             testY += BRICK_HEIGHT;
@@ -425,7 +444,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
     }
 
-    setGhostPosition([finalX, finalY, finalZ]);
+    return [finalX, finalY, finalZ];
+  };
+
+  const updateGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3) => {
+    setGhostPosition(computeGhostPosition(point, normal));
   };
 
   useEffect(() => {
@@ -441,6 +464,28 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const isBuilding = mode === "Build";
     const isMoving = mode === "Move" && movingBrickId !== null;
     if (!isBuilding && !isMoving) return;
+
+    if (isMoving && !isDraggingBrick) {
+      if (pointerDownPos.current) {
+        const coords = getPointerCoords(e);
+        const dx = coords.x - pointerDownPos.current.x;
+        const dy = coords.y - pointerDownPos.current.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const threshold = pointerDownPos.current.isTouch ? 20 : 5;
+        if (distance > threshold) {
+           setIsDraggingBrick(true);
+           useLegoStore.getState().setJustSelectedBrick(false); // Also clear click
+        } else {
+           return; // wait
+        }
+      } else {
+        // pointer not down.
+        // We shouldn't track mouse unless we are in some active drag mode
+        // Wait, for mobile, tapping empty space moves ghost position without dragging?
+        // Let's only ignore if it's touch, or restrict tracking
+        // Actually we allow pointerMove to update ghost even if button not held if it's PC.
+      }
+    }
 
     e.stopPropagation();
     const point = e.point;
@@ -606,7 +651,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const presetPlacementStatus = useMemo(() => {
     if (mode !== "Build" || !activePreset)
       return { valid: false, reason: "inactive" };
-    return checkStructureValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
+    return checkPresetPlacementValid(bricks, presetBricks, MODULE_SIZE, BRICK_HEIGHT);
   }, [bricks, presetBricks, activePreset, mode]);
 
   useEffect(() => {
@@ -656,8 +701,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return { x: 0, y: 0 };
   };
 
+  const isMultiTouchRef = useRef(false);
+
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
+
+    // Check multi-touch
+    if (e.nativeEvent?.touches && e.nativeEvent.touches.length >= 2) {
+      isMultiTouchRef.current = true;
+    }
+
     if (mode === "Move" && movingBrick) {
       isBrickInteractionRef.current = true;
     }
@@ -674,7 +727,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const handlePointerUp = (e: any) => {
     e.stopPropagation();
     isBrickInteractionRef.current = false;
+
+    const touchesCount = e.nativeEvent?.touches ? e.nativeEvent.touches.length : 0;
+    const wasMultiTouch = isMultiTouchRef.current;
+    
+    if (touchesCount === 0) {
+      isMultiTouchRef.current = false; // reset when all fingers off
+    }
+
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
+
+    if (wasMultiTouch) {
+      // It was a multi-touch gesture, do not treat as a click/placement
+      return;
+    }
 
     const coords = getPointerCoords(e);
     let isClick = false;
@@ -696,12 +762,131 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       isClick = true; // pointerDown wasn't recorded here (e.g. fired on ground)
     }
 
+    // Sync compute position if we have a point
+    let currentGhostPos = ghostPosition;
+    if (e.point && e.face?.normal) {
+        const p3 = new THREE.Vector3(e.point.x, e.point.y, e.point.z).divideScalar(currentVRScale);
+        const normal = new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
+          .transformDirection(e.object.matrixWorld).normalize();
+        
+        currentGhostPos = computeGhostPosition(p3, normal);
+        setGhostPosition(currentGhostPos);
+    }
+
+    // Now re-calculate validation synchronously for currentGhostPos
+    
+    const checkCurrentPlacement = () => {
+      if (mode === "Move") {
+         // validate the whole group
+        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+        const oxA = movingBrick!.position[0] - movingGroupPivot[0];
+        const ozA = movingBrick!.position[2] - movingGroupPivot[2];
+        let rotatedOxA = oxA,
+          rotatedOzA = ozA;
+        if (rotMod === 90 || rotMod === -270) {
+          rotatedOxA = -ozA;
+          rotatedOzA = oxA;
+        } else if (Math.abs(rotMod) === 180) {
+          rotatedOxA = -oxA;
+          rotatedOzA = -ozA;
+        } else if (rotMod === 270 || rotMod === -90) {
+          rotatedOxA = ozA;
+          rotatedOzA = -oxA;
+        }
+
+        const currentPivotX = currentGhostPos[0] - rotatedOxA;
+        const currentPivotZ = currentGhostPos[2] - rotatedOzA;
+        const currentPivotY =
+          currentGhostPos[1] - (movingBrick!.position[1] - movingGroupPivot[1]);
+
+        const testGroupBricks = movingGroupOriginalBricks.map((b) => {
+          const ox = b.position[0] - movingGroupPivot[0];
+          const oz = b.position[2] - movingGroupPivot[2];
+          let nx = ox,
+            nz = oz;
+          if (rotMod === 90 || rotMod === -270) {
+            nx = -oz;
+            nz = ox;
+          } else if (Math.abs(rotMod) === 180) {
+            nx = -ox;
+            nz = -oz;
+          } else if (rotMod === 270 || rotMod === -90) {
+            nx = oz;
+            nz = -ox;
+          }
+
+          return {
+            ...b,
+            rotation: ((b.rotation || 0) + rotMod) % 360,
+            position: [
+              currentPivotX + nx,
+              currentPivotY + (b.position[1] - movingGroupPivot[1]),
+              currentPivotZ + nz,
+            ] as [number, number, number],
+          };
+        });
+
+        const otherBricks = bricks.filter(
+          (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
+        );
+        return {
+          status: checkStructureValid(otherBricks, testGroupBricks, MODULE_SIZE, BRICK_HEIGHT),
+          ghostGroupBricks: testGroupBricks
+        };
+      } else {
+        const testBrickData = {
+          id: "ghost",
+          type: selectedType,
+          position: currentGhostPos as [number, number, number],
+          rotation: ghostRotation,
+        };
+        return {
+          status: checkPlacementValid(bricks, testBrickData, MODULE_SIZE, BRICK_HEIGHT),
+          ghostGroupBricks: []
+        };
+      }
+    };
+
+    const checkCurrentPresetPlacement = () => {
+        if (!activePreset || !PRESETS[activePreset]) return { valid: false, reason: "inactive" };
+        const testPresetBricks = PRESETS[activePreset]
+          .filter(isValidBrickData)
+          .map((b) => {
+            let ox = b.position[0];
+            let oz = b.position[2];
+            let nx = ox, nz = oz;
+      
+            const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+            if (rotMod === 90 || rotMod === -270) {
+              nx = -oz;
+              nz = ox;
+            } else if (Math.abs(rotMod) === 180) {
+              nx = -ox;
+              nz = -oz;
+            } else if (rotMod === 270 || rotMod === -90) {
+              nx = oz;
+              nz = -ox;
+            }
+      
+            return {
+              ...b,
+              rotation: ((b.rotation || 0) + rotMod) % 360,
+              position: [
+                nx + currentGhostPos[0],
+                b.position[1] + currentGhostPos[1],
+                nz + currentGhostPos[2],
+              ] as [number, number, number],
+            };
+          });
+        return checkPresetPlacementValid(bricks, testPresetBricks, MODULE_SIZE, BRICK_HEIGHT);
+    };
+
     // If we're dragging a brick, we drop it now regardless of distance
     setIsDraggingBrick(false);
 
     if (activePreset) {
-      if (presetPlacementStatus.valid) {
-        commitPreset(ghostPosition, ghostRotation);
+      if (checkCurrentPresetPlacement().valid) {
+        commitPreset(currentGhostPos, ghostRotation);
       } else {
         useLegoStore
           .getState()
@@ -714,21 +899,22 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     if (mode === "Build" && !activePreset) {
-      if (placementStatus.valid) {
+      const { status } = checkCurrentPlacement();
+      if (status.valid) {
         addBrick({
           type: selectedType,
           color: selectedColor,
-          position: ghostPosition,
+          position: currentGhostPos,
           rotation: ghostRotation,
         });
-      } else if (placementStatus.reason === "overlap") {
-        // Auto-stack: find the highest brick at this X/Z and place on top
-        const BRICK_HEIGHT = 0.096;
-        const epsilon = 0.01;
+      } else if (status.reason === "overlap") {
+        // Auto-stack: only if the tapped position matches exactly in X/Z to existing bricks.
+        // Wait, if we tap the exact X/Z it should stack. If not, it shouldn't auto-stack on random previous position.
+        // `currentGhostPos` is already the computed position for the TAP. So it's safe to auto-stack at currentGhostPos.X / Z !
         const ghostAABB = getBrickAABB({
           id: "ghost",
           type: selectedType,
-          position: ghostPosition,
+          position: currentGhostPos,
           rotation: ghostRotation,
         });
         const stackCandidates = bricks.filter((b) => {
@@ -741,11 +927,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           addBrick({
             type: selectedType,
             color: selectedColor,
-            position: [ghostPosition[0], stackY, ghostPosition[2]],
+            position: [currentGhostPos[0], stackY, currentGhostPos[2]],
             rotation: ghostRotation,
           });
         }
-      } else if (placementStatus.reason === "floating") {
+      } else if (status.reason === "floating") {
         useLegoStore.getState().setToastMessage("Cannot float in mid-air.");
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
       }
@@ -755,7 +941,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (isClick && justSelected) {
         // Just selected the brick with a click. Do not commit move yet.
       } else {
-        if (placementStatus.valid) {
+        const { status, ghostGroupBricks } = checkCurrentPlacement();
+        if (status.valid) {
           if (movingGroupOriginalBricks.length > 1) {
             useLegoStore.getState().updateBricks(
               ghostGroupBricks.map((b) => ({
@@ -768,7 +955,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             );
           } else {
             useLegoStore.getState().updateBrick(movingBrick.id, {
-              position: ghostPosition,
+              position: currentGhostPos,
               rotation: ghostRotation,
             });
           }
@@ -776,7 +963,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         } else {
           useLegoStore
             .getState()
-            .setToastMessage(`Cannot move: ${placementStatus.reason}`);
+            .setToastMessage(`Cannot move: ${status.reason}`);
           setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
         }
       }
@@ -830,39 +1017,42 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return groups;
   }, [ghostGroupBricks]);
 
+  const enableOneFingerCamera = mode !== "Build" && mode !== "Delete" && (!isDraggingBrick || mode !== "Move") && !activePreset;
+
   const mouseButtons = useMemo(() => {
     switch (cameraMode) {
       case "Orbit":
         return {
-          LEFT: THREE.MOUSE.ROTATE,
+          LEFT: enableOneFingerCamera ? THREE.MOUSE.ROTATE : undefined,
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.PAN,
         };
       case "Pan":
         return {
-          LEFT: THREE.MOUSE.PAN,
+          LEFT: enableOneFingerCamera ? THREE.MOUSE.PAN : undefined,
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.ROTATE,
         };
       case "Zoom":
         return {
-          LEFT: THREE.MOUSE.DOLLY,
+          LEFT: enableOneFingerCamera ? THREE.MOUSE.DOLLY : undefined,
           MIDDLE: THREE.MOUSE.PAN,
           RIGHT: THREE.MOUSE.ROTATE,
         };
     }
-  }, [cameraMode]);
+  }, [cameraMode, enableOneFingerCamera]);
 
   const touches = useMemo(() => {
+    // We cast undefined as any to bypass Drei's strict typing if it doesn't allow undefined
     switch (cameraMode) {
       case "Orbit":
-        return { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN };
+        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.ROTATE : undefined) as any, TWO: THREE.TOUCH.DOLLY_PAN };
       case "Pan":
-        return { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_PAN };
+        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.PAN : undefined) as any, TWO: THREE.TOUCH.DOLLY_PAN };
       case "Zoom":
-        return { ONE: THREE.TOUCH.DOLLY_PAN, TWO: THREE.TOUCH.ROTATE };
+        return { ONE: (enableOneFingerCamera ? THREE.TOUCH.DOLLY_PAN : undefined) as any, TWO: THREE.TOUCH.ROTATE };
     }
-  }, [cameraMode]);
+  }, [cameraMode, enableOneFingerCamera]);
 
   return (
     <>
@@ -929,7 +1119,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           {mode === "Move" && movingBrick && (
             <>
               {/* The ghost preview that follows the mouse */}
-              {Object.entries(groupedGhostGroupBricks).map(
+              {isDraggingBrick && Object.entries(groupedGhostGroupBricks).map(
                 ([key, group]) => {
                   const [type, color] = key.split("_");
                   return (
@@ -953,7 +1143,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                       type={type as any}
                       color={color}
                       bricks={group}
-                      isGhost
+                      isGhost={true}
                     />
                   );
                 },
@@ -996,9 +1186,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         target={[0, 0.2, 0]}
         maxPolarAngle={Math.PI / 2 - 0.05}
         minPolarAngle={0.15}
-        enabled={isCameraLocked ? false : mode === 'Move' ? !isDraggingBrick : mode !== 'Build' && mode !== 'Delete'}
-        mouseButtons={mouseButtons}
-        touches={touches}
+        enabled={!isCameraLocked}
+        mouseButtons={mouseButtons as any}
+        touches={touches as any}
       />
     </>
   );

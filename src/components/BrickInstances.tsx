@@ -70,7 +70,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               setMovingBrickId(brick.id);
               e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
               e.stopPropagation();
-              useLegoStore.getState().setIsDraggingBrick(true);
+              useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
               window.dispatchEvent(
                 new CustomEvent("set-ghost-rotation", {
@@ -87,7 +87,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 setMovingBrickId(brick.id);
                 e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
                 e.stopPropagation();
-                useLegoStore.getState().setIsDraggingBrick(true);
+                useLegoStore.getState().setIsDraggingBrick(false);
                 useLegoStore.getState().setJustSelectedBrick(true);
                 window.dispatchEvent(
                   new CustomEvent("set-ghost-rotation", {

@@ -24,6 +24,8 @@ export const HumanViewLayer = ({ currentVRScale, sceneGroupRef, updateGhostPosit
 
   const wasTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
+  const wasActionPressed = useRef(false);
+  const snapTurnCooldown = useRef(false);
 
   const isValidTarget = (obj: THREE.Object3D) => {
     let curr: THREE.Object3D | null = obj;
@@ -34,93 +36,177 @@ export const HumanViewLayer = ({ currentVRScale, sceneGroupRef, updateGhostPosit
     return true;
   };
 
-  useFrame(() => {
-    const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
-    if (!session || !sceneGroupRef.current) return;
+    const laserRef = useRef<THREE.Mesh>(null);
+    const laserGeo = React.useMemo(() => {
+      const geo = new THREE.BoxGeometry(0.002, 0.002, 1);
+      geo.translate(0, 0, -0.5); // Pivot at the start of the laser
+      return geo;
+    }, []);
 
-    let rightController: THREE.Group | null = null;
-    let rightInput: XRInputSource | null = null;
+    useFrame(() => {
+        const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
+        if (!session || !sceneGroupRef.current) return;
 
-    for (let i = 0; i < 2; i++) {
-        const source = session.inputSources[i];
-        if (source && source.handedness === 'right') {
-            rightController = gl.xr.getController(i);
-            rightInput = source;
-            break;
-        }
-    }
+        let leftController: THREE.Group | null = null;
+        let rightController: THREE.Group | null = null;
+        let leftInput: XRInputSource | null = null;
+        let rightInput: XRInputSource | null = null;
 
-    if (rightController && rightInput && rightInput.gamepad) {
-        const pos = new THREE.Vector3().setFromMatrixPosition(rightController.matrixWorld);
-        raycaster.set(pos, downVector);
-
-        const intersects = raycaster.intersectObject(sceneGroupRef.current, true);
-        
-        let hit = null;
-        for (const inter of intersects) {
-            if (isValidTarget(inter.object)) {
-                hit = inter;
-                break;
+        for (let i = 0; i < session.inputSources.length; i++) {
+            const source = session.inputSources[i];
+            if (source && source.handedness === 'left') {
+                leftController = gl.xr.getController(i);
+                leftInput = source;
+            } else if (source && source.handedness === 'right') {
+                rightController = gl.xr.getController(i);
+                rightInput = source;
             }
         }
 
-        if (hit) {
-            const unscaledP3 = hit.point.clone().divideScalar(currentVRScale);
-            const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
-            
-            updateGhostPosition(unscaledP3, normal);
+        // Handle Locomotion (Thumbsticks)
+        const dt = 1 / 60; // Approximate
+        if (leftInput && leftInput.gamepad) {
+            const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
+            const zAxis = leftInput.gamepad.axes[3] || 0; // z forward/back
+            if (Math.abs(xAxis) > 0.1 || Math.abs(zAxis) > 0.1) {
+                const speed = 2.0 * dt; // 2 m/s
+                const camForward = new THREE.Vector3(0, 0, -1).transformDirection(gl.xr.getCamera().matrixWorld).setY(0).normalize();
+                const camRight = new THREE.Vector3(1, 0, 0).transformDirection(gl.xr.getCamera().matrixWorld).setY(0).normalize();
+                
+                const moveVec = new THREE.Vector3()
+                    .addScaledVector(camRight, xAxis * speed)
+                    .addScaledVector(camForward, zAxis * speed);
 
+                const refSpace = gl.xr.getReferenceSpace();
+                if (refSpace) {
+                    const transform = new XRRigidTransform({ x: -moveVec.x, y: -moveVec.y, z: -moveVec.z });
+                    const newRefSpace = refSpace.getOffsetReferenceSpace(transform);
+                    gl.xr.setReferenceSpace(newRefSpace);
+                }
+            }
+        }
+
+        if (rightInput && rightInput.gamepad) {
+            const xAxis = rightInput.gamepad.axes[2] || 0;
+            if (Math.abs(xAxis) > 0.5) {
+                if (!snapTurnCooldown.current) { 
+                    snapTurnCooldown.current = true;
+                    const turnAngle = xAxis > 0 ? -Math.PI / 4 : Math.PI / 4;
+                    const refSpace = gl.xr.getReferenceSpace();
+                    if (refSpace) {
+                        const rotTransform = new XRRigidTransform(
+                            { x: 0, y: 0, z: 0 },
+                            { x: 0, y: Math.sin(turnAngle / 2), z: 0, w: Math.cos(turnAngle / 2) }
+                        );
+                        const newRefSpace = refSpace.getOffsetReferenceSpace(rotTransform);
+                        gl.xr.setReferenceSpace(newRefSpace);
+                    }
+                }
+            } else {
+                snapTurnCooldown.current = false;
+            }
+        }
+
+        if (rightController && rightInput && rightInput.gamepad) {
+            const pos = new THREE.Vector3().setFromMatrixPosition(rightController.matrixWorld);
+            const fwd = new THREE.Vector3(0, 0, -1).transformDirection(rightController.matrixWorld).normalize();
+            raycaster.set(pos, fwd);
+
+            const intersects = raycaster.intersectObject(sceneGroupRef.current, true);
+            
+            let hit = null;
+            for (const inter of intersects) {
+                if (isValidTarget(inter.object)) {
+                    hit = inter;
+                    break;
+                }
+            }
+
+            let laserDistance = 0.5; // Short length when not hitting anything
             const gp = rightInput.gamepad;
             const triggerPressed = gp.buttons[0]?.pressed || false;
             const squeezePressed = gp.buttons[1]?.pressed || false;
+            const aPressed = gp.buttons[4]?.pressed || false;
+            const bPressed = gp.buttons[5]?.pressed || false;
+            const actionPressed = aPressed || bPressed;
 
-            if (triggerPressed && !wasTriggerPressed.current) {
-                window.dispatchEvent(new CustomEvent('human-view-action', { detail: { type: 'trigger' } }));
-            }
+            if (hit) {
+                laserDistance = hit.distance;
+                const unscaledP3 = hit.point.clone().divideScalar(currentVRScale);
+                const normal = hit.face?.normal ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize() : new THREE.Vector3(0, 1, 0);
+                
+                updateGhostPosition(unscaledP3, normal);
 
-            if (squeezePressed && !wasSqueezePressed.current) {
-                if (mode === 'Delete' || mode === 'Move') {
-                    const instId = hit.instanceId;
-                    const ud = hit.object.userData;
-                    if (instId !== undefined && ud && ud.bricks) {
-                        let brickIndex = instId;
-                        if (ud.isStud) {
-                            brickIndex = Math.floor(instId / (ud.w * ud.d));
-                        }
-                        const b = ud.bricks[brickIndex];
-                        if (b) {
-                            if (mode === 'Delete') {
-                                if (selectionMode === 'Group') {
-                                    const allb = useLegoStore.getState().bricks;
-                                    const g = getGroupBricks(b, allb);
-                                    removeBricks(g.map((bz: any) => bz.id));
-                                } else {
-                                    removeBrick(b.id);
+                if (triggerPressed && !wasTriggerPressed.current) {
+                    window.dispatchEvent(new CustomEvent('human-view-action', { detail: { type: 'trigger' } }));
+                }
+
+                if (actionPressed && !wasActionPressed.current) {
+                    if (mode === 'Move' && movingBrickId) {
+                        window.dispatchEvent(new CustomEvent('human-view-action', { detail: { type: 'cancelMove' } }));
+                        setMovingBrickId(null);
+                        setIsDraggingBrick(false);
+                    } else if (mode === 'Build' || mode === 'Move') {
+                        window.dispatchEvent(new CustomEvent('rotate-ghost'));
+                    }
+                }
+
+                if (squeezePressed && !wasSqueezePressed.current) {
+                    if (mode === 'Delete' || mode === 'Move') {
+                        const instId = hit.instanceId;
+                        const ud = hit.object.userData;
+                        if (instId !== undefined && ud && ud.bricks) {
+                            let brickIndex = instId;
+                            if (ud.isStud) {
+                                brickIndex = Math.floor(instId / (ud.w * ud.d));
+                            }
+                            const b = ud.bricks[brickIndex];
+                            if (b) {
+                                if (mode === 'Delete') {
+                                    if (selectionMode === 'Group') {
+                                        const allb = useLegoStore.getState().bricks;
+                                        const g = getGroupBricks(b, allb);
+                                        removeBricks(g.map((bz: any) => bz.id));
+                                    } else {
+                                        removeBrick(b.id);
+                                    }
+                                } else if (mode === 'Move' && !movingBrickId) {
+                                    setMovingBrickId(b.id);
+                                    setIsDraggingBrick(true);
+                                    setJustSelectedBrick(true);
+                                    window.dispatchEvent(new CustomEvent("set-ghost-rotation", { detail: b.rotation }));
                                 }
-                            } else if (mode === 'Move' && !movingBrickId) {
-                                setMovingBrickId(b.id);
-                                setIsDraggingBrick(true);
-                                setJustSelectedBrick(true);
-                                window.dispatchEvent(new CustomEvent("set-ghost-rotation", { detail: b.rotation }));
                             }
                         }
                     }
                 }
+            } else {
+                // Not aimed at valid target, clear action states without logic
+                // if users click trigger, nothing happens.
             }
 
+            // Always track state
+            wasActionPressed.current = actionPressed;
             wasTriggerPressed.current = triggerPressed;
             wasSqueezePressed.current = squeezePressed;
-        } else {
-            const gp = rightInput?.gamepad;
-            if (gp) {
-                wasTriggerPressed.current = gp.buttons[0]?.pressed || false;
-                wasSqueezePressed.current = gp.buttons[1]?.pressed || false;
-            }
-        }
-    }
-  });
 
-  return null;
+            // Render laser
+            if (laserRef.current) {
+                laserRef.current.visible = true;
+                laserRef.current.position.copy(pos);
+                laserRef.current.quaternion.setFromRotationMatrix(rightController.matrixWorld);
+                laserRef.current.scale.set(1, 1, laserDistance);
+            }
+        } else {
+            if (laserRef.current) laserRef.current.visible = false;
+        }
+    });
+
+    return (
+        <mesh ref={laserRef} geometry={laserGeo} visible={false}>
+            <meshBasicMaterial color="#aaaaaa" transparent opacity={0.6} depthWrite={false} />
+        </mesh>
+    );
 };
 
 export const MicroViewLayer = () => { return null; };
