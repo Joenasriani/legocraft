@@ -95,10 +95,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useFrame((state) => {
     if (controlsRef.current) {
-      if (isCameraLocked) {
+      if (isCameraLocked || isVR) {
         controlsRef.current.enabled = false;
       } else {
-        controlsRef.current.enabled = !isBrickInteractionRef.current && (mode === 'Move' ? !isDraggingBrick : mode !== 'Build' && mode !== 'Delete');
+        controlsRef.current.enabled = !isBrickInteractionRef.current && !isDraggingBrick;
       }
       if (controlsRef.current.target.y < 0) {
         controlsRef.current.target.y = 0;
@@ -487,7 +487,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
     }
 
-    e.stopPropagation();
     const point = e.point;
     if (!point) return;
 
@@ -707,7 +706,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // Only stop propagation if we don't want the camera to rotate.
     // For now we allow camera to rotate even when interacting.
     // OrbitControls ignores event if it's not handled.
-    e.stopPropagation();
 
     // Check multi-touch
     if (e.nativeEvent?.touches && e.nativeEvent.touches.length >= 2) {
@@ -728,7 +726,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   };
 
   const handlePointerUp = (e: any) => {
-    e.stopPropagation();
     isBrickInteractionRef.current = false;
 
     const touchesCount = e.nativeEvent?.touches ? e.nativeEvent.touches.length : 0;
@@ -1201,7 +1198,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         target={[0, 0.2, 0]}
         maxPolarAngle={Math.PI / 2 - 0.05}
         minPolarAngle={0.15}
-        enabled={!isCameraLocked && !isVR}
+        enabled={!isCameraLocked && !isVR && !isDraggingBrick}
         mouseButtons={mouseButtons as any}
         touches={touches as any}
       />
