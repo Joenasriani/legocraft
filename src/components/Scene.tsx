@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -14,15 +14,40 @@ import {
   isValidBrickData,
   BrickData,
   getGroupBricks,
+  LEGO_COLORS,
+  getBrickAABB,
+  doAABBsOverlap,
 } from "../Store";
 
-export const Scene = ({ xrStore }: { xrStore?: any }) => {
+const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const { gl, scene, camera } = useThree();
 
+  const bricks = useLegoStore((state) => state.bricks);
+  const mode = useLegoStore((state) => state.mode);
+  const cameraMode = useLegoStore((state) => state.cameraMode);
+  const selectedType = useLegoStore((state) => state.selectedType);
+  const selectedColor = useLegoStore((state) => state.selectedColor);
+  const addBrick = useLegoStore((state) => state.addBrick);
+  const activePreset = useLegoStore((state) => state.activePreset);
+  const commitPreset = useLegoStore((state) => state.commitPreset);
+  const movingBrickId = useLegoStore((state) => state.movingBrickId);
+  const setMovingBrickId = useLegoStore((state) => state.setMovingBrickId);
+  const updateBrick = useLegoStore((state) => state.updateBrick);
+  const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
+  const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
+  const selectionMode = useLegoStore((state) => state.selectionMode);
+  const isCameraLocked = useLegoStore((state) => state.isCameraLocked);
+
   const controlsRef = useRef<any>(null);
+  const isBrickInteractionRef = useRef(false);
 
   useFrame((state) => {
     if (controlsRef.current) {
+      if (isCameraLocked) {
+        controlsRef.current.enabled = false;
+      } else {
+        controlsRef.current.enabled = !isBrickInteractionRef.current && (mode === 'Move' ? !isDraggingBrick : mode !== 'Build' && mode !== 'Delete');
+      }
       if (controlsRef.current.target.y < 0) {
         controlsRef.current.target.y = 0;
       }
@@ -44,22 +69,6 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     window.addEventListener("take-screenshot", onScreenshot);
     return () => window.removeEventListener("take-screenshot", onScreenshot);
   }, [gl, scene, camera]);
-
-  const bricks = useLegoStore((state) => state.bricks);
-  const mode = useLegoStore((state) => state.mode);
-  const cameraMode = useLegoStore((state) => state.cameraMode);
-  const selectedType = useLegoStore((state) => state.selectedType);
-  const selectedColor = useLegoStore((state) => state.selectedColor);
-  const addBrick = useLegoStore((state) => state.addBrick);
-  const activePreset = useLegoStore((state) => state.activePreset);
-  const commitPreset = useLegoStore((state) => state.commitPreset);
-  const movingBrickId = useLegoStore((state) => state.movingBrickId);
-  const setMovingBrickId = useLegoStore((state) => state.setMovingBrickId);
-  const updateBrick = useLegoStore((state) => state.updateBrick);
-  const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
-  const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
-
-  const selectionMode = useLegoStore((state) => state.selectionMode);
 
   const movingBrick = useMemo(() => {
     return bricks.find((b) => b.id === movingBrickId) || null;
@@ -588,6 +597,9 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
   const handlePointerDown = (e: any) => {
     e.stopPropagation();
+    if (mode === "Move" && movingBrick) {
+      isBrickInteractionRef.current = true;
+    }
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
     const coords = getPointerCoords(e);
     const isTouch =
@@ -600,20 +612,27 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
   const handlePointerUp = (e: any) => {
     e.stopPropagation();
+    isBrickInteractionRef.current = false;
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
 
+    const coords = getPointerCoords(e);
+    let isClick = false;
+    let distance = 0;
+
     if (pointerDownPos.current) {
-      const coords = getPointerCoords(e);
       const dx = coords.x - pointerDownPos.current.x;
       const dy = coords.y - pointerDownPos.current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      distance = Math.sqrt(dx * dx + dy * dy);
 
       const threshold = pointerDownPos.current.isTouch ? 20 : 5;
+      isClick = distance <= threshold;
       pointerDownPos.current = null;
 
-      if (distance > threshold && !useLegoStore.getState().isDraggingBrick) {
+      if (!isClick && !useLegoStore.getState().isDraggingBrick) {
         return; // It was a camera drag
       }
+    } else {
+      isClick = true; // pointerDown wasn't recorded here (e.g. fired on ground)
     }
 
     // If we're dragging a brick, we drop it now regardless of distance
@@ -641,41 +660,67 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
           position: ghostPosition,
           rotation: ghostRotation,
         });
-      } else {
-        let msg = `Cannot place: ${placementStatus.reason}`;
-        if (placementStatus.reason === "overlap") {
-          msg = "Blocked: overlaps another brick.";
-        } else if (placementStatus.reason === "floating") {
-          msg = "Blocked: floating unsupported.";
-        }
-        useLegoStore.getState().setToastMessage(msg);
-        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-      }
-    } else if (mode === "Move" && movingBrick) {
-      if (placementStatus.valid) {
-        if (movingGroupOriginalBricks.length > 1) {
-          useLegoStore.getState().updateBricks(
-            ghostGroupBricks.map((b) => ({
-              id: b.id,
-              updates: {
-                position: b.position as [number, number, number],
-                rotation: b.rotation,
-              },
-            })),
-          );
-        } else {
-          useLegoStore.getState().updateBrick(movingBrick.id, {
-            position: ghostPosition,
+      } else if (placementStatus.reason === "overlap") {
+        // Auto-stack: find the highest brick at this X/Z and place on top
+        const BRICK_HEIGHT = 0.096;
+        const epsilon = 0.01;
+        const ghostAABB = getBrickAABB({
+          id: "ghost",
+          type: selectedType,
+          position: ghostPosition,
+          rotation: ghostRotation,
+        });
+        const stackCandidates = bricks.filter((b) => {
+          const bAABB = getBrickAABB(b);
+          return doAABBsOverlap(ghostAABB, bAABB, 0.001);
+        });
+        if (stackCandidates.length > 0) {
+          const highestY = Math.max(...stackCandidates.map((b) => b.position[1]));
+          const stackY = highestY + BRICK_HEIGHT;
+          addBrick({
+            type: selectedType,
+            color: selectedColor,
+            position: [ghostPosition[0], stackY, ghostPosition[2]],
             rotation: ghostRotation,
           });
         }
-        setMovingBrickId(null);
-      } else {
-        useLegoStore
-          .getState()
-          .setToastMessage(`Cannot move: ${placementStatus.reason}`);
-        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+      } else if (placementStatus.reason === "floating") {
+        useLegoStore.getState().setToastMessage("Cannot float in mid-air.");
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
       }
+    } else if (mode === "Move" && movingBrick) {
+      const justSelected = useLegoStore.getState().justSelectedBrick;
+
+      if (isClick && justSelected) {
+        // Just selected the brick with a click. Do not commit move yet.
+      } else {
+        if (placementStatus.valid) {
+          if (movingGroupOriginalBricks.length > 1) {
+            useLegoStore.getState().updateBricks(
+              ghostGroupBricks.map((b) => ({
+                id: b.id,
+                updates: {
+                  position: b.position as [number, number, number],
+                  rotation: b.rotation,
+                },
+              })),
+            );
+          } else {
+            useLegoStore.getState().updateBrick(movingBrick.id, {
+              position: ghostPosition,
+              rotation: ghostRotation,
+            });
+          }
+          setMovingBrickId(null);
+        } else {
+          useLegoStore
+            .getState()
+            .setToastMessage(`Cannot move: ${placementStatus.reason}`);
+          setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+        }
+      }
+      // Always clear justSelected on any pointer release while moving
+      useLegoStore.getState().setJustSelectedBrick(false);
     }
   };
 
@@ -691,6 +736,18 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
     });
     return groups;
   }, [bricks, mode, movingGroupOriginalBricks]);
+
+  const groupedOriginalSelectedBricks = useMemo(() => {
+    const groups: Record<string, typeof bricks> = {};
+    if (mode === "Move" && movingGroupOriginalBricks.length > 0) {
+      movingGroupOriginalBricks.forEach((brick) => {
+        const key = `${brick.type}_${brick.color}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(brick);
+      });
+    }
+    return groups;
+  }, [movingGroupOriginalBricks, mode]);
 
   const groupedPresetBricks = useMemo(() => {
     const groups: Record<string, any[]> = {};
@@ -748,219 +805,135 @@ export const Scene = ({ xrStore }: { xrStore?: any }) => {
 
   return (
     <>
-      {xrStore ? (
-        <XR store={xrStore}>
-          <color attach="background" args={["#4da6ff"]} />
-          <fog attach="fog" args={["#4da6ff", 50, 300]} />
-          <ambientLight intensity={0.4} />
-          <hemisphereLight
-            intensity={0.6}
-            color="#ffffff"
-            groundColor="#002D04"
-          />
-          <directionalLight
-            position={[10, 20, 10]}
-            intensity={1.5}
-            castShadow
-          />
+      <color attach="background" args={["#4da6ff"]} />
+      <fog attach="fog" args={["#4da6ff", 50, 300]} />
+      <ambientLight intensity={0.4} />
+      <hemisphereLight
+        intensity={0.6}
+        color="#ffffff"
+        groundColor="#002D04"
+      />
+      <directionalLight
+        position={[10, 20, 10]}
+        intensity={1.5}
+        castShadow
+      />
 
-          <Suspense fallback={null}>
-            <group
-              onPointerMove={handlePointerMove}
-              onPointerDown={handlePointerDown}
-              onPointerUp={handlePointerUp}
-              onContextMenu={handleContextMenu}
-            >
-              {/* Visualized Bricks using InstancedMesh */}
-              {Object.entries(groupedBricks).map(([key, group]) => {
+      <Suspense fallback={null}>
+        <group
+          onPointerMove={handlePointerMove}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onContextMenu={handleContextMenu}
+        >
+          {/* Visualized Bricks using InstancedMesh */}
+          {Object.entries(groupedBricks).map(([key, group]) => {
+            const [type, color] = key.split("_");
+            return (
+              <BrickInstances
+                key={key}
+                type={type as any}
+                color={color}
+                bricks={group}
+              />
+            );
+          })}
+
+          {mode === "Build" && !activePreset && (
+            <LegoBrick
+              id="ghost"
+              type={selectedType}
+              color={selectedColor}
+              position={ghostPosition}
+              rotation={ghostRotation}
+              isPlacementGhost
+            />
+          )}
+
+          {mode === "Move" && movingBrick && (
+            <>
+              {/* The ghost preview that follows the mouse */}
+              {Object.entries(groupedGhostGroupBricks).map(
+                ([key, group]) => {
+                  const [type, color] = key.split("_");
+                  return (
+                    <BrickInstances
+                      key={`moving-ghost-${key}`}
+                      type={type as any}
+                      color={color}
+                      bricks={group}
+                      isGhost
+                    />
+                  );
+                },
+              )}
+              {/* The original bricks left in place (visual only) */}
+              {Object.entries(groupedOriginalSelectedBricks).map(
+                ([key, group]) => {
+                  const [type, color] = key.split("_");
+                  return (
+                    <BrickInstances
+                      key={`original-ghost-${key}`}
+                      type={type as any}
+                      color={color}
+                      bricks={group}
+                      isGhost
+                    />
+                  );
+                },
+              )}
+            </>
+          )}
+
+          {activePreset && (
+            <>
+              {Object.entries(groupedPresetBricks).map(([key, group]) => {
                 const [type, color] = key.split("_");
                 return (
                   <BrickInstances
-                    key={key}
+                    key={`preset-ghost-${key}`}
                     type={type as any}
                     color={color}
                     bricks={group}
+                    isGhost
                   />
                 );
               })}
+            </>
+          )}
 
-              {mode === "Build" && !activePreset && (
-                <LegoBrick
-                  id="ghost"
-                  type={selectedType}
-                  color={selectedColor}
-                  position={ghostPosition}
-                  rotation={ghostRotation}
-                  isPlacementGhost
-                />
-              )}
-
-              {mode === "Move" && movingBrick && (
-                <>
-                  {Object.entries(groupedGhostGroupBricks).map(
-                    ([key, group]) => {
-                      const [type, color] = key.split("_");
-                      return (
-                        <BrickInstances
-                          key={`moving-ghost-${key}`}
-                          type={type as any}
-                          color={color}
-                          bricks={group}
-                          isGhost
-                        />
-                      );
-                    },
-                  )}
-                </>
-              )}
-
-              {activePreset && (
-                <>
-                  {Object.entries(groupedPresetBricks).map(([key, group]) => {
-                    const [type, color] = key.split("_");
-                    return (
-                      <BrickInstances
-                        key={`preset-ghost-${key}`}
-                        type={type as any}
-                        color={color}
-                        bricks={group}
-                        isGhost
-                      />
-                    );
-                  })}
-                </>
-              )}
-
-              <mesh
-                receiveShadow
-                rotation={[-Math.PI / 2, 0, 0]}
-                onPointerMove={handlePointerMove}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-              >
-                <planeGeometry args={[100, 100]} />
-                <meshStandardMaterial color="#002D04" />
-              </mesh>
-            </group>
-          </Suspense>
-          <OrbitControls
-            ref={controlsRef}
-            makeDefault
-            target={[0, 0.2, 0]}
-            maxPolarAngle={Math.PI / 2 - 0.05}
-            minPolarAngle={0.15}
-            enabled={!isDraggingBrick}
-            mouseButtons={mouseButtons}
-            touches={touches}
-          />
-        </XR>
-      ) : (
-        <>
-          <color attach="background" args={["#4da6ff"]} />
-          <fog attach="fog" args={["#4da6ff", 50, 300]} />
-          <ambientLight intensity={0.4} />
-          <hemisphereLight
-            intensity={0.6}
-            color="#ffffff"
-            groundColor="#002D04"
-          />
-          <directionalLight
-            position={[10, 20, 10]}
-            intensity={1.5}
-            castShadow
-          />
-
-          <Suspense fallback={null}>
-            <group
-              onPointerMove={handlePointerMove}
-              onPointerDown={handlePointerDown}
-              onPointerUp={handlePointerUp}
-              onContextMenu={handleContextMenu}
-            >
-              {/* Visualized Bricks using InstancedMesh */}
-              {Object.entries(groupedBricks).map(([key, group]) => {
-                const [type, color] = key.split("_");
-                return (
-                  <BrickInstances
-                    key={key}
-                    type={type as any}
-                    color={color}
-                    bricks={group}
-                  />
-                );
-              })}
-
-              {mode === "Build" && !activePreset && (
-                <LegoBrick
-                  id="ghost"
-                  type={selectedType}
-                  color={selectedColor}
-                  position={ghostPosition}
-                  rotation={ghostRotation}
-                  isPlacementGhost
-                />
-              )}
-
-              {mode === "Move" && movingBrick && (
-                <>
-                  {Object.entries(groupedGhostGroupBricks).map(
-                    ([key, group]) => {
-                      const [type, color] = key.split("_");
-                      return (
-                        <BrickInstances
-                          key={`moving-ghost-${key}`}
-                          type={type as any}
-                          color={color}
-                          bricks={group}
-                          isGhost
-                        />
-                      );
-                    },
-                  )}
-                </>
-              )}
-
-              {activePreset && (
-                <>
-                  {Object.entries(groupedPresetBricks).map(([key, group]) => {
-                    const [type, color] = key.split("_");
-                    return (
-                      <BrickInstances
-                        key={`preset-ghost-${key}`}
-                        type={type as any}
-                        color={color}
-                        bricks={group}
-                        isGhost
-                      />
-                    );
-                  })}
-                </>
-              )}
-
-              <mesh
-                receiveShadow
-                rotation={[-Math.PI / 2, 0, 0]}
-                onPointerMove={handlePointerMove}
-                onPointerDown={handlePointerDown}
-                onPointerUp={handlePointerUp}
-              >
-                <planeGeometry args={[100, 100]} />
-                <meshStandardMaterial color="#002D04" />
-              </mesh>
-            </group>
-          </Suspense>
-          <OrbitControls
-            ref={controlsRef}
-            makeDefault
-            target={[0, 0.2, 0]}
-            maxPolarAngle={Math.PI / 2 - 0.05}
-            minPolarAngle={0.15}
-            enabled={!isDraggingBrick}
-            mouseButtons={mouseButtons}
-            touches={touches}
-          />
-        </>
-      )}
+          <mesh
+            receiveShadow
+            rotation={[-Math.PI / 2, 0, 0]}
+            onPointerMove={handlePointerMove}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+          >
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial color="#002D04" />
+          </mesh>
+        </group>
+      </Suspense>
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        target={[0, 0.2, 0]}
+        maxPolarAngle={Math.PI / 2 - 0.05}
+        minPolarAngle={0.15}
+        enabled={isCameraLocked ? false : mode === 'Move' ? !isDraggingBrick : mode !== 'Build' && mode !== 'Delete'}
+        mouseButtons={mouseButtons}
+        touches={touches}
+      />
     </>
+  );
+};
+
+export const Scene = ({ xrStore }: { xrStore?: any }) => {
+  return xrStore ? (
+    <XR store={xrStore}>
+      <SceneContents xrStore={xrStore} />
+    </XR>
+  ) : (
+    <SceneContents />
   );
 };

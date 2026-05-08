@@ -34,11 +34,11 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   const allBricks = useLegoStore((state) => state.bricks);
 
   const handlePointerDown = (e: any) => {
+    e.stopPropagation();
     if (isGhost) return;
 
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === "contextmenu";
     if (mode === "Delete" || mode === "Move" || isSqueeze) {
-      e.stopPropagation();
       const instanceId = e.instanceId;
       if (instanceId !== undefined) {
         // If they click on body or stud, the IDs map predictably
@@ -68,7 +68,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
             if (selectionMode === "Group") {
               // We just set the anchor, and the Scene handles computing the rest of the group!
               setMovingBrickId(brick.id);
+              e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
+              e.stopPropagation();
               useLegoStore.getState().setIsDraggingBrick(true);
+              useLegoStore.getState().setJustSelectedBrick(true);
               window.dispatchEvent(
                 new CustomEvent("set-ghost-rotation", {
                   detail: brick.rotation,
@@ -82,7 +85,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
                 setMovingBrickId(brick.id);
+                e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
+                e.stopPropagation();
                 useLegoStore.getState().setIsDraggingBrick(true);
+                useLegoStore.getState().setJustSelectedBrick(true);
                 window.dispatchEvent(
                   new CustomEvent("set-ghost-rotation", {
                     detail: brick.rotation,

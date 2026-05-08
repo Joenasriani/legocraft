@@ -136,6 +136,22 @@ const OrbitCameraIcon = ({ size = 16 }: { size?: number }) => (
   </svg>
 );
 
+const LockIcon = ({ size = 16 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+  </svg>
+);
+
 const TreeIcon = ({ size = 24 }: { size?: number }) => (
   <svg
     width={size}
@@ -441,6 +457,8 @@ export default function App() {
     loadPreset,
     selectionMode,
     setSelectionMode,
+    isCameraLocked,
+    setIsCameraLocked,
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(true);
@@ -519,7 +537,7 @@ export default function App() {
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
-        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}>
+        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }} gl={{ preserveDrawingBuffer: true }}>
           <Scene xrStore={xrStore} />
         </Canvas>
       </div>
@@ -536,25 +554,57 @@ export default function App() {
         {/* Camera Modes */}
         <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 pointer-events-auto bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10">
           <button
-            onClick={() => setCameraMode("Pan")}
-            className={`p-1.5 rounded-md transition-colors ${cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10"}`}
+            onClick={() => {
+              if (mode === "Build" || mode === "Delete") {
+                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
+                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                return;
+              }
+              setCameraMode("Pan");
+              setIsCameraLocked(false);
+            }}
+            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Pan Camera"
           >
             <PanIcon size={16} />
           </button>
           <button
-            onClick={() => setCameraMode("Zoom")}
-            className={`p-1.5 rounded-md transition-colors ${cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10"}`}
+            onClick={() => {
+              if (mode === "Build" || mode === "Delete") {
+                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
+                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                return;
+              }
+              setCameraMode("Zoom");
+              setIsCameraLocked(false);
+            }}
+            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Zoom Camera"
           >
             <ZoomIcon size={16} />
           </button>
           <button
-            onClick={() => setCameraMode("Orbit")}
-            className={`p-1.5 rounded-md transition-colors ${cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10"}`}
+            onClick={() => {
+              if (mode === "Build" || mode === "Delete") {
+                useLegoStore.getState().setToastMessage("Use Move mode to pan, zoom, or orbit the camera.");
+                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                return;
+              }
+              setCameraMode("Orbit");
+              setIsCameraLocked(false);
+            }}
+            className={`p-1.5 rounded-md transition-colors ${(mode !== "Build" && mode !== "Delete") && !isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
             title="Orbit Camera"
           >
             <OrbitCameraIcon size={16} />
+          </button>
+          <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
+          <button
+            onClick={() => setIsCameraLocked(!isCameraLocked)}
+            className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+            title="Lock Camera"
+          >
+            <LockIcon size={16} />
           </button>
         </div>
 
@@ -571,10 +621,10 @@ export default function App() {
                   try {
                     const p = xrStore.enterVR();
                     if (p && p.catch) {
-                      p.catch(() => alert(xrErrorMsg));
+                      p.catch(() => useLegoStore.getState().setToastMessage("VR failed to start."));
                     }
                   } catch (e) {
-                    alert(xrErrorMsg);
+                    useLegoStore.getState().setToastMessage("VR failed to start.");
                   }
                 }}
                 className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-5 py-2 rounded-full text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"

@@ -12,18 +12,14 @@
     "test": "tsx --test src/*.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.1",
-    "@react-three/rapier": "^2.2.0",
     "@react-three/xr": "^6.6.29",
     "@tailwindcss/vite": "^4.1.14",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.160.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "dotenv": "^17.2.3",
-    "express": "^4.21.2",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.2.5",
