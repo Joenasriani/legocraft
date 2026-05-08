@@ -1054,6 +1054,19 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
   }, [cameraMode, enableOneFingerCamera]);
 
+  const [isVR, setIsVR] = useState(false);
+
+  useEffect(() => {
+    const handleSessionStart = () => setIsVR(true);
+    const handleSessionEnd = () => setIsVR(false);
+    gl.xr.addEventListener("sessionstart", handleSessionStart);
+    gl.xr.addEventListener("sessionend", handleSessionEnd);
+    return () => {
+      gl.xr.removeEventListener("sessionstart", handleSessionStart);
+      gl.xr.removeEventListener("sessionend", handleSessionEnd);
+    };
+  }, [gl.xr]);
+
   return (
     <>
       <color attach="background" args={["#4da6ff"]} />
@@ -1186,7 +1199,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         target={[0, 0.2, 0]}
         maxPolarAngle={Math.PI / 2 - 0.05}
         minPolarAngle={0.15}
-        enabled={!isCameraLocked}
+        enabled={!isCameraLocked && !isVR}
         mouseButtons={mouseButtons as any}
         touches={touches as any}
       />
