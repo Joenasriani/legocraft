@@ -203,7 +203,18 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
     bodyMesh.count = count;
     studMesh.count = Math.max(0, count * w * d);
-  }, [bricks, w, d]);
+    
+    // Store bricks on userData so custom raycasters can retrieve them
+    bodyMesh.userData.bricks = bricks;
+    bodyMesh.userData.w = w;
+    bodyMesh.userData.d = d;
+    bodyMesh.userData.isGhost = isGhost;
+    studMesh.userData.bricks = bricks;
+    studMesh.userData.w = w;
+    studMesh.userData.d = d;
+    studMesh.userData.isStud = true;
+    studMesh.userData.isGhost = isGhost;
+  }, [bricks, w, d, isGhost]);
 
   return (
     <group>

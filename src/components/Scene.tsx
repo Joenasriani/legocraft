@@ -19,8 +19,30 @@ import {
   doAABBsOverlap,
 } from "../Store";
 
+import { VRRadialMenu } from "./VRRadialMenu";
+
+import { HumanViewLayer, MicroViewLayer } from "./VRViewLayers";
+
+export type VRScaleMode = 'human' | 'micro';
+
+const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
+  human: 0.4,
+  micro: 17.5,
+};
+
 const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const { gl, scene, camera } = useThree();
+  const [vrScale, setVrScale] = useState<VRScaleMode>('human');
+  const [xrSessionActive, setXrSessionActive] = useState(false);
+  const currentVRScale = xrSessionActive ? VR_SCALE_VALUES[vrScale] : 1.0;
+
+  useEffect(() => {
+    if (!xrStore) return;
+    return xrStore.subscribe((state: any) => {
+      setXrSessionActive(!!state.session);
+      if (!state.session) setVrScale('human');
+    });
+  }, [xrStore]);
 
   const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
@@ -40,6 +62,25 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const controlsRef = useRef<any>(null);
   const isBrickInteractionRef = useRef(false);
+
+  const handlePointerUpRef = useRef<any>(null);
+
+  useEffect(() => {
+    handlePointerUpRef.current = handlePointerUp;
+  });
+
+  useEffect(() => {
+    const handleVRAction = (e: any) => {
+      if (e.detail.type === 'trigger') {
+         pointerDownPos.current = null;
+         if (handlePointerUpRef.current) {
+             handlePointerUpRef.current({ stopPropagation: () => {}, clientX: 0, clientY: 0, button: 0 });
+         }
+      }
+    }
+    window.addEventListener('human-view-action', handleVRAction);
+    return () => window.removeEventListener('human-view-action', handleVRAction);
+  }, []);
 
   useFrame((state) => {
     if (controlsRef.current) {
@@ -108,6 +149,32 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     0, 0, 0,
   ]);
   const [ghostRotation, setGhostRotation] = useState<number>(0);
+
+  const sceneGroupRef = useRef<THREE.Group>(null);
+
+  async function teleportPlayer(offsetPosition: { x: number; y: number; z: number }) {
+    if (!gl.xr.isPresenting) return;
+    const session = gl.xr.getSession();
+    if (!session) return;
+    const refSpace = await session.requestReferenceSpace('local-floor');
+    const transform = new XRRigidTransform(
+      offsetPosition,
+      { x: 0, y: 0, z: 0, w: 1 }
+    );
+    gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
+  }
+
+  const toggleScale = () => {
+    setVrScale((v) => {
+      if (v === 'human') {
+        teleportPlayer({ x: 0, y: 0, z: -0.15 });
+        return 'micro';
+      } else {
+        teleportPlayer({ x: 0, y: 0, z: 0 });
+        return 'human';
+      }
+    });
+  };
 
   useEffect(() => {
     const handleRotate = () => setGhostRotation((r) => (r + 90) % 360);
@@ -379,18 +446,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const point = e.point;
     if (!point) return;
 
-    // Convert to Three Vector3 just in case
-    const p3 = new THREE.Vector3(point.x, point.y, point.z);
+    // Convert to Three Vector3 just in case, and unscale the coordinates (CRITICAL)
+    const p3 = new THREE.Vector3(point.x, point.y, point.z).divideScalar(currentVRScale);
     const normal = e.face?.normal
       ? new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
       : new THREE.Vector3(0, 1, 0);
 
-    // Multiply by object scale/rotation if intersected object has them?
-    // R3F gives e.face.normal in local space usually, but e.normal might be world space?
-    // Wait, e.intersections[0]?.normal is usually world space but let's just use point + normal.
-    // e.face.normal is local... wait! If e.object.rotation is applied, normal needs to be transformed.
-    // Drei's events provide e.normal as world space usually, wait no, they don't?
-    // Let's stick to e.face.normal, but just transform it!
     const worldNormal = normal
       .clone()
       .transformDirection(e.object.matrixWorld)
@@ -820,7 +881,22 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       />
 
       <Suspense fallback={null}>
+        {xrSessionActive && vrScale === 'human' && (
+          <HumanViewLayer
+             currentVRScale={currentVRScale}
+             sceneGroupRef={sceneGroupRef}
+             updateGhostPosition={updateGhostPosition}
+          />
+        )}
+        {xrSessionActive && vrScale === 'micro' && (
+          <MicroViewLayer />
+        )}
+        {xrSessionActive && (
+          <VRRadialMenu vrScale={vrScale} onToggle={toggleScale} currentVRScale={currentVRScale} />
+        )}
         <group
+          ref={sceneGroupRef}
+          scale={currentVRScale}
           onPointerMove={handlePointerMove}
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
