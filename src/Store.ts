@@ -16,15 +16,25 @@ export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
   const a1 = getBrickAABB(b1);
   const a2 = getBrickAABB(b2);
   const dy = Math.abs(b1.position[1] - b2.position[1]);
-  
-  const overlapX = Math.max(0, Math.min(a1.maxX, a2.maxX) - Math.max(a1.minX, a2.minX));
-  const overlapZ = Math.max(0, Math.min(a1.maxZ, a2.maxZ) - Math.max(a1.minZ, a2.minZ));
+
+  const overlapX = Math.max(
+    0,
+    Math.min(a1.maxX, a2.maxX) - Math.max(a1.minX, a2.minX),
+  );
+  const overlapZ = Math.max(
+    0,
+    Math.min(a1.maxZ, a2.maxZ) - Math.max(a1.minZ, a2.minZ),
+  );
 
   if (dy > 0.096 + 0.001) return false; // BRICK_HEIGHT
 
   if (dy < 0.001) {
-    const touchX = Math.abs(a1.maxX - a2.minX) < 0.001 || Math.abs(a2.maxX - a1.minX) < 0.001;
-    const touchZ = Math.abs(a1.maxZ - a2.minZ) < 0.001 || Math.abs(a2.maxZ - a1.minZ) < 0.001;
+    const touchX =
+      Math.abs(a1.maxX - a2.minX) < 0.001 ||
+      Math.abs(a2.maxX - a1.minX) < 0.001;
+    const touchZ =
+      Math.abs(a1.maxZ - a2.minZ) < 0.001 ||
+      Math.abs(a2.maxZ - a1.minZ) < 0.001;
     return (
       (overlapX > 0.001 && touchZ) ||
       (overlapZ > 0.001 && touchX) ||
@@ -307,8 +317,11 @@ interface LegoStore {
 
   isCameraLocked: boolean;
   setIsCameraLocked: (locked: boolean) => void;
-  selectionMode: "Single" | "Group";
-  setSelectionMode: (mode: "Single" | "Group") => void;
+  selectionMode: "Solo" | "Multi" | "Group";
+  setSelectionMode: (mode: "Solo" | "Multi" | "Group") => void;
+  multiSelectedBrickIds: string[];
+  setMultiSelectedBrickIds: (ids: string[]) => void;
+  toggleMultiSelectBrickId: (id: string) => void;
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
@@ -368,7 +381,7 @@ const generateLifeSizedTree = (): BrickData[] => {
   const trunk = "#8B4513";
   const leaf = "#00AD3C";
   // Trunk
-  for(let y=0; y<3; y++) tree.push(createBrick("2x2", trunk, 0.5, y, 0.5));
+  for (let y = 0; y < 3; y++) tree.push(createBrick("2x2", trunk, 0.5, y, 0.5));
   // Branches & Leaves - alternating 2x4s to make a canopy
   tree.push(createBrick("2x4", leaf, 0.5, 3, 0.5, 0));
   tree.push(createBrick("2x4", leaf, 0.5, 4, 0.5, 90));
@@ -382,7 +395,7 @@ const generateLifeSizedCabin = (): BrickData[] => {
   const brown = "#8B4513";
   const roof = "#3b2f2f";
   // Walls
-  for(let y=0; y<3; y++) {
+  for (let y = 0; y < 3; y++) {
     // left wall (span Z: -1.5 to 2.5)
     cabin.push(createBrick("2x4", brown, -2.5, y, 0.5, 0));
     // right wall
@@ -392,10 +405,10 @@ const generateLifeSizedCabin = (): BrickData[] => {
     cabin.push(createBrick("1x2", brown, 1.5, y, -2.5, 90));
     // front wall with door (gap at X=0.5)
     if (y > 1) {
-      cabin.push(createBrick("1x2", brown, -0.5, y, 2.5, 90)); 
+      cabin.push(createBrick("1x2", brown, -0.5, y, 2.5, 90));
     } else {
-       // pillar for the side of the door
-       cabin.push(createBrick("1x1", brown, -0.5, y, 2.5, 0)); 
+      // pillar for the side of the door
+      cabin.push(createBrick("1x1", brown, -0.5, y, 2.5, 0));
     }
   }
   // Roof - span X: -2.5 to 2.5, Z: -2.5 to 2.5
@@ -409,7 +422,7 @@ const generateLifeSizedCabin = (): BrickData[] => {
   // Front roof gap
   cabin.push(createBrick("1x2", roof, -1.5, 3, 2.5, 90));
   cabin.push(createBrick("1x2", roof, 1.5, 3, 2.5, 90));
-  
+
   // Top roof
   cabin.push(createBrick("2x4", roof, 0.5, 4, 0.5, 0));
   return cabin;
@@ -421,7 +434,7 @@ const generateRoundWaterWell = (): BrickData[] => {
   const blue = "#0055BF";
   const brown = "#8B4513";
   // Base
-  for(let y=0; y<2; y++) {
+  for (let y = 0; y < 2; y++) {
     well.push(createBrick("2x4", stone, -1.5, y, 0.5, 0)); // Left wall
     well.push(createBrick("2x4", stone, 2.5, y, 0.5, 0)); // Right wall
     well.push(createBrick("2x2", stone, 0.5, y, -0.5, 0)); // Back
@@ -444,12 +457,12 @@ const generatePineTree = (): BrickData[] => {
   const green = "#00AD3C";
   tree.push(createBrick("1x1", brown, 0.5, 0, 0.5));
   tree.push(createBrick("1x1", brown, 0.5, 1, 0.5));
-  
+
   tree.push(createBrick("2x2", green, -0.5, 2, -0.5));
   tree.push(createBrick("2x2", green, 1.5, 2, -0.5));
   tree.push(createBrick("2x2", green, -0.5, 2, 1.5));
   tree.push(createBrick("2x2", green, 1.5, 2, 1.5));
-  
+
   tree.push(createBrick("2x2", green, 0.5, 3, 0.5));
   tree.push(createBrick("1x1", green, 0.5, 4, 0.5));
   return tree;
@@ -459,21 +472,27 @@ const generateWalkInCastle = (): BrickData[] => {
   const castle: BrickData[] = [];
   const stone = "#A0A0A0";
   // Walls
-  for(let y=0; y<3; y++) {
+  for (let y = 0; y < 3; y++) {
     castle.push(createBrick("2x4", stone, -2.5, y, 0.5, 90));
     castle.push(createBrick("2x4", stone, 3.5, y, 0.5, 90));
     castle.push(createBrick("2x4", stone, 0.5, y, -2.5, 0));
-    if(y>1) {
-       castle.push(createBrick("2x2", stone, 0.5, y, 3.5, 0)); // Door gap
+    if (y > 1) {
+      castle.push(createBrick("2x2", stone, 0.5, y, 3.5, 0)); // Door gap
     } else {
-       castle.push(createBrick("1x2", stone, -1.5, y, 3.5, 0));
-       castle.push(createBrick("1x2", stone, 2.5, y, 3.5, 0));
+      castle.push(createBrick("1x2", stone, -1.5, y, 3.5, 0));
+      castle.push(createBrick("1x2", stone, 2.5, y, 3.5, 0));
     }
   }
   // Towers
-  const corners = [[-2.5, -2.5], [3.5, -2.5], [-2.5, 3.5], [3.5, 3.5]];
+  const corners = [
+    [-2.5, -2.5],
+    [3.5, -2.5],
+    [-2.5, 3.5],
+    [3.5, 3.5],
+  ];
   corners.forEach(([cx, cz]) => {
-    for(let y=0; y<5; y++) castle.push(createBrick("1x1", stone, cx, y, cz));
+    for (let y = 0; y < 5; y++)
+      castle.push(createBrick("1x1", stone, cx, y, cz));
   });
   return castle;
 };
@@ -486,7 +505,7 @@ const generateHorse = (): BrickData[] => {
   horse.push(createBrick("1x1", brown, 1.5, 0, -1.5));
   horse.push(createBrick("1x1", brown, -0.5, 0, 1.5));
   horse.push(createBrick("1x1", brown, 1.5, 0, 1.5));
-  // Body (X: -1.5 to 2.5, Z: -2.5 to 2.5) -> Wait, W=4, D=4? 
+  // Body (X: -1.5 to 2.5, Z: -2.5 to 2.5) -> Wait, W=4, D=4?
   // Let's use two 2x4s side by side so it spans X: [-0.5, 1.5], Z: [-1.5, 2.5]
   // 2x4 rot 0: X goes -0.5 to 1.5, Z goes -1.5 to 2.5. Fits all 4 legs!
   horse.push(createBrick("2x4", brown, 0.5, 1, 0.5, 0));
@@ -535,10 +554,11 @@ const generateRoad = (): BrickData[] => {
   const road: BrickData[] = [];
   const gray = "#707070";
   const yellow = "#FFD500";
-  for(let z=-4.5; z<=4.5; z+=2) {
+  for (let z = -4.5; z <= 4.5; z += 2) {
     road.push(createBrick("2x4", gray, -2.5, 0, z, 90));
     road.push(createBrick("2x4", gray, 3.5, 0, z, 90));
-    if (Math.abs(z) % 4 < 1) road.push(createBrick("1x2", yellow, 0.5, 0, z, 90));
+    if (Math.abs(z) % 4 < 1)
+      road.push(createBrick("1x2", yellow, 0.5, 0, z, 90));
     else road.push(createBrick("1x2", gray, 0.5, 0, z, 90));
   }
   return road;
@@ -549,17 +569,17 @@ const generateMountain = (): BrickData[] => {
   const gray = "#A0A0A0";
   const white = "#FFFFFF";
   const green = "#00AD3C";
-  
+
   // Base
   mtn.push(createBrick("2x4", green, -1.5, 0, 0.5, 0));
   mtn.push(createBrick("2x4", green, 2.5, 0, 0.5, 0));
-  // L2 
+  // L2
   mtn.push(createBrick("2x4", gray, 0.5, 1, 0.5, 90));
-  // L3 
+  // L3
   mtn.push(createBrick("2x2", gray, 0.5, 2, 0.5, 0));
-  // L4 
+  // L4
   mtn.push(createBrick("1x1", white, 0.5, 3, 0.5, 0));
-  
+
   return mtn;
 };
 
@@ -645,8 +665,18 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 
-  selectionMode: "Single",
+  selectionMode: "Solo",
   setSelectionMode: (mode) => set({ selectionMode: mode }),
+  multiSelectedBrickIds: [],
+  setMultiSelectedBrickIds: (ids) => set({ multiSelectedBrickIds: ids }),
+  toggleMultiSelectBrickId: (id) => {
+    const ids = get().multiSelectedBrickIds;
+    if (ids.includes(id)) {
+      set({ multiSelectedBrickIds: ids.filter((x) => x !== id) });
+    } else {
+      set({ multiSelectedBrickIds: [...ids, id] });
+    }
+  },
 
   removeBricks: (ids) => {
     const { bricks, undoStack } = get();
@@ -719,6 +749,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       activePreset: null,
       movingBrickId: null,
       isDraggingBrick: false,
+      multiSelectedBrickIds: [],
     }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setSelectedType: (selectedType) =>
@@ -727,23 +758,41 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       activePreset: null,
       movingBrickId: null,
       isDraggingBrick: false,
+      multiSelectedBrickIds: [],
     }),
   setSelectedColor: (selectedColor) => {
-    const { mode, movingBrickId, bricks, updateBricks, selectionMode } = get();
+    const {
+      mode,
+      movingBrickId,
+      multiSelectedBrickIds,
+      bricks,
+      updateBricks,
+      selectionMode,
+    } = get();
     set({ selectedColor });
 
-    if (mode === "Move" && movingBrickId) {
-      const movingBrick = bricks.find((b) => b.id === movingBrickId);
-      if (movingBrick) {
-        if (selectionMode === "Group") {
-          const groupBricks = getGroupBricks(movingBrick, bricks);
-          const updates = groupBricks.map((b) => ({
-            id: b.id,
-            updates: { color: selectedColor },
-          }));
-          updateBricks(updates);
-        } else {
-          updateBricks([{ id: movingBrick.id, updates: { color: selectedColor } }]);
+    if (mode === "Move" || mode === "Delete") {
+      if (selectionMode === "Multi" && multiSelectedBrickIds.length > 0) {
+        const updates = multiSelectedBrickIds.map((id) => ({
+          id: id,
+          updates: { color: selectedColor },
+        }));
+        updateBricks(updates);
+      } else if (movingBrickId) {
+        const movingBrick = bricks.find((b) => b.id === movingBrickId);
+        if (movingBrick) {
+          if (selectionMode === "Group") {
+            const groupBricks = getGroupBricks(movingBrick, bricks);
+            const updates = groupBricks.map((b) => ({
+              id: b.id,
+              updates: { color: selectedColor },
+            }));
+            updateBricks(updates);
+          } else {
+            updateBricks([
+              { id: movingBrick.id, updates: { color: selectedColor } },
+            ]);
+          }
         }
       }
     }
@@ -844,13 +893,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     // STRUCTURE PLACEMENT VALIDATION
-    const check = checkStructureValid(
-      bricks,
-      presetBricks,
-      ms,
-      bh,
-      0.01,
-    );
+    const check = checkStructureValid(bricks, presetBricks, ms, bh, 0.01);
     if (!check.valid) {
       console.warn("Preset placement blocked:", check.reason);
       return;

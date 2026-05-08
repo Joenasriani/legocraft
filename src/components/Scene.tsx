@@ -23,7 +23,7 @@ import { VRRadialMenu } from "./VRRadialMenu";
 
 import { HumanViewLayer, MicroViewLayer } from "./VRViewLayers";
 
-export type VRScaleMode = 'human' | 'micro';
+export type VRScaleMode = "human" | "micro";
 
 const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
@@ -32,7 +32,7 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
 
 const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const { gl, scene, camera } = useThree();
-  const [vrScale, setVrScale] = useState<VRScaleMode>('human');
+  const [vrScale, setVrScale] = useState<VRScaleMode>("human");
   const [xrSessionActive, setXrSessionActive] = useState(false);
   const currentVRScale = xrSessionActive ? VR_SCALE_VALUES[vrScale] : 1.0;
 
@@ -41,16 +41,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return xrStore.subscribe((state: any) => {
       setXrSessionActive(!!state.session);
       if (!state.session) {
-          setVrScale('human');
+        setVrScale("human");
       }
     });
   }, [xrStore]);
 
   useEffect(() => {
     if (xrSessionActive) {
-       // Push player back and up slightly so build is in front
-       // Give it a tiny delay to ensure session is active
-       setTimeout(() => teleportPlayer({ x: 0, y: 0.5, z: 0.8 }), 100);
+      // Push player back and up slightly so build is in front
+      // Give it a tiny delay to ensure session is active
+      setTimeout(() => teleportPlayer({ x: 0, y: 0.5, z: 0.8 }), 100);
     }
   }, [xrSessionActive]);
 
@@ -69,6 +69,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
   const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
   const selectionMode = useLegoStore((state) => state.selectionMode);
+  const multiSelectedBrickIds = useLegoStore(
+    (state) => state.multiSelectedBrickIds,
+  );
   const isCameraLocked = useLegoStore((state) => state.isCameraLocked);
 
   const controlsRef = useRef<any>(null);
@@ -82,15 +85,25 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     const handleVRAction = (e: any) => {
-      if (e.detail.type === 'trigger') {
-         pointerDownPos.current = null;
-         if (handlePointerUpRef.current) {
-             handlePointerUpRef.current({ stopPropagation: () => {}, clientX: 0, clientY: 0, button: 0 });
-         }
+      if (e.detail.type === "trigger") {
+        pointerDownPos.current = null;
+        if (handlePointerUpRef.current) {
+          const vrEventPayload = {
+            stopPropagation: () => {},
+            clientX: 0,
+            clientY: 0,
+            button: 0,
+            isVRTrigger: true,
+            vrPoint: e.detail.point,
+            vrNormal: e.detail.normal,
+          };
+          handlePointerUpRef.current(vrEventPayload);
+        }
       }
-    }
-    window.addEventListener('human-view-action', handleVRAction);
-    return () => window.removeEventListener('human-view-action', handleVRAction);
+    };
+    window.addEventListener("human-view-action", handleVRAction);
+    return () =>
+      window.removeEventListener("human-view-action", handleVRAction);
   }, []);
 
   useFrame((state) => {
@@ -98,7 +111,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (isCameraLocked || isVR) {
         controlsRef.current.enabled = false;
       } else {
-        controlsRef.current.enabled = !isBrickInteractionRef.current && !isDraggingBrick;
+        controlsRef.current.enabled =
+          !isBrickInteractionRef.current && !isDraggingBrick;
       }
       if (controlsRef.current.target.y < 0) {
         controlsRef.current.target.y = 0;
@@ -127,10 +141,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [bricks, movingBrickId]);
 
   const movingGroupOriginalBricks = useMemo(() => {
+    if (selectionMode === "Multi") {
+      return bricks.filter((b) => multiSelectedBrickIds.includes(b.id));
+    }
     if (!movingBrick) return [];
-    if (selectionMode === "Single") return [movingBrick];
+    if (selectionMode === "Solo") return [movingBrick];
     return getGroupBricks(movingBrick, bricks);
-  }, [movingBrick, bricks, selectionMode]);
+  }, [movingBrick, bricks, selectionMode, multiSelectedBrickIds]);
 
   const movingGroupPivot = useMemo(() => {
     if (movingGroupOriginalBricks.length === 0) return [0, 0, 0];
@@ -163,26 +180,32 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const sceneGroupRef = useRef<THREE.Group>(null);
 
-  async function teleportPlayer(offsetPosition: { x: number; y: number; z: number }) {
+  async function teleportPlayer(offsetPosition: {
+    x: number;
+    y: number;
+    z: number;
+  }) {
     if (!gl.xr.isPresenting) return;
     const session = gl.xr.getSession();
     if (!session) return;
-    const refSpace = await session.requestReferenceSpace('local-floor');
-    const transform = new XRRigidTransform(
-      offsetPosition,
-      { x: 0, y: 0, z: 0, w: 1 }
-    );
+    const refSpace = await session.requestReferenceSpace("local-floor");
+    const transform = new XRRigidTransform(offsetPosition, {
+      x: 0,
+      y: 0,
+      z: 0,
+      w: 1,
+    });
     gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
   }
 
   const toggleScale = () => {
     setVrScale((v) => {
-      if (v === 'human') {
+      if (v === "human") {
         teleportPlayer({ x: 0, y: 0, z: -0.15 });
-        return 'micro';
+        return "micro";
       } else {
         teleportPlayer({ x: 0, y: 0, z: 0 });
-        return 'human';
+        return "human";
       }
     });
   };
@@ -222,7 +245,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     normal: THREE.Vector3;
   } | null>(null);
 
-  const computeGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3): [number, number, number] => {
+  const computeGhostPosition = (
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+  ): [number, number, number] => {
     const activeType = movingBrick ? movingBrick.type : selectedType;
     const { w, d } = getBrickDimensions(activeType);
     const rot = Math.round(ghostRotation / 90) % 4;
@@ -264,7 +290,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     let finalZ = targetZ;
 
     // Floor clamp for moved groups or presets
-    if (mode === "Move" && movingBrick && movingGroupOriginalBricks.length > 0) {
+    if (
+      mode === "Move" &&
+      movingBrick &&
+      movingGroupOriginalBricks.length > 0
+    ) {
       let minGroupY = Infinity;
       movingGroupOriginalBricks.forEach((b) => {
         if (b.position[1] < minGroupY) minGroupY = b.position[1];
@@ -274,13 +304,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         finalY = minYRequired;
       }
     } else if (activePreset && PRESETS[activePreset]) {
-       let minGroupY = Infinity;
-       PRESETS[activePreset].filter(isValidBrickData).forEach((b) => {
-         if (b.position[1] < minGroupY) minGroupY = b.position[1];
-       });
-       if (finalY + minGroupY < 0) {
-         finalY = -minGroupY;
-       }
+      let minGroupY = Infinity;
+      PRESETS[activePreset].filter(isValidBrickData).forEach((b) => {
+        if (b.position[1] < minGroupY) minGroupY = b.position[1];
+      });
+      if (finalY + minGroupY < 0) {
+        finalY = -minGroupY;
+      }
     }
 
     const checkPos = (x: number, y: number, z: number) => {
@@ -473,10 +503,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         const distance = Math.sqrt(dx * dx + dy * dy);
         const threshold = pointerDownPos.current.isTouch ? 20 : 5;
         if (distance > threshold) {
-           setIsDraggingBrick(true);
-           useLegoStore.getState().setJustSelectedBrick(false); // Also clear click
+          setIsDraggingBrick(true);
+          useLegoStore.getState().setJustSelectedBrick(false); // Also clear click
         } else {
-           return; // wait
+          return; // wait
         }
       } else {
         // pointer not down.
@@ -491,7 +521,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!point) return;
 
     // Convert to Three Vector3 just in case, and unscale the coordinates (CRITICAL)
-    const p3 = new THREE.Vector3(point.x, point.y, point.z).divideScalar(currentVRScale);
+    const p3 = new THREE.Vector3(point.x, point.y, point.z).divideScalar(
+      currentVRScale,
+    );
     const normal = e.face?.normal
       ? new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
       : new THREE.Vector3(0, 1, 0);
@@ -728,9 +760,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const handlePointerUp = (e: any) => {
     isBrickInteractionRef.current = false;
 
-    const touchesCount = e.nativeEvent?.touches ? e.nativeEvent.touches.length : 0;
+    const touchesCount = e.nativeEvent?.touches
+      ? e.nativeEvent.touches.length
+      : 0;
     const wasMultiTouch = isMultiTouchRef.current;
-    
+
     if (touchesCount === 0) {
       isMultiTouchRef.current = false; // reset when all fingers off
     }
@@ -764,20 +798,32 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     // Sync compute position if we have a point
     let currentGhostPos = ghostPosition;
-    if (e.point && e.face?.normal) {
-        const p3 = new THREE.Vector3(e.point.x, e.point.y, e.point.z).divideScalar(currentVRScale);
-        const normal = new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
-          .transformDirection(e.object.matrixWorld).normalize();
-        
-        currentGhostPos = computeGhostPosition(p3, normal);
-        setGhostPosition(currentGhostPos);
+    if (e.isVRTrigger && e.vrPoint && e.vrNormal) {
+      currentGhostPos = computeGhostPosition(e.vrPoint, e.vrNormal);
+      setGhostPosition(currentGhostPos);
+    } else if (e.point && e.face?.normal) {
+      const p3 = new THREE.Vector3(
+        e.point.x,
+        e.point.y,
+        e.point.z,
+      ).divideScalar(currentVRScale);
+      const normal = new THREE.Vector3(
+        e.face.normal.x,
+        e.face.normal.y,
+        e.face.normal.z,
+      )
+        .transformDirection(e.object.matrixWorld)
+        .normalize();
+
+      currentGhostPos = computeGhostPosition(p3, normal);
+      setGhostPosition(currentGhostPos);
     }
 
     // Now re-calculate validation synchronously for currentGhostPos
-    
+
     const checkCurrentPlacement = () => {
       if (mode === "Move") {
-         // validate the whole group
+        // validate the whole group
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const oxA = movingBrick!.position[0] - movingGroupPivot[0];
         const ozA = movingBrick!.position[2] - movingGroupPivot[2];
@@ -830,8 +876,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
         );
         return {
-          status: checkStructureValid(otherBricks, testGroupBricks, MODULE_SIZE, BRICK_HEIGHT),
-          ghostGroupBricks: testGroupBricks
+          status: checkStructureValid(
+            otherBricks,
+            testGroupBricks,
+            MODULE_SIZE,
+            BRICK_HEIGHT,
+          ),
+          ghostGroupBricks: testGroupBricks,
         };
       } else {
         const testBrickData = {
@@ -841,44 +892,56 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           rotation: ghostRotation,
         };
         return {
-          status: checkPlacementValid(bricks, testBrickData, MODULE_SIZE, BRICK_HEIGHT),
-          ghostGroupBricks: []
+          status: checkPlacementValid(
+            bricks,
+            testBrickData,
+            MODULE_SIZE,
+            BRICK_HEIGHT,
+          ),
+          ghostGroupBricks: [],
         };
       }
     };
 
     const checkCurrentPresetPlacement = () => {
-        if (!activePreset || !PRESETS[activePreset]) return { valid: false, reason: "inactive" };
-        const testPresetBricks = PRESETS[activePreset]
-          .filter(isValidBrickData)
-          .map((b) => {
-            let ox = b.position[0];
-            let oz = b.position[2];
-            let nx = ox, nz = oz;
-      
-            const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-            if (rotMod === 90 || rotMod === -270) {
-              nx = -oz;
-              nz = ox;
-            } else if (Math.abs(rotMod) === 180) {
-              nx = -ox;
-              nz = -oz;
-            } else if (rotMod === 270 || rotMod === -90) {
-              nx = oz;
-              nz = -ox;
-            }
-      
-            return {
-              ...b,
-              rotation: ((b.rotation || 0) + rotMod) % 360,
-              position: [
-                nx + currentGhostPos[0],
-                b.position[1] + currentGhostPos[1],
-                nz + currentGhostPos[2],
-              ] as [number, number, number],
-            };
-          });
-        return checkStructureValid(bricks, testPresetBricks, MODULE_SIZE, BRICK_HEIGHT);
+      if (!activePreset || !PRESETS[activePreset])
+        return { valid: false, reason: "inactive" };
+      const testPresetBricks = PRESETS[activePreset]
+        .filter(isValidBrickData)
+        .map((b) => {
+          let ox = b.position[0];
+          let oz = b.position[2];
+          let nx = ox,
+            nz = oz;
+
+          const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+          if (rotMod === 90 || rotMod === -270) {
+            nx = -oz;
+            nz = ox;
+          } else if (Math.abs(rotMod) === 180) {
+            nx = -ox;
+            nz = -oz;
+          } else if (rotMod === 270 || rotMod === -90) {
+            nx = oz;
+            nz = -ox;
+          }
+
+          return {
+            ...b,
+            rotation: ((b.rotation || 0) + rotMod) % 360,
+            position: [
+              nx + currentGhostPos[0],
+              b.position[1] + currentGhostPos[1],
+              nz + currentGhostPos[2],
+            ] as [number, number, number],
+          };
+        });
+      return checkStructureValid(
+        bricks,
+        testPresetBricks,
+        MODULE_SIZE,
+        BRICK_HEIGHT,
+      );
     };
 
     // If we're dragging a brick, we drop it now regardless of distance
@@ -926,7 +989,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           return doAABBsOverlap(ghostAABB, bAABB, 0.001);
         });
         if (stackCandidates.length > 0) {
-          const highestY = Math.max(...stackCandidates.map((b) => b.position[1]));
+          const highestY = Math.max(
+            ...stackCandidates.map((b) => b.position[1]),
+          );
           const stackY = highestY + BRICK_HEIGHT;
           addBrick({
             type: selectedType,
@@ -981,7 +1046,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const groups: Record<string, typeof bricks> = {};
     const movingIds = new Set(movingGroupOriginalBricks.map((b) => b.id));
     bricks.forEach((brick) => {
-      if (mode === "Move" && movingIds.has(brick.id)) return;
+      if ((mode === "Move" || mode === "Delete") && movingIds.has(brick.id))
+        return;
       const key = `${brick.type}_${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
@@ -991,7 +1057,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const groupedOriginalSelectedBricks = useMemo(() => {
     const groups: Record<string, typeof bricks> = {};
-    if (mode === "Move" && movingGroupOriginalBricks.length > 0) {
+    if (
+      (mode === "Move" || mode === "Delete") &&
+      movingGroupOriginalBricks.length > 0
+    ) {
       movingGroupOriginalBricks.forEach((brick) => {
         const key = `${brick.type}_${brick.color}`;
         if (!groups[key]) groups[key] = [];
@@ -1074,30 +1143,24 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       <color attach="background" args={["#4da6ff"]} />
       <fog attach="fog" args={["#4da6ff", 50, 300]} />
       <ambientLight intensity={0.4} />
-      <hemisphereLight
-        intensity={0.6}
-        color="#ffffff"
-        groundColor="#002D04"
-      />
-      <directionalLight
-        position={[10, 20, 10]}
-        intensity={1.5}
-        castShadow
-      />
+      <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
+      <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
 
       <Suspense fallback={null}>
-        {xrSessionActive && vrScale === 'human' && (
+        {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
-             currentVRScale={currentVRScale}
-             sceneGroupRef={sceneGroupRef}
-             updateGhostPosition={updateGhostPosition}
+            currentVRScale={currentVRScale}
+            sceneGroupRef={sceneGroupRef}
+            updateGhostPosition={updateGhostPosition}
           />
         )}
-        {xrSessionActive && vrScale === 'micro' && (
-          <MicroViewLayer />
-        )}
+        {xrSessionActive && vrScale === "micro" && <MicroViewLayer />}
         {xrSessionActive && (
-          <VRRadialMenu vrScale={vrScale} onToggle={toggleScale} currentVRScale={currentVRScale} />
+          <VRRadialMenu
+            vrScale={vrScale}
+            onToggle={toggleScale}
+            currentVRScale={currentVRScale}
+          />
         )}
         <group
           ref={sceneGroupRef}
@@ -1131,40 +1194,43 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             />
           )}
 
-          {mode === "Move" && movingBrick && (
-            <>
-              {/* The ghost preview that follows the mouse */}
-              {isDraggingBrick && Object.entries(groupedGhostGroupBricks).map(
-                ([key, group]) => {
-                  const [type, color] = key.split("_");
-                  return (
-                    <BrickInstances
-                      key={`moving-ghost-${key}`}
-                      type={type as any}
-                      color={color}
-                      bricks={group}
-                      isGhost
-                    />
-                  );
-                },
-              )}
-              {/* The original bricks left in place (visual only) */}
-              {Object.entries(groupedOriginalSelectedBricks).map(
-                ([key, group]) => {
-                  const [type, color] = key.split("_");
-                  return (
-                    <BrickInstances
-                      key={`original-ghost-${key}`}
-                      type={type as any}
-                      color={color}
-                      bricks={group}
-                      isGhost={true}
-                    />
-                  );
-                },
-              )}
-            </>
-          )}
+          {(mode === "Move" || mode === "Delete") &&
+            movingGroupOriginalBricks.length > 0 && (
+              <>
+                {/* The ghost preview that follows the mouse */}
+                {mode === "Move" &&
+                  isDraggingBrick &&
+                  Object.entries(groupedGhostGroupBricks).map(
+                    ([key, group]) => {
+                      const [type, color] = key.split("_");
+                      return (
+                        <BrickInstances
+                          key={`moving-ghost-${key}`}
+                          type={type as any}
+                          color={color}
+                          bricks={group}
+                          isGhost
+                        />
+                      );
+                    },
+                  )}
+                {/* The original bricks left in place (visual only) */}
+                {Object.entries(groupedOriginalSelectedBricks).map(
+                  ([key, group]) => {
+                    const [type, color] = key.split("_");
+                    return (
+                      <BrickInstances
+                        key={`original-ghost-${key}`}
+                        type={type as any}
+                        color={color}
+                        bricks={group}
+                        isGhost={true}
+                      />
+                    );
+                  },
+                )}
+              </>
+            )}
 
           {activePreset && (
             <>
@@ -1183,10 +1249,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-          <mesh
-            receiveShadow
-            rotation={[-Math.PI / 2, 0, 0]}
-          >
+          <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#002D04" />
           </mesh>

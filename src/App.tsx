@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Canvas } from "@react-three/fiber";
 import { motion, AnimatePresence } from "motion/react";
-import { useLegoStore, LEGO_COLORS, BrickType, PresetName, getGroupBricks } from "./Store";
+import {
+  useLegoStore,
+  LEGO_COLORS,
+  BrickType,
+  PresetName,
+  getGroupBricks,
+} from "./Store";
 import { Scene } from "./components/Scene";
 import { createXRStore } from "@react-three/xr";
 
@@ -273,28 +279,64 @@ const HelpIcon = ({ size = 24 }: { size?: number }) => (
 );
 
 const UndoIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M3 7v6h6" />
     <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
   </svg>
 );
 
 const RedoIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M21 7v6h-6" />
     <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
   </svg>
 );
 
 const ClearIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M3 6h18" />
     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </svg>
 );
 
 const ScreenshotIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
     <circle cx="12" cy="13" r="4" />
   </svg>
@@ -454,7 +496,7 @@ const PRESET_OPTIONS: {
 
 const xrStore = createXRStore({
   hand: false,
-  controller: false,
+  controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
 });
 
 const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
@@ -559,7 +601,11 @@ export default function App() {
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
-        <Canvas shadows camera={{ position: [2.8, 2.2, 3.2], fov: 50 }} gl={{ preserveDrawingBuffer: true }}>
+        <Canvas
+          shadows
+          camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
+          gl={{ preserveDrawingBuffer: true }}
+        >
           <Scene xrStore={xrStore} />
         </Canvas>
       </div>
@@ -578,7 +624,8 @@ export default function App() {
           {/* Top Bar */}
           <div className="flex justify-between items-start sm:items-center pointer-events-auto flex-wrap gap-2">
             <div className="text-base sm:text-xl font-extrabold tracking-[2px] flex items-center gap-1 sm:gap-2 shrink-0">
-              BRICK <span className="font-light opacity-60 hidden sm:inline">XR</span>
+              BRICK{" "}
+              <span className="font-light opacity-60 hidden sm:inline">XR</span>
             </div>
             <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
               {vrStatus === "ready" && (
@@ -588,10 +635,16 @@ export default function App() {
                     try {
                       const p = xrStore.enterVR();
                       if (p && p.catch) {
-                        p.catch(() => useLegoStore.getState().setToastMessage("VR failed to start."));
+                        p.catch(() =>
+                          useLegoStore
+                            .getState()
+                            .setToastMessage("VR failed to start."),
+                        );
                       }
                     } catch (e) {
-                      useLegoStore.getState().setToastMessage("VR failed to start.");
+                      useLegoStore
+                        .getState()
+                        .setToastMessage("VR failed to start.");
                     }
                   }}
                   className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
@@ -621,53 +674,53 @@ export default function App() {
           {/* Camera Modes */}
           <div className="flex justify-center pointer-events-auto w-full">
             <div className="flex items-center gap-1 pointer-events-auto bg-black/40 backdrop-blur-md rounded-lg p-1 border border-white/10">
-          <button
-            onClick={() => {
-              setCameraMode("Pan");
-              setIsCameraLocked(false);
-            }}
-            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-            title="Pan Camera"
-          >
-            <PanIcon size={16} />
-          </button>
-          <button
-            onClick={() => {
-              setCameraMode("Zoom");
-              setIsCameraLocked(false);
-            }}
-            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-            title="Zoom Camera"
-          >
-            <ZoomIcon size={16} />
-          </button>
-          <button
-            onClick={() => {
-              setCameraMode("Orbit");
-              setIsCameraLocked(false);
-            }}
-            className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-            title="Orbit Camera"
-          >
-            <OrbitCameraIcon size={16} />
-          </button>
-          <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
-          <button
-            onClick={() => {
-              if (isCameraLocked) {
-                setIsCameraLocked(false);
-                setCameraMode("Orbit");
-              } else {
-                setIsCameraLocked(true);
-              }
-            }}
-            className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
-            title="Lock Camera"
-          >
-            <LockIcon size={16} />
-          </button>
+              <button
+                onClick={() => {
+                  setCameraMode("Pan");
+                  setIsCameraLocked(false);
+                }}
+                className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                title="Pan Camera"
+              >
+                <PanIcon size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  setCameraMode("Zoom");
+                  setIsCameraLocked(false);
+                }}
+                className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                title="Zoom Camera"
+              >
+                <ZoomIcon size={16} />
+              </button>
+              <button
+                onClick={() => {
+                  setCameraMode("Orbit");
+                  setIsCameraLocked(false);
+                }}
+                className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                title="Orbit Camera"
+              >
+                <OrbitCameraIcon size={16} />
+              </button>
+              <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
+              <button
+                onClick={() => {
+                  if (isCameraLocked) {
+                    setIsCameraLocked(false);
+                    setCameraMode("Orbit");
+                  } else {
+                    setIsCameraLocked(true);
+                  }
+                }}
+                className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
+                title="Lock Camera"
+              >
+                <LockIcon size={16} />
+              </button>
+            </div>
           </div>
-        </div>
         </div>
 
         {/* Absolute Floating Docks (Anchored to middle) */}
@@ -699,17 +752,27 @@ export default function App() {
               active={mode === "Delete"}
               onClick={() => {
                 const state = useLegoStore.getState();
-                if (state.mode === "Move" && state.movingBrickId) {
+                if (
+                  (state.mode === "Move" || state.mode === "Delete") &&
+                  (state.movingBrickId ||
+                    state.multiSelectedBrickIds.length > 0)
+                ) {
                   // Delete currently selected brick(s)
                   if (state.selectionMode === "Group") {
-                    const movingBrick = state.bricks.find(b => b.id === state.movingBrickId);
+                    const movingBrick = state.bricks.find(
+                      (b) => b.id === state.movingBrickId,
+                    );
                     if (movingBrick) {
                       const allb = state.bricks;
                       const g = getGroupBricks(movingBrick, allb);
                       state.removeBricks(g.map((bz: any) => bz.id));
                     }
+                  } else if (state.selectionMode === "Multi") {
+                    state.removeBricks(state.multiSelectedBrickIds);
+                    state.setMultiSelectedBrickIds([]);
                   } else {
-                    state.removeBrick(state.movingBrickId);
+                    if (state.movingBrickId)
+                      state.removeBrick(state.movingBrickId);
                   }
                   state.setMovingBrickId(null);
                   state.setIsDraggingBrick(false);
@@ -723,22 +786,33 @@ export default function App() {
 
           <AnimatePresence>
             {(mode === "Move" || mode === "Delete") && (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -10 }}
                 className="glass-panel flex flex-col gap-1.5 p-1.5 sm:p-2 rounded-[14px] sm:rounded-2xl pointer-events-auto shrink-0"
               >
                 <button
-                  onClick={() => setSelectionMode("Single")}
+                  onClick={() => setSelectionMode("Solo")}
                   className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all font-bold text-[9px] sm:text-[11px] uppercase tracking-wider ${
-                    selectionMode === "Single"
+                    selectionMode === "Solo"
                       ? "bg-white/20 text-white shadow-md ring-1 ring-white/30"
                       : "text-white/40 hover:text-white/80 hover:bg-white/5"
                   }`}
                   title="Select Single Brick"
                 >
                   Solo
+                </button>
+                <button
+                  onClick={() => setSelectionMode("Multi")}
+                  className={`w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center transition-all font-bold text-[9px] sm:text-[11px] uppercase tracking-wider ${
+                    selectionMode === "Multi"
+                      ? "bg-white/20 text-white shadow-md ring-1 ring-white/30"
+                      : "text-white/40 hover:text-white/80 hover:bg-white/5"
+                  }`}
+                  title="Select Multiple Bricks"
+                >
+                  Multi
                 </button>
                 <button
                   onClick={() => setSelectionMode("Group")}
@@ -848,7 +922,9 @@ export default function App() {
                 className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
                 <UndoIcon size={18} />
-                <span className="hidden sm:inline text-[13px] font-semibold">Undo</span>
+                <span className="hidden sm:inline text-[13px] font-semibold">
+                  Undo
+                </span>
               </button>
               <button
                 onClick={redo}
@@ -856,7 +932,9 @@ export default function App() {
                 className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
                 <RedoIcon size={18} />
-                <span className="hidden sm:inline text-[13px] font-semibold">Redo</span>
+                <span className="hidden sm:inline text-[13px] font-semibold">
+                  Redo
+                </span>
               </button>
             </div>
 
@@ -877,7 +955,9 @@ export default function App() {
                 className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-red-400 hover:text-red-300"
               >
                 <ClearIcon size={18} />
-                <span className="hidden sm:inline text-[13px] font-semibold">Clear</span>
+                <span className="hidden sm:inline text-[13px] font-semibold">
+                  Clear
+                </span>
               </button>
 
               <div className="relative flex items-center">
@@ -891,7 +971,9 @@ export default function App() {
                   className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-colors text-emerald-400 hover:text-emerald-300"
                 >
                   <PresetsIcon size={18} />
-                  <span className="hidden sm:inline text-[13px] font-semibold">Presets</span>
+                  <span className="hidden sm:inline text-[13px] font-semibold">
+                    Presets
+                  </span>
                 </button>
               </div>
 
@@ -901,7 +983,9 @@ export default function App() {
                 className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
                 <ScreenshotIcon size={18} />
-                <span className="hidden sm:inline text-[13px] font-semibold">Capture</span>
+                <span className="hidden sm:inline text-[13px] font-semibold">
+                  Capture
+                </span>
               </button>
 
               <button
@@ -910,7 +994,9 @@ export default function App() {
                 className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
               >
                 <HelpIcon size={18} />
-                <span className="hidden sm:inline text-[13px] font-semibold">Help</span>
+                <span className="hidden sm:inline text-[13px] font-semibold">
+                  Help
+                </span>
               </button>
             </div>
           </div>

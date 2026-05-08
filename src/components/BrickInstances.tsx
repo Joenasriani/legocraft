@@ -61,6 +61,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               useLegoStore
                 .getState()
                 .removeBricks(groupBricks.map((b) => b.id));
+            } else if (selectionMode === "Multi") {
+              useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
             } else {
               removeBrick(brick.id);
             }
@@ -68,7 +70,37 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
             if (selectionMode === "Group") {
               // We just set the anchor, and the Scene handles computing the rest of the group!
               setMovingBrickId(brick.id);
-              e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
+              e.nativeEvent?.target?.setPointerCapture?.(
+                e.nativeEvent.pointerId,
+              );
+              e.stopPropagation();
+              useLegoStore.getState().setIsDraggingBrick(false);
+              useLegoStore.getState().setJustSelectedBrick(true);
+              window.dispatchEvent(
+                new CustomEvent("set-ghost-rotation", {
+                  detail: brick.rotation,
+                }),
+              );
+            } else if (selectionMode === "Multi") {
+              const stateBefore = useLegoStore.getState();
+              stateBefore.toggleMultiSelectBrickId(brick.id);
+              const stateAfter = useLegoStore.getState();
+              const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
+                brick.id,
+              );
+              if (isNowSelected) {
+                setMovingBrickId(brick.id);
+              } else if (stateBefore.movingBrickId === brick.id) {
+                // If it was the anchor, find a new anchor or clear it
+                const newAnchor =
+                  stateAfter.multiSelectedBrickIds[
+                    stateAfter.multiSelectedBrickIds.length - 1
+                  ];
+                setMovingBrickId(newAnchor || null);
+              }
+              e.nativeEvent?.target?.setPointerCapture?.(
+                e.nativeEvent.pointerId,
+              );
               e.stopPropagation();
               useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
@@ -85,7 +117,9 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
                 setMovingBrickId(brick.id);
-                e.nativeEvent?.target?.setPointerCapture?.(e.nativeEvent.pointerId);
+                e.nativeEvent?.target?.setPointerCapture?.(
+                  e.nativeEvent.pointerId,
+                );
                 e.stopPropagation();
                 useLegoStore.getState().setIsDraggingBrick(false);
                 useLegoStore.getState().setJustSelectedBrick(true);
@@ -203,7 +237,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
     bodyMesh.count = count;
     studMesh.count = Math.max(0, count * w * d);
-    
+
     // Store bricks on userData so custom raycasters can retrieve them
     bodyMesh.userData.bricks = bricks;
     bodyMesh.userData.w = w;

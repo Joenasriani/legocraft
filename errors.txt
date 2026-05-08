@@ -1,0 +1,1 @@
+src/App.tsx(457,17): error TS2353: Object literal may only specify known properties, and 'ray' does not exist in type 'ComponentType | DefaultXRControllerOptions | ({ none?: boolean | ComponentType | DefaultXRControllerOptions; left?: boolean | ... 1 more ... | DefaultXRControllerOptions; right?: boolean | ... 1 more ... | DefaultXRControllerOptions; } & { ...; })'.
