@@ -320,7 +320,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     normal: THREE.Vector3;
   } | null>(null);
 
-  const computeGhostPosition = (
+  const computePlacementTarget = (
     point: THREE.Vector3,
     normal: THREE.Vector3,
   ): [number, number, number] => {
@@ -514,7 +514,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   };
 
   const updateGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3) => {
-    setGhostPosition(computeGhostPosition(point, normal));
+    setGhostPosition(computePlacementTarget(point, normal));
   };
 
   useEffect(() => {
@@ -983,7 +983,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (now - lastPlacementRef.current < 50) return;
     lastPlacementRef.current = now;
 
-    const currentGhostPos = computeGhostPosition(p3, normal);
+    const currentGhostPos = computePlacementTarget(p3, normal);
     setGhostPosition(currentGhostPos);
 
     const checkCurrentPlacement = () => {
