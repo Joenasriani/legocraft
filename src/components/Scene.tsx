@@ -68,6 +68,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const [vrScale, setVrScale] = useState<VRScaleMode>("human");
   const [xrSessionActive, setXrSessionActive] = useState(false);
   const [vrReady, setVrReady] = useState(true);
+  const [clipboard, setClipboard] = useState<BrickData[]>([]);
+  const [marqueeStart, setMarqueeStart] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
+  const [marqueeCurrent, setMarqueeCurrent] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const currentVRScale = xrSessionActive ? VR_SCALE_VALUES[vrScale] : 1.0;
 
   useEffect(() => {
@@ -88,16 +97,35 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (xrSessionActive) {
-      // Warm-up wait: wait for controllers, session start, DOM to settle
-      const timer = setTimeout(() => {
-        teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+      let rafId: number;
+      let startTime = Date.now();
+
+      const checkReady = () => {
         // Compile scene to reduce shader stutter
         try {
           gl.compile(scene, camera);
         } catch (e) {}
-        setVrReady(true);
-      }, 1500);
-      return () => clearTimeout(timer);
+
+        const targets = vrTargetManager.getValidTargets();
+        const hasGrid = targets.some((t) => t.name === "Grid");
+
+        let hasController = false;
+        try {
+          hasController = gl.xr.getController(0) !== undefined;
+        } catch (e) {}
+
+        // Wait up to 3s, or until conditions met
+        const timeElapsed = Date.now() - startTime;
+        if ((hasGrid && hasController) || timeElapsed > 3000) {
+          teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+          setVrReady(true);
+        } else {
+          rafId = requestAnimationFrame(checkReady);
+        }
+      };
+
+      rafId = requestAnimationFrame(checkReady);
+      return () => cancelAnimationFrame(rafId);
     }
   }, [xrSessionActive, gl, scene, camera]);
 
@@ -295,8 +323,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     point: THREE.Vector3,
     normal: THREE.Vector3,
   ): [number, number, number] => {
-    const activeType = movingBrick ? movingBrick.type : selectedType;
-    const { w, d } = getBrickDimensions(activeType);
+    const activeType = activePreset
+      ? "1x1"
+      : movingBrick
+        ? movingBrick.type
+        : selectedType;
+    const { w, d } = getBrickDimensions(activeType as any);
     const rot = Math.round(ghostRotation / 90) % 4;
     const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
     const effW = isRot ? d : w;
@@ -733,13 +765,156 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && useLegoStore.getState().activePreset) {
-        useLegoStore.getState().loadPreset(null);
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.key === "Escape") {
+        if (useLegoStore.getState().activePreset) {
+          useLegoStore.getState().loadPreset(null);
+        }
+        if (marqueeStart) {
+          setMarqueeStart(null);
+          setMarqueeCurrent(null);
+          if (controlsRef.current) controlsRef.current.enabled = true;
+        }
+      }
+
+      const { bricks, mode, selectionMode, multiSelectedBrickIds } =
+        useLegoStore.getState();
+
+      // Copy
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+        if (
+          mode === "Move" &&
+          selectionMode === "Multi" &&
+          multiSelectedBrickIds.length > 0
+        ) {
+          const copied = bricks.filter((b) =>
+            multiSelectedBrickIds.includes(b.id),
+          );
+
+          if (copied.length > 0) {
+            // Create relative offsets based on their center so they aren't offset wildly
+            let minX = Infinity,
+              minZ = Infinity;
+            copied.forEach((b) => {
+              if (b.position[0] < minX) minX = b.position[0];
+              if (b.position[2] < minZ) minZ = b.position[2];
+            });
+            const normalized = copied.map((b) => ({
+              ...b,
+              position: [
+                b.position[0] - minX,
+                b.position[1],
+                b.position[2] - minZ,
+              ] as [number, number, number],
+            }));
+            setClipboard(normalized);
+          }
+        }
+      }
+
+      // Paste
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
+        if (clipboard.length > 0) {
+          PRESETS["_clipboard"] = clipboard;
+          useLegoStore.getState().loadPreset("_clipboard");
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [marqueeStart, clipboard]);
+
+  useEffect(() => {
+    if (!marqueeStart) return;
+
+    const onPointerMove = (e: PointerEvent) => {
+      setMarqueeCurrent({ x: e.clientX, y: e.clientY });
+    };
+
+    const onPointerUp = (e: PointerEvent) => {
+      const endX = e.clientX;
+      const endY = e.clientY;
+      setMarqueeCurrent({ x: endX, y: endY });
+
+      const minX = Math.min(marqueeStart.x, endX);
+      const maxX = Math.max(marqueeStart.x, endX);
+      const minY = Math.min(marqueeStart.y, endY);
+      const maxY = Math.max(marqueeStart.y, endY);
+
+      const { bricks, setMultiSelectedBrickIds, setSelectionMode } =
+        useLegoStore.getState();
+      const selectedIds: string[] = [];
+      const cam = camera.clone();
+
+      // Only select if there was an actual drag, otherwise it's just a click (or deselect)
+      if (maxX - minX > 5 || maxY - minY > 5) {
+        bricks.forEach((brick) => {
+          const aabb = getBrickAABB(brick);
+          const corners = [
+            new THREE.Vector3(aabb.min[0], aabb.min[1], aabb.min[2]),
+            new THREE.Vector3(aabb.min[0], aabb.min[1], aabb.max[2]),
+            new THREE.Vector3(aabb.min[0], aabb.max[1], aabb.min[2]),
+            new THREE.Vector3(aabb.min[0], aabb.max[1], aabb.max[2]),
+            new THREE.Vector3(aabb.max[0], aabb.min[1], aabb.min[2]),
+            new THREE.Vector3(aabb.max[0], aabb.min[1], aabb.max[2]),
+            new THREE.Vector3(aabb.max[0], aabb.max[1], aabb.min[2]),
+            new THREE.Vector3(aabb.max[0], aabb.max[1], aabb.max[2]),
+          ];
+
+          let inside = false;
+          for (const c of corners) {
+            c.project(cam);
+            const sx = (c.x * 0.5 + 0.5) * window.innerWidth;
+            const sy = (1 - (c.y * 0.5 + 0.5)) * window.innerHeight;
+            if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) {
+              inside = true;
+              break;
+            }
+          }
+          if (inside) {
+            selectedIds.push(brick.id);
+          }
+        });
+      }
+
+      if (e.shiftKey) {
+        setSelectionMode("Multi");
+        const current = useLegoStore.getState().multiSelectedBrickIds;
+        setMultiSelectedBrickIds(
+          Array.from(new Set([...current, ...selectedIds])),
+        );
+      } else {
+        if (selectedIds.length > 0) {
+          setSelectionMode("Multi");
+          setMultiSelectedBrickIds(selectedIds);
+        } else if (maxX - minX <= 5 && maxY - minY <= 5) {
+          // Wait, a standard click on empty space will fall here
+          // We do not want to deselect if they just clicked empty space?
+          // Ah wait, standard click on empty space clears selection! This is correct.
+          setMultiSelectedBrickIds([]);
+        }
+      }
+
+      setMarqueeStart(null);
+      setMarqueeCurrent(null);
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true;
+      }
+    };
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [marqueeStart, camera]);
 
   const handleContextMenu = (e: any) => {
     e.stopPropagation();
@@ -800,6 +975,23 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       e.nativeEvent?.pointerType === "touch" ||
       e.nativeEvent?.type?.includes("touch") ||
       false;
+
+    if (
+      e.object.name === "Grid" &&
+      mode === "Move" &&
+      !isTouch &&
+      e.button === 0 &&
+      isCameraLocked
+    ) {
+      setMarqueeStart({ x: coords.x, y: coords.y });
+      setMarqueeCurrent({ x: coords.x, y: coords.y });
+      if (controlsRef.current) {
+        controlsRef.current.enabled = false;
+      }
+      e.stopPropagation();
+      return;
+    }
+
     pointerDownPos.current = { x: coords.x, y: coords.y, isTouch };
   };
 
@@ -1017,7 +1209,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           .setToastMessage(`Cannot move: ${status.reason}`);
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
       }
-      
+
       // Always clear justSelected on any action release
       useLegoStore.getState().setJustSelectedBrick(false);
     }
@@ -1064,7 +1256,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       isClick = true; // pointerDown wasn't recorded here (e.g. fired on ground)
     }
 
-    if (!isClick && mode === "Move" && useLegoStore.getState().justSelectedBrick) {
+    if (
+      !isClick &&
+      mode === "Move" &&
+      useLegoStore.getState().justSelectedBrick
+    ) {
       // Special case for dragging to move
       return;
     }
@@ -1085,14 +1281,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       // Only execute commit if it was a real click and not just selecting
       let shouldCommit = true;
-      if (mode === "Move" && useLegoStore.getState().justSelectedBrick && isClick) {
-         shouldCommit = false; // Just selected, wait for next action
-         useLegoStore.getState().setJustSelectedBrick(false); // clear it
+      if (
+        mode === "Move" &&
+        useLegoStore.getState().justSelectedBrick &&
+        isClick
+      ) {
+        shouldCommit = false; // Just selected, wait for next action
+        useLegoStore.getState().setJustSelectedBrick(false); // clear it
       }
       if (shouldCommit) {
-         executeCommit(p3, normal);
+        executeCommit(p3, normal);
       } else {
-         setIsDraggingBrick(false);
+        setIsDraggingBrick(false);
       }
     }
   };
@@ -1195,7 +1395,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [gl.xr]);
 
   const gridRef = useRef<THREE.Mesh>(null);
-  
+
   useEffect(() => {
     vrTargetManager.register(gridRef.current);
     return () => vrTargetManager.unregister(gridRef.current);
@@ -1250,11 +1450,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             );
           })}
 
-          {mode === "Build" && !activePreset && (
+          {mode === "Build" && (
             <LegoBrick
               id="ghost"
-              type={selectedType}
-              color={selectedColor}
+              type={activePreset ? "1x1" : selectedType}
+              color={activePreset ? "#ffffff" : selectedColor}
               position={ghostPosition}
               rotation={ghostRotation}
               isPlacementGhost
@@ -1316,10 +1516,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-          <mesh ref={gridRef} name="Grid" receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
-            <planeGeometry args={[100, 100]} />
-            <meshStandardMaterial color="#002D04" />
-          </mesh>
+          <group>
+            <mesh
+              ref={gridRef}
+              name="Grid"
+              receiveShadow
+              rotation={[-Math.PI / 2, 0, 0]}
+            >
+              <planeGeometry args={[100, 100]} />
+              <meshStandardMaterial color="#002D04" />
+            </mesh>
+            <gridHelper
+              args={[40, 500, "#004010", "#003A0A"]}
+              position={[0, 0.001, 0]}
+            />
+          </group>
         </group>
       </Suspense>
       <OrbitControls
@@ -1328,10 +1539,31 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         target={[0, 0.2, 0]}
         maxPolarAngle={Math.PI / 2 - 0.05}
         minPolarAngle={0.15}
-        enabled={!isCameraLocked && !isVR && !isDraggingBrick}
+        enabled={!isCameraLocked && !isVR && !isDraggingBrick && !marqueeStart}
         mouseButtons={mouseButtons as any}
         touches={touches as any}
       />
+
+      {marqueeStart && marqueeCurrent && (
+        <Html
+          center={false}
+          prepend
+          style={{ pointerEvents: "none", zIndex: 9999 }}
+        >
+          <div
+            style={{
+              position: "fixed",
+              left: Math.min(marqueeStart.x, marqueeCurrent.x),
+              top: Math.min(marqueeStart.y, marqueeCurrent.y),
+              width: Math.abs(marqueeCurrent.x - marqueeStart.x),
+              height: Math.abs(marqueeCurrent.y - marqueeStart.y),
+              border: "1px solid #4da6ff",
+              backgroundColor: "rgba(77, 166, 255, 0.2)",
+              pointerEvents: "none",
+            }}
+          />
+        </Html>
+      )}
     </>
   );
 };

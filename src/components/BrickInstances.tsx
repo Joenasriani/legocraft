@@ -96,7 +96,23 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               );
             } else if (selectionMode === "Multi") {
               const stateBefore = useLegoStore.getState();
-              stateBefore.toggleMultiSelectBrickId(brick.id);
+              const isTouch =
+                e.pointerType === "touch" ||
+                e.nativeEvent?.pointerType === "touch" ||
+                e.nativeEvent?.type?.includes("touch");
+
+              if (isTouch) {
+                stateBefore.toggleMultiSelectBrickId(brick.id);
+              } else {
+                if (e.shiftKey) {
+                  stateBefore.toggleMultiSelectBrickId(brick.id);
+                } else {
+                  if (!stateBefore.multiSelectedBrickIds.includes(brick.id)) {
+                    stateBefore.setMultiSelectedBrickIds([brick.id]);
+                  }
+                }
+              }
+
               const stateAfter = useLegoStore.getState();
               const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
                 brick.id,
@@ -271,8 +287,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         args={[bodyGeom, material, bodyCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
-        onPointerDown={handlePointerDown}
-        onContextMenu={handlePointerDown}
+        onPointerDown={isGhost ? undefined : handlePointerDown}
+        onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}
       />
       <instancedMesh
@@ -281,8 +297,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         args={[studGeom, material, studCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
-        onPointerDown={handlePointerDown}
-        onContextMenu={handlePointerDown}
+        onPointerDown={isGhost ? undefined : handlePointerDown}
+        onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}
       />
     </group>

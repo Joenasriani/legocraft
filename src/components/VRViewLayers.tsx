@@ -42,11 +42,18 @@ export const HumanViewLayer = ({
   };
 
   const laserRef = useRef<THREE.Mesh>(null);
+  const hoverMarkerRef = useRef<THREE.Mesh>(null);
+
   const laserGeo = React.useMemo(() => {
     const geo = new THREE.BoxGeometry(0.002, 0.002, 1);
     geo.translate(0, 0, -0.5); // Pivot at the start of the laser
     return geo;
   }, []);
+
+  const [aimedBrickPoint, setAimedBrickPoint] = useState<{
+    p: THREE.Vector3;
+    n: THREE.Vector3;
+  } | null>(null);
 
   useFrame(() => {
     const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
@@ -277,19 +284,58 @@ export const HumanViewLayer = ({
         );
         laserRef.current.scale.set(1, 1, laserDistance);
       }
+
+      // Render hover marker
+      if (hoverMarkerRef.current) {
+        if (
+          hit &&
+          (hit.object.name === "BrickBodyInstanced" ||
+            hit.object.name === "BrickStudsInstanced")
+        ) {
+          hoverMarkerRef.current.visible = true;
+          hoverMarkerRef.current.position.copy(hit.point);
+          const normal = hit.face?.normal
+            ? hit.face.normal
+                .clone()
+                .transformDirection(hit.object.matrixWorld)
+                .normalize()
+            : new THREE.Vector3(0, 1, 0);
+
+          // Align marker with the normal
+          const quaternion = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            normal,
+          );
+          hoverMarkerRef.current.quaternion.copy(quaternion);
+        } else {
+          hoverMarkerRef.current.visible = false;
+        }
+      }
     } else {
       if (laserRef.current) laserRef.current.visible = false;
+      if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
     }
   });
 
   return (
-    <mesh ref={laserRef} geometry={laserGeo} visible={false}>
-      <meshBasicMaterial
-        color="#aaaaaa"
-        transparent
-        opacity={0.6}
-        depthWrite={false}
-      />
-    </mesh>
+    <>
+      <mesh ref={laserRef} geometry={laserGeo} visible={false}>
+        <meshBasicMaterial
+          color="#aaaaaa"
+          transparent
+          opacity={0.6}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={hoverMarkerRef} visible={false}>
+        <ringGeometry args={[0.02, 0.025, 16]} />
+        <meshBasicMaterial
+          color="#ffffff"
+          transparent
+          opacity={0.8}
+          depthTest={false}
+        />
+      </mesh>
+    </>
   );
 };

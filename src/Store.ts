@@ -292,7 +292,8 @@ export type PresetName =
   | "sheep"
   | "car"
   | "road"
-  | "mountain";
+  | "mountain"
+  | "_clipboard";
 export type AppMode = "Build" | "Move" | "Delete";
 export type CameraMode = "Orbit" | "Pan" | "Zoom";
 
@@ -594,6 +595,7 @@ export const PRESETS: Record<PresetName, BrickData[]> = {
   round_water_well: generateRoundWaterWell(),
   pine_tree: generatePineTree(),
   walk_in_castle: generateWalkInCastle(),
+  _clipboard: [],
 };
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
@@ -900,11 +902,20 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }
 
     const newBricks = [...bricks, ...presetBricks];
-    set({
+    const updates: Partial<LegoStore> = {
       undoStack: [...undoStack, { bricks: [...bricks] }],
       redoStack: [],
       bricks: newBricks,
-    });
+    };
+    
+    if (activePreset === "_clipboard") {
+      updates.activePreset = null;
+      updates.mode = "Move";
+      updates.selectionMode = "Multi";
+      updates.multiSelectedBrickIds = presetBricks.map(b => b.id);
+    }
+
+    set(updates);
     localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
   },
 }));

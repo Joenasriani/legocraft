@@ -87,12 +87,19 @@ export const VRRadialMenu = ({
   });
 
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const [clearArmed, setClearArmed] = useState(false);
 
   React.useEffect(() => {
     const handleHover = (e: any) => setHoveredLabel(e.detail);
     window.addEventListener("vr-menu-hover", handleHover);
     return () => window.removeEventListener("vr-menu-hover", handleHover);
   }, []);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setClearArmed(false);
+    }
+  }, [visible]);
 
   const radius = vrScale === "human" ? 0.15 : 2.2;
   const boxDepth = vrScale === "human" ? 0.01 : 0.1;
@@ -125,9 +132,17 @@ export const VRRadialMenu = ({
       theta: 0, // Right
     },
     {
-      label: "CLEAR",
-      color: "#ff8c42",
-      action: () => useLegoStore.getState().clearAll(),
+      label: clearArmed ? "CONFIRM" : "CLEAR",
+      color: clearArmed ? "#ff0000" : "#ff8c42",
+      action: () => {
+        if (!clearArmed) {
+          setClearArmed(true);
+        } else {
+          useLegoStore.getState().clearAll();
+          setClearArmed(false);
+          onToggle(); // Close menu
+        }
+      },
       theta: -Math.PI / 2, // Down
     },
   ];
@@ -143,10 +158,7 @@ export const VRRadialMenu = ({
           const isHovered = hoveredLabel === seg.label;
           const depth = isHovered ? boxDepth * 1.5 : boxDepth;
           return (
-            <group
-              key={i}
-              position={[x, y, 0]}
-            >
+            <group key={i} position={[x, y, 0]}>
               <Box
                 ref={(node) => {
                   if (node) {

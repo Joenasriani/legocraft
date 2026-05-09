@@ -675,7 +675,10 @@ export default function App() {
       </AnimatePresence>
 
       {/* 3D Viewport */}
-      <div className="absolute inset-0 z-0">
+      <div 
+        className="absolute inset-0 z-0" 
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <Canvas
           shadows
           camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
