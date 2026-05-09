@@ -10,6 +10,7 @@ import {
   checkPlacementValid,
   checkStructureValid,
   getBrickDimensions,
+  getPresetInfo,
   PRESETS,
   isValidBrickData,
   BrickData,
@@ -323,12 +324,23 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     point: THREE.Vector3,
     normal: THREE.Vector3,
   ): [number, number, number] => {
+    let w = 1, d = 1;
     const activeType = activePreset
       ? "1x1"
       : movingBrick
         ? movingBrick.type
         : selectedType;
-    const { w, d } = getBrickDimensions(activeType as any);
+
+    if (activePreset) {
+      const info = getPresetInfo(activePreset);
+      w = info.w;
+      d = info.d;
+    } else {
+      const dims = getBrickDimensions(activeType as any);
+      w = dims.w;
+      d = dims.d;
+    }
+
     const rot = Math.round(ghostRotation / 90) % 4;
     const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
     const effW = isRot ? d : w;
@@ -396,11 +408,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         if (!PRESETS[activePreset])
           return { valid: false, reason: "invalid-preset" };
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+        const info = getPresetInfo(activePreset);
         const testPresetBricks = PRESETS[activePreset]
           .filter(isValidBrickData)
           .map((b) => {
-            let ox = b.position[0];
-            let oz = b.position[2];
+            let ox = b.position[0] - info.cx;
+            let oz = b.position[2] - info.cz;
             let nx = ox, nz = oz;
             if (rotMod === 90 || rotMod === -270) {
               nx = -oz; nz = ox;
@@ -411,7 +424,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             }
             return {
               ...b,
-              rotation: ((b.rotation || 0) + rotMod) % 360,
+              rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
               position: [nx + x, b.position[1] + y, nz + z] as [number, number, number],
             };
           });
@@ -461,7 +474,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
           return {
             ...b,
-            rotation: ((b.rotation || 0) + rotMod) % 360,
+            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
             position: [
               currentPivotX + nx,
               currentPivotY + (b.position[1] - movingGroupPivot[1]),
@@ -601,7 +614,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       return {
         ...b,
-        rotation: ((b.rotation || 0) + rotMod) % 360,
+        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
         position: [
           currentPivotX + nx,
           currentPivotY + (b.position[1] - movingGroupPivot[1]),
@@ -672,9 +685,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       return valid;
     });
 
+    const info = getPresetInfo(activePreset);
+
     return validPresetBricks.map((b) => {
-      let ox = b.position[0];
-      let oz = b.position[2];
+      let ox = b.position[0] - info.cx;
+      let oz = b.position[2] - info.cz;
       let nx = ox,
         nz = oz;
 
@@ -692,7 +707,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       return {
         ...b,
-        rotation: ((b.rotation || 0) + rotMod) % 360,
+        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
         position: [
           nx + ghostPosition[0],
           b.position[1] + ghostPosition[1],
@@ -1013,7 +1028,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
           return {
             ...b,
-            rotation: ((b.rotation || 0) + rotMod) % 360,
+            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
             position: [
               currentPivotX + nx,
               currentPivotY + (b.position[1] - movingGroupPivot[1]),
@@ -1056,11 +1071,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const checkCurrentPresetPlacement = () => {
       if (!activePreset || !PRESETS[activePreset])
         return { valid: false, reason: "inactive" };
+      const info = getPresetInfo(activePreset);
       const testPresetBricks = PRESETS[activePreset]
         .filter(isValidBrickData)
         .map((b) => {
-          let ox = b.position[0];
-          let oz = b.position[2];
+          let ox = b.position[0] - info.cx;
+          let oz = b.position[2] - info.cz;
           let nx = ox,
             nz = oz;
 
@@ -1078,7 +1094,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
           return {
             ...b,
-            rotation: ((b.rotation || 0) + rotMod) % 360,
+            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
             position: [
               nx + currentGhostPos[0],
               b.position[1] + currentGhostPos[1],

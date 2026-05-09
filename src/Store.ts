@@ -132,6 +132,33 @@ export const getBrickAABB = (brick: Omit<BrickData, "color">): AABB => {
   };
 };
 
+export const getPresetInfo = (presetName: string) => {
+  const bricks = PRESETS[presetName as PresetName];
+  if (!bricks) return { cx: 0, cz: 0, w: 1, d: 1 };
+  
+  const validBricks = bricks.filter(isValidBrickData);
+  if (validBricks.length === 0) return { cx: 0, cz: 0, w: 1, d: 1 };
+
+  let minX = Infinity, maxX = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  
+  for (const b of validBricks) {
+    const aabb = getBrickAABB(b);
+    if (aabb.minX < minX) minX = aabb.minX;
+    if (aabb.maxX > maxX) maxX = aabb.maxX;
+    if (aabb.minZ < minZ) minZ = aabb.minZ;
+    if (aabb.maxZ > maxZ) maxZ = aabb.maxZ;
+  }
+  
+  const cx = (minX + maxX) / 2;
+  const cz = (minZ + maxZ) / 2;
+  const w = Math.round((maxX - minX) / 0.08);
+  const d = Math.round((maxZ - minZ) / 0.08);
+
+  return { cx, cz, w, d };
+};
+
+
 export const doAABBsOverlap = (a: AABB, b: AABB, epsilon: number = 0.001) => {
   return (
     a.minX < b.maxX - epsilon &&
@@ -862,10 +889,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       return valid;
     });
 
+    const info = getPresetInfo(activePreset);
+
     const groupId = crypto.randomUUID();
     const presetBricks = validPresetBricks.map((b) => {
-      let ox = b.position[0];
-      let oz = b.position[2];
+      let ox = b.position[0] - info.cx;
+      let oz = b.position[2] - info.cz;
       let nx = ox,
         nz = oz;
 
