@@ -137,7 +137,19 @@ export const HumanViewLayer = ({
         .normalize();
       raycaster.set(pos, fwd);
 
-      const intersects = raycaster.intersectObject(scene, true);
+      const targets: THREE.Object3D[] = [];
+      scene.traverseVisible((obj) => {
+        if (
+          obj.name === "Grid" ||
+          obj.name === "BrickBodyInstanced" ||
+          obj.name === "BrickStudsInstanced" ||
+          obj.userData?.isVRMenuItem
+        ) {
+          targets.push(obj);
+        }
+      });
+
+      const intersects = raycaster.intersectObjects(targets, false);
 
       let hit = null;
       for (const inter of intersects) {
@@ -161,14 +173,21 @@ export const HumanViewLayer = ({
         let isMenuItem = false;
         let onTriggerFn = null;
 
+        let hitMenuLabel = "";
+
         while (currentHitObj) {
           if (currentHitObj.userData?.isVRMenuItem) {
             isMenuItem = true;
             onTriggerFn = currentHitObj.userData.onTrigger;
+            hitMenuLabel = currentHitObj.userData.label || "";
             break;
           }
           currentHitObj = currentHitObj.parent;
         }
+
+        window.dispatchEvent(
+          new CustomEvent("vr-menu-hover", { detail: hitMenuLabel }),
+        );
 
         if (isMenuItem && onTriggerFn) {
           if (triggerPressed && !wasTriggerPressed.current) {
@@ -188,9 +207,10 @@ export const HumanViewLayer = ({
 
           if (triggerPressed && !wasTriggerPressed.current) {
             window.dispatchEvent(
-              new CustomEvent("human-view-action", {
+              new CustomEvent("vr-controller-action", {
                 detail: {
                   type: "trigger",
+                  action: "commit",
                   point: unscaledP3,
                   normal: normal,
                 },
@@ -201,7 +221,7 @@ export const HumanViewLayer = ({
           if (actionPressed && !wasActionPressed.current) {
             if (mode === "Move" && movingBrickId) {
               window.dispatchEvent(
-                new CustomEvent("human-view-action", {
+                new CustomEvent("vr-controller-action", {
                   detail: { type: "cancelMove" },
                 }),
               );
@@ -249,6 +269,7 @@ export const HumanViewLayer = ({
       } else {
         // Not aimed at valid target, clear action states without logic
         // if users click trigger, nothing happens.
+        window.dispatchEvent(new CustomEvent("vr-menu-hover", { detail: "" }));
       }
 
       // Always track state

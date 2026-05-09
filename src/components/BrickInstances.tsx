@@ -254,6 +254,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     <group>
       <instancedMesh
         ref={bodyMeshRef}
+        name="BrickBodyInstanced"
         args={[bodyGeom, material, bodyCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
@@ -263,6 +264,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       />
       <instancedMesh
         ref={studMeshRef}
+        name="BrickStudsInstanced"
         args={[studGeom, material, studCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}

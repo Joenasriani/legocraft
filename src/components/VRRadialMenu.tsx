@@ -84,12 +84,19 @@ export const VRRadialMenu = ({
     }
   });
 
-  const radius = vrScale === "human" ? 0.06 : 2.2;
-  const padding = vrScale === "human" ? 0.02 : 0.6;
-  const boxDepth = vrScale === "human" ? 0.005 : 0.1;
-  const fontSize = vrScale === "human" ? 0.015 : 0.5;
+  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const handleHover = (e: any) => setHoveredLabel(e.detail);
+    window.addEventListener("vr-menu-hover", handleHover);
+    return () => window.removeEventListener("vr-menu-hover", handleHover);
+  }, []);
+
+  const radius = vrScale === "human" ? 0.15 : 2.2;
+  const boxDepth = vrScale === "human" ? 0.01 : 0.1;
+  const fontSize = vrScale === "human" ? 0.03 : 0.5;
   const boxWidth = ((radius * Math.PI) / 3) * 1.5;
-  const boxHeight = vrScale === "human" ? 0.03 : 1.0;
+  const boxHeight = vrScale === "human" ? 0.06 : 1.0;
 
   const handleAction = (action: () => void) => {
     action();
@@ -107,27 +114,19 @@ export const VRRadialMenu = ({
       label: "DELETE",
       color: "#ff4757",
       action: () => setMode("Delete"),
-      theta: Math.PI / 6,
+      theta: Math.PI, // Left
     },
     {
       label: "MOVE",
       color: "#4da6ff",
       action: () => setMode("Move"),
-      theta: -Math.PI / 6,
-    },
-    {
-      label: "COLOR",
-      color: "#ffd700",
-      action: () => {
-        /* Maybe future expansion */
-      },
-      theta: -Math.PI / 2,
+      theta: 0, // Right
     },
     {
       label: "CLEAR",
       color: "#ff8c42",
       action: () => useLegoStore.getState().clearAll(),
-      theta: (-5 * Math.PI) / 6,
+      theta: -Math.PI / 2, // Down
     },
   ];
 
@@ -139,23 +138,26 @@ export const VRRadialMenu = ({
         {SEGMENTS.map((seg, i) => {
           const x = Math.cos(seg.theta) * radius;
           const y = Math.sin(seg.theta) * radius;
+          const isHovered = hoveredLabel === seg.label;
+          const depth = isHovered ? boxDepth * 1.5 : boxDepth;
           return (
             <group
               key={i}
               position={[x, y, 0]}
               userData={{
                 isVRMenuItem: true,
+                label: seg.label,
                 onTrigger: () => handleAction(seg.action),
               }}
             >
               <Box
-                args={[boxWidth, boxHeight, boxDepth]}
-                material-color={seg.color}
+                args={[boxWidth, boxHeight, depth]}
+                material-color={isHovered ? "#ffffff" : seg.color}
               />
               <Text
-                position={[0, 0, boxDepth + 0.001]}
+                position={[0, 0, depth + 0.001]}
                 fontSize={fontSize}
-                color="white"
+                color={isHovered ? seg.color : "white"}
                 anchorX="center"
                 anchorY="middle"
               >

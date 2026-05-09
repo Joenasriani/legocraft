@@ -78,22 +78,28 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (!active) {
         setVrScale("human");
         setVrReady(true);
+        gl.setPixelRatio(window.devicePixelRatio);
       } else {
         setVrReady(false);
+        gl.setPixelRatio(1); // Standard VR performance optimization
       }
     });
-  }, [xrStore]);
+  }, [xrStore, gl]);
 
   useEffect(() => {
     if (xrSessionActive) {
       // Warm-up wait: wait for controllers, session start, DOM to settle
       const timer = setTimeout(() => {
         teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+        // Compile scene to reduce shader stutter
+        try {
+          gl.compile(scene, camera);
+        } catch (e) {}
         setVrReady(true);
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [xrSessionActive]);
+  }, [xrSessionActive, gl, scene, camera]);
 
   const bricks = useLegoStore((state) => state.bricks);
   const mode = useLegoStore((state) => state.mode);
@@ -125,26 +131,39 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   });
 
   useEffect(() => {
-    const handleVRAction = (e: any) => {
-      if (e.detail.type === "trigger") {
+    const handleVRControllerAction = (e: any) => {
+      const { type, point, normal, action } = e.detail;
+
+      if (type === "cancelMove") {
+        // handle cancel move, already handled via event but we can centralise
+      }
+
+      if (type === "trigger") {
         pointerDownPos.current = null;
-        if (handlePointerUpRef.current) {
-          const vrEventPayload = {
-            stopPropagation: () => {},
-            clientX: 0,
-            clientY: 0,
-            button: 0,
-            isVRTrigger: true,
-            vrPoint: e.detail.point,
-            vrNormal: e.detail.normal,
-          };
-          handlePointerUpRef.current(vrEventPayload);
+
+        if (action === "commit") {
+          // Commit whatever the ghost is currently showing
+          if (handlePointerUpRef.current) {
+            const vrEventPayload = {
+              stopPropagation: () => {},
+              clientX: 0,
+              clientY: 0,
+              button: 0,
+              isVRTrigger: true,
+              vrPoint: point,
+              vrNormal: normal,
+            };
+            handlePointerUpRef.current(vrEventPayload);
+          }
         }
       }
     };
-    window.addEventListener("human-view-action", handleVRAction);
+    window.addEventListener("vr-controller-action", handleVRControllerAction);
     return () =>
-      window.removeEventListener("human-view-action", handleVRAction);
+      window.removeEventListener(
+        "vr-controller-action",
+        handleVRControllerAction,
+      );
   }, []);
 
   useFrame((state) => {
@@ -1185,7 +1204,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       <fog attach="fog" args={["#4da6ff", 50, 300]} />
       <ambientLight intensity={0.4} />
       <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
-      <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
+      <directionalLight
+        position={[10, 20, 10]}
+        intensity={1.5}
+        castShadow={!xrSessionActive}
+      />
 
       <Suspense fallback={null}>
         {xrSessionActive && !vrReady && <VRLoadingScreen />}
@@ -1291,7 +1314,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-          <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh name="Grid" receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#002D04" />
           </mesh>
