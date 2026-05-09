@@ -1,5 +1,4 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, Text } from "@react-three/drei";
 import { XR } from "@react-three/xr";
@@ -1521,7 +1520,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         touches={touches as any}
       />
 
-      {marqueeStart && marqueeCurrent && gl.domElement.parentElement && createPortal(
+      {marqueeStart && marqueeCurrent && (
+        <Html
+          center={false}
+          prepend
+          calculatePosition={() => [0, 0]}
+          style={{ pointerEvents: "none", zIndex: 9999 }}
+        >
           <div
             style={{
               position: "absolute",
@@ -1532,10 +1537,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               border: "1px solid #4da6ff",
               backgroundColor: "rgba(77, 166, 255, 0.2)",
               pointerEvents: "none",
-              zIndex: 9999,
             }}
-          />,
-          gl.domElement.parentElement
+          />
+        </Html>
       )}
     </>
   );
