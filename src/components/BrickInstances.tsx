@@ -7,6 +7,8 @@ import {
   getGroupBricks,
 } from "../Store";
 
+import { vrTargetManager } from "../lib/vrTargets";
+
 interface BrickInstancesProps {
   type: any;
   color: string;
@@ -27,6 +29,17 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 }) => {
   const bodyMeshRef = useRef<THREE.InstancedMesh>(null);
   const studMeshRef = useRef<THREE.InstancedMesh>(null);
+
+  useEffect(() => {
+    if (!isGhost) {
+      vrTargetManager.register(bodyMeshRef.current);
+      vrTargetManager.register(studMeshRef.current);
+      return () => {
+        vrTargetManager.unregister(bodyMeshRef.current);
+        vrTargetManager.unregister(studMeshRef.current);
+      };
+    }
+  }, [isGhost, bricks.length]);
   const removeBrick = useLegoStore((state) => state.removeBrick);
   const setMovingBrickId = useLegoStore((state) => state.setMovingBrickId);
   const setToastMessage = useLegoStore((state) => state.setToastMessage);

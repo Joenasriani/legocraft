@@ -3,6 +3,8 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLegoStore, getGroupBricks } from "../Store";
 
+import { vrTargetManager } from "../lib/vrTargets";
+
 export const HumanViewLayer = ({
   currentVRScale,
   sceneGroupRef,
@@ -14,7 +16,6 @@ export const HumanViewLayer = ({
 }) => {
   const { gl, scene } = useThree();
   const raycaster = new THREE.Raycaster();
-  const downVector = new THREE.Vector3(0, -1, 0);
 
   const mode = useLegoStore((s) => s.mode);
   const bricks = useLegoStore((s) => s.bricks);
@@ -137,17 +138,7 @@ export const HumanViewLayer = ({
         .normalize();
       raycaster.set(pos, fwd);
 
-      const targets: THREE.Object3D[] = [];
-      scene.traverseVisible((obj) => {
-        if (
-          obj.name === "Grid" ||
-          obj.name === "BrickBodyInstanced" ||
-          obj.name === "BrickStudsInstanced" ||
-          obj.userData?.isVRMenuItem
-        ) {
-          targets.push(obj);
-        }
-      });
+      const targets = vrTargetManager.getValidTargets();
 
       const intersects = raycaster.intersectObjects(targets, false);
 
@@ -301,8 +292,4 @@ export const HumanViewLayer = ({
       />
     </mesh>
   );
-};
-
-export const MicroViewLayer = () => {
-  return null;
 };

@@ -4,6 +4,8 @@ import { Billboard, Text, Box } from "@react-three/drei";
 import * as THREE from "three";
 import { useLegoStore } from "../Store";
 
+import { vrTargetManager } from "../lib/vrTargets";
+
 export const VRRadialMenu = ({
   vrScale,
   onToggle,
@@ -144,13 +146,17 @@ export const VRRadialMenu = ({
             <group
               key={i}
               position={[x, y, 0]}
-              userData={{
-                isVRMenuItem: true,
-                label: seg.label,
-                onTrigger: () => handleAction(seg.action),
-              }}
             >
               <Box
+                ref={(node) => {
+                  if (node) {
+                    vrTargetManager.register(node);
+                    node.userData.isVRMenuItem = true;
+                    node.userData.label = seg.label;
+                    node.userData.onTrigger = () => handleAction(seg.action);
+                  }
+                }}
+                name="VRMenuItem"
                 args={[boxWidth, boxHeight, depth]}
                 material-color={isHovered ? "#ffffff" : seg.color}
               />

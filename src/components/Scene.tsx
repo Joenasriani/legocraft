@@ -20,14 +20,14 @@ import {
 } from "../Store";
 
 import { VRRadialMenu } from "./VRRadialMenu";
+import { vrTargetManager } from "../lib/vrTargets";
 
-import { HumanViewLayer, MicroViewLayer } from "./VRViewLayers";
+import { HumanViewLayer } from "./VRViewLayers";
 
-export type VRScaleMode = "human" | "micro";
+export type VRScaleMode = "human";
 
 const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
-  micro: 17.5,
 };
 
 const VRLoadingScreen = () => {
@@ -126,8 +126,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const handlePointerUpRef = useRef<any>(null);
 
+  const executeCommitRef = useRef<any>(null);
+
   useEffect(() => {
     handlePointerUpRef.current = handlePointerUp;
+    // We update executeCommitRef when we render, but the function isn't defined yet! It's defined at line 817.
+    // It's hoisted or we can just keep executeCommitRef and update it right after executeCommit is defined later down.
   });
 
   useEffect(() => {
@@ -142,18 +146,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         pointerDownPos.current = null;
 
         if (action === "commit") {
-          // Commit whatever the ghost is currently showing
-          if (handlePointerUpRef.current) {
-            const vrEventPayload = {
-              stopPropagation: () => {},
-              clientX: 0,
-              clientY: 0,
-              button: 0,
-              isVRTrigger: true,
-              vrPoint: point,
-              vrNormal: normal,
-            };
-            handlePointerUpRef.current(vrEventPayload);
+          if (executeCommitRef.current) {
+            executeCommitRef.current(point, normal);
           }
         }
       }
@@ -259,15 +253,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }
 
   const toggleScale = () => {
-    setVrScale((v) => {
-      if (v === "human") {
-        teleportPlayer({ x: 0, y: 0, z: -0.15 });
-        return "micro";
-      } else {
-        teleportPlayer({ x: 0, y: 0, z: 0 });
-        return "human";
-      }
-    });
+    // Disabled until Micro mode has interaction
   };
 
   useEffect(() => {
@@ -817,69 +803,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     pointerDownPos.current = { x: coords.x, y: coords.y, isTouch };
   };
 
-  const handlePointerUp = (e: any) => {
-    isBrickInteractionRef.current = false;
+  const executeCommit = (p3: THREE.Vector3, normal: THREE.Vector3) => {
+    setIsDraggingBrick(false);
 
-    const touchesCount = e.nativeEvent?.touches
-      ? e.nativeEvent.touches.length
-      : 0;
-    const wasMultiTouch = isMultiTouchRef.current;
+    const now = Date.now();
+    if (now - lastPlacementRef.current < 50) return;
+    lastPlacementRef.current = now;
 
-    if (touchesCount === 0) {
-      isMultiTouchRef.current = false; // reset when all fingers off
-    }
-
-    if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
-
-    if (wasMultiTouch) {
-      // It was a multi-touch gesture, do not treat as a click/placement
-      return;
-    }
-
-    const coords = getPointerCoords(e);
-    let isClick = false;
-    let distance = 0;
-
-    if (pointerDownPos.current) {
-      const dx = coords.x - pointerDownPos.current.x;
-      const dy = coords.y - pointerDownPos.current.y;
-      distance = Math.sqrt(dx * dx + dy * dy);
-
-      const threshold = pointerDownPos.current.isTouch ? 20 : 5;
-      isClick = distance <= threshold;
-      pointerDownPos.current = null;
-
-      if (!isClick && !useLegoStore.getState().isDraggingBrick) {
-        return; // It was a camera drag
-      }
-    } else {
-      isClick = true; // pointerDown wasn't recorded here (e.g. fired on ground)
-    }
-
-    // Sync compute position if we have a point
-    let currentGhostPos = ghostPosition;
-    if (e.isVRTrigger && e.vrPoint && e.vrNormal) {
-      currentGhostPos = computeGhostPosition(e.vrPoint, e.vrNormal);
-      setGhostPosition(currentGhostPos);
-    } else if (e.point && e.face?.normal) {
-      const p3 = new THREE.Vector3(
-        e.point.x,
-        e.point.y,
-        e.point.z,
-      ).divideScalar(currentVRScale);
-      const normal = new THREE.Vector3(
-        e.face.normal.x,
-        e.face.normal.y,
-        e.face.normal.z,
-      )
-        .transformDirection(e.object.matrixWorld)
-        .normalize();
-
-      currentGhostPos = computeGhostPosition(p3, normal);
-      setGhostPosition(currentGhostPos);
-    }
-
-    // Now re-calculate validation synchronously for currentGhostPos
+    const currentGhostPos = computeGhostPosition(p3, normal);
+    setGhostPosition(currentGhostPos);
 
     const checkCurrentPlacement = () => {
       if (mode === "Move") {
@@ -1004,13 +936,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       );
     };
 
-    // If we're dragging a brick, we drop it now regardless of distance
-    setIsDraggingBrick(false);
-
-    const now = Date.now();
-    if (now - lastPlacementRef.current < 50) return;
-    lastPlacementRef.current = now;
-
     if (activePreset) {
       if (checkCurrentPresetPlacement().valid) {
         commitPreset(currentGhostPos, ghostRotation);
@@ -1036,8 +961,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         });
       } else if (status.reason === "overlap") {
         // Auto-stack: only if the tapped position matches exactly in X/Z to existing bricks.
-        // Wait, if we tap the exact X/Z it should stack. If not, it shouldn't auto-stack on random previous position.
-        // `currentGhostPos` is already the computed position for the TAP. So it's safe to auto-stack at currentGhostPos.X / Z !
         const ghostAABB = getBrickAABB({
           id: "ghost",
           type: selectedType,
@@ -1067,37 +990,110 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     } else if (mode === "Move" && movingBrick) {
       const justSelected = useLegoStore.getState().justSelectedBrick;
 
-      if (isClick && justSelected) {
-        // Just selected the brick with a click. Do not commit move yet.
-      } else {
-        const { status, ghostGroupBricks } = checkCurrentPlacement();
-        if (status.valid) {
-          if (movingGroupOriginalBricks.length > 1) {
-            useLegoStore.getState().updateBricks(
-              ghostGroupBricks.map((b) => ({
-                id: b.id,
-                updates: {
-                  position: b.position as [number, number, number],
-                  rotation: b.rotation,
-                },
-              })),
-            );
-          } else {
-            useLegoStore.getState().updateBrick(movingBrick.id, {
-              position: currentGhostPos,
-              rotation: ghostRotation,
-            });
-          }
-          setMovingBrickId(null);
+      // In VR we don't have isClick exactly because VR is explicitly triggering commit.
+      // But if justSelected is true we might skip if it was a selection click.
+      const { status, ghostGroupBricks } = checkCurrentPlacement();
+      if (status.valid) {
+        if (movingGroupOriginalBricks.length > 1) {
+          useLegoStore.getState().updateBricks(
+            ghostGroupBricks.map((b) => ({
+              id: b.id,
+              updates: {
+                position: b.position as [number, number, number],
+                rotation: b.rotation,
+              },
+            })),
+          );
         } else {
-          useLegoStore
-            .getState()
-            .setToastMessage(`Cannot move: ${status.reason}`);
-          setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+          useLegoStore.getState().updateBrick(movingBrick.id, {
+            position: currentGhostPos,
+            rotation: ghostRotation,
+          });
         }
+        setMovingBrickId(null);
+      } else {
+        useLegoStore
+          .getState()
+          .setToastMessage(`Cannot move: ${status.reason}`);
+        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
       }
-      // Always clear justSelected on any pointer release while moving
+      
+      // Always clear justSelected on any action release
       useLegoStore.getState().setJustSelectedBrick(false);
+    }
+  };
+
+  executeCommitRef.current = executeCommit;
+
+  const handlePointerUp = (e: any) => {
+    isBrickInteractionRef.current = false;
+
+    const touchesCount = e.nativeEvent?.touches
+      ? e.nativeEvent.touches.length
+      : 0;
+    const wasMultiTouch = isMultiTouchRef.current;
+
+    if (touchesCount === 0) {
+      isMultiTouchRef.current = false; // reset when all fingers off
+    }
+
+    if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
+
+    if (wasMultiTouch) {
+      // It was a multi-touch gesture, do not treat as a click/placement
+      return;
+    }
+
+    const coords = getPointerCoords(e);
+    let isClick = false;
+    let distance = 0;
+
+    if (pointerDownPos.current) {
+      const dx = coords.x - pointerDownPos.current.x;
+      const dy = coords.y - pointerDownPos.current.y;
+      distance = Math.sqrt(dx * dx + dy * dy);
+
+      const threshold = pointerDownPos.current.isTouch ? 20 : 5;
+      isClick = distance <= threshold;
+      pointerDownPos.current = null;
+
+      if (!isClick && !useLegoStore.getState().isDraggingBrick) {
+        return; // It was a camera drag
+      }
+    } else {
+      isClick = true; // pointerDown wasn't recorded here (e.g. fired on ground)
+    }
+
+    if (!isClick && mode === "Move" && useLegoStore.getState().justSelectedBrick) {
+      // Special case for dragging to move
+      return;
+    }
+
+    if (e.point && e.face?.normal) {
+      const p3 = new THREE.Vector3(
+        e.point.x,
+        e.point.y,
+        e.point.z,
+      ).divideScalar(currentVRScale);
+      const normal = new THREE.Vector3(
+        e.face.normal.x,
+        e.face.normal.y,
+        e.face.normal.z,
+      )
+        .transformDirection(e.object.matrixWorld)
+        .normalize();
+
+      // Only execute commit if it was a real click and not just selecting
+      let shouldCommit = true;
+      if (mode === "Move" && useLegoStore.getState().justSelectedBrick && isClick) {
+         shouldCommit = false; // Just selected, wait for next action
+         useLegoStore.getState().setJustSelectedBrick(false); // clear it
+      }
+      if (shouldCommit) {
+         executeCommit(p3, normal);
+      } else {
+         setIsDraggingBrick(false);
+      }
     }
   };
 
@@ -1198,6 +1194,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     };
   }, [gl.xr]);
 
+  const gridRef = useRef<THREE.Mesh>(null);
+  
+  useEffect(() => {
+    vrTargetManager.register(gridRef.current);
+    return () => vrTargetManager.unregister(gridRef.current);
+  }, []);
+
   return (
     <>
       <color attach="background" args={["#4da6ff"]} />
@@ -1219,7 +1222,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             updateGhostPosition={updateGhostPosition}
           />
         )}
-        {xrSessionActive && vrScale === "micro" && <MicroViewLayer />}
         {xrSessionActive && (
           <VRRadialMenu
             vrScale={vrScale}
@@ -1314,7 +1316,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-          <mesh name="Grid" receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh ref={gridRef} name="Grid" receiveShadow rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#002D04" />
           </mesh>
