@@ -1,4 +1,5 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html, Text } from "@react-three/drei";
 import { XR } from "@react-three/xr";
@@ -834,12 +835,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!marqueeStart) return;
 
     const onPointerMove = (e: PointerEvent) => {
-      setMarqueeCurrent({ x: e.clientX, y: e.clientY });
+      const rect = gl.domElement.getBoundingClientRect();
+      setMarqueeCurrent({ x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
 
     const onPointerUp = (e: PointerEvent) => {
-      const endX = e.clientX;
-      const endY = e.clientY;
+      const rect = gl.domElement.getBoundingClientRect();
+      const endX = e.clientX - rect.left;
+      const endY = e.clientY - rect.top;
       setMarqueeCurrent({ x: endX, y: endY });
 
       const minX = Math.min(marqueeStart.x, endX);
@@ -886,8 +889,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           let inside = false;
           for (const c of corners) {
             c.project(cam);
-            const sx = (c.x * 0.5 + 0.5) * window.innerWidth;
-            const sy = (1 - (c.y * 0.5 + 0.5)) * window.innerHeight;
+            const sx = (c.x * 0.5 + 0.5) * rect.width;
+            const sy = (1 - (c.y * 0.5 + 0.5)) * rect.height;
             if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) {
               inside = true;
               break;
@@ -930,7 +933,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
-  }, [marqueeStart, camera]);
+  }, [marqueeStart, camera, gl]);
 
   const handleContextMenu = (e: any) => {
     e.stopPropagation();
@@ -999,8 +1002,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       e.button === 0 &&
       isCameraLocked
     ) {
-      setMarqueeStart({ x: coords.x, y: coords.y });
-      setMarqueeCurrent({ x: coords.x, y: coords.y });
+      const rect = gl.domElement.getBoundingClientRect();
+      const localX = coords.x - rect.left;
+      const localY = coords.y - rect.top;
+      setMarqueeStart({ x: localX, y: localY });
+      setMarqueeCurrent({ x: localX, y: localY });
       if (controlsRef.current) {
         controlsRef.current.enabled = false;
       }
@@ -1570,15 +1576,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         touches={touches as any}
       />
 
-      {marqueeStart && marqueeCurrent && (
-        <Html
-          center={false}
-          prepend
-          style={{ pointerEvents: "none", zIndex: 9999 }}
-        >
+      {marqueeStart && marqueeCurrent && gl.domElement.parentElement && createPortal(
           <div
             style={{
-              position: "fixed",
+              position: "absolute",
               left: Math.min(marqueeStart.x, marqueeCurrent.x),
               top: Math.min(marqueeStart.y, marqueeCurrent.y),
               width: Math.abs(marqueeCurrent.x - marqueeStart.x),
@@ -1586,9 +1587,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               border: "1px solid #4da6ff",
               backgroundColor: "rgba(77, 166, 255, 0.2)",
               pointerEvents: "none",
+              zIndex: 9999,
             }}
-          />
-        </Html>
+          />,
+          gl.domElement.parentElement
       )}
     </>
   );
