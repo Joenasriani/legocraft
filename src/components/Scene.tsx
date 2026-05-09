@@ -857,14 +857,30 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         bricks.forEach((brick) => {
           const aabb = getBrickAABB(brick);
           const corners = [
-            new THREE.Vector3(aabb.min[0], aabb.min[1], aabb.min[2]),
-            new THREE.Vector3(aabb.min[0], aabb.min[1], aabb.max[2]),
-            new THREE.Vector3(aabb.min[0], aabb.max[1], aabb.min[2]),
-            new THREE.Vector3(aabb.min[0], aabb.max[1], aabb.max[2]),
-            new THREE.Vector3(aabb.max[0], aabb.min[1], aabb.min[2]),
-            new THREE.Vector3(aabb.max[0], aabb.min[1], aabb.max[2]),
-            new THREE.Vector3(aabb.max[0], aabb.max[1], aabb.min[2]),
-            new THREE.Vector3(aabb.max[0], aabb.max[1], aabb.max[2]),
+            new THREE.Vector3(aabb.minX, brick.position[1], aabb.minZ),
+            new THREE.Vector3(aabb.minX, brick.position[1], aabb.maxZ),
+            new THREE.Vector3(
+              aabb.minX,
+              brick.position[1] + BRICK_HEIGHT,
+              aabb.minZ,
+            ),
+            new THREE.Vector3(
+              aabb.minX,
+              brick.position[1] + BRICK_HEIGHT,
+              aabb.maxZ,
+            ),
+            new THREE.Vector3(aabb.maxX, brick.position[1], aabb.minZ),
+            new THREE.Vector3(aabb.maxX, brick.position[1], aabb.maxZ),
+            new THREE.Vector3(
+              aabb.maxX,
+              brick.position[1] + BRICK_HEIGHT,
+              aabb.minZ,
+            ),
+            new THREE.Vector3(
+              aabb.maxX,
+              brick.position[1] + BRICK_HEIGHT,
+              aabb.maxZ,
+            ),
           ];
 
           let inside = false;
@@ -1450,11 +1466,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             );
           })}
 
-          {mode === "Build" && (
+          {mode === "Build" && !activePreset && (
             <LegoBrick
               id="ghost"
-              type={activePreset ? "1x1" : selectedType}
-              color={activePreset ? "#ffffff" : selectedColor}
+              type={selectedType}
+              color={selectedColor}
               position={ghostPosition}
               rotation={ghostRotation}
               isPlacementGhost
@@ -1513,6 +1529,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                   />
                 );
               })}
+              {/* Tiny anchor marker for the preset origin */}
+              <mesh position={ghostPosition}>
+                <sphereGeometry args={[0.015, 8, 8]} />
+                <meshBasicMaterial
+                  color="#ffffff"
+                  transparent
+                  opacity={0.6}
+                  depthTest={false}
+                />
+              </mesh>
             </>
           )}
 
