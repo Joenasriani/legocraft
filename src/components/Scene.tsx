@@ -396,16 +396,26 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (activePreset) {
         if (!PRESETS[activePreset])
           return { valid: false, reason: "invalid-preset" };
+        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const testPresetBricks = PRESETS[activePreset]
           .filter(isValidBrickData)
-          .map((b) => ({
-            ...b,
-            position: [
-              b.position[0] + x,
-              b.position[1] + y,
-              b.position[2] + z,
-            ] as [number, number, number],
-          }));
+          .map((b) => {
+            let ox = b.position[0];
+            let oz = b.position[2];
+            let nx = ox, nz = oz;
+            if (rotMod === 90 || rotMod === -270) {
+              nx = -oz; nz = ox;
+            } else if (Math.abs(rotMod) === 180) {
+              nx = -ox; nz = -oz;
+            } else if (rotMod === 270 || rotMod === -90) {
+              nx = oz; nz = -ox;
+            }
+            return {
+              ...b,
+              rotation: ((b.rotation || 0) + rotMod) % 360,
+              position: [nx + x, b.position[1] + y, nz + z] as [number, number, number],
+            };
+          });
         return checkStructureValid(
           bricks,
           testPresetBricks,
@@ -1536,7 +1546,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                 );
               })}
               {/* Tiny anchor marker for the preset origin */}
-              <mesh position={ghostPosition}>
+              <mesh position={ghostPosition} raycast={() => null}>
                 <sphereGeometry args={[0.015, 8, 8]} />
                 <meshBasicMaterial
                   color="#ffffff"
