@@ -55,6 +55,42 @@ export const HumanViewLayer = ({
     n: THREE.Vector3;
   } | null>(null);
 
+  const leftControllerIndex = useRef<number | null>(null);
+  const rightControllerIndex = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleConnected = (index: number) => (event: any) => {
+      const handedness = event.data?.handedness;
+      if (handedness === 'left') leftControllerIndex.current = index;
+      if (handedness === 'right') rightControllerIndex.current = index;
+      console.log(`[XR] Controller ${index} connected:`, handedness, event.data?.profiles);
+    };
+    
+    const handleDisconnected = (index: number) => () => {
+      if (leftControllerIndex.current === index) leftControllerIndex.current = null;
+      if (rightControllerIndex.current === index) rightControllerIndex.current = null;
+    };
+
+    const c0 = gl.xr.getController(0);
+    const cb0_conn = handleConnected(0);
+    const cb0_disc = handleDisconnected(0);
+    c0.addEventListener('connected', cb0_conn);
+    c0.addEventListener('disconnected', cb0_disc);
+
+    const c1 = gl.xr.getController(1);
+    const cb1_conn = handleConnected(1);
+    const cb1_disc = handleDisconnected(1);
+    c1.addEventListener('connected', cb1_conn);
+    c1.addEventListener('disconnected', cb1_disc);
+
+    return () => {
+      c0.removeEventListener('connected', cb0_conn);
+      c0.removeEventListener('disconnected', cb0_disc);
+      c1.removeEventListener('connected', cb1_conn);
+      c1.removeEventListener('disconnected', cb1_disc);
+    };
+  }, [gl.xr]);
+
   useFrame(() => {
     const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
     if (!session || !sceneGroupRef.current) return;
@@ -64,15 +100,17 @@ export const HumanViewLayer = ({
     let leftInput: XRInputSource | null = null;
     let rightInput: XRInputSource | null = null;
 
-    for (let i = 0; i < session.inputSources.length; i++) {
-      const source = session.inputSources[i];
-      if (source && source.handedness === "left") {
-        leftController = gl.xr.getController(i);
-        leftInput = source;
-      } else if (source && source.handedness === "right") {
-        rightController = gl.xr.getController(i);
-        rightInput = source;
-      }
+    if (leftControllerIndex.current !== null) {
+      leftController = gl.xr.getController(leftControllerIndex.current);
+    }
+    if (rightControllerIndex.current !== null) {
+      rightController = gl.xr.getController(rightControllerIndex.current);
+    }
+
+    for (const source of session.inputSources) {
+      if (!source) continue;
+      if (source.handedness === "left") leftInput = source;
+      if (source.handedness === "right") rightInput = source;
     }
 
     // Handle Locomotion (Thumbsticks)
@@ -161,9 +199,9 @@ export const HumanViewLayer = ({
       const gp = rightInput.gamepad;
       const triggerPressed = gp.buttons[0]?.pressed || false;
       const squeezePressed = gp.buttons[1]?.pressed || false;
+      // right A = 4
       const aPressed = gp.buttons[4]?.pressed || false;
-      const bPressed = gp.buttons[5]?.pressed || false;
-      const actionPressed = aPressed || bPressed;
+      const actionPressed = aPressed;
 
       if (hit) {
         laserDistance = hit.distance;

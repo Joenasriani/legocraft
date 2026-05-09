@@ -372,6 +372,7 @@ interface LegoStore {
   loadPreset: (presetName: PresetName | null) => void;
   commitPreset: (position: [number, number, number], rotation: number) => void;
   activePreset: PresetName | null;
+  toastTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
 const COLORS = [
@@ -611,6 +612,15 @@ const generateMountain = (): BrickData[] => {
   return mtn;
 };
 
+const MAX_HISTORY = 50;
+const pushHistory = (stack: HistoryState[], bricks: BrickData[]) => {
+  const newStack = [...stack, { bricks: [...bricks] }];
+  if (newStack.length > MAX_HISTORY) {
+    return newStack.slice(newStack.length - MAX_HISTORY);
+  }
+  return newStack;
+};
+
 export const PRESETS: Record<PresetName, BrickData[]> = {
   horse: generateHorse(),
   sheep: generateSheep(),
@@ -635,12 +645,24 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   undoStack: [],
   redoStack: [],
   toastMessage: null,
+  toastTimeoutId: null,
   movingBrickId: null,
   isDraggingBrick: false,
   justSelectedBrick: false,
   isCameraLocked: false,
 
-  setToastMessage: (msg) => set({ toastMessage: msg }),
+  setToastMessage: (msg) => {
+    const { toastTimeoutId } = get();
+    if (toastTimeoutId) clearTimeout(toastTimeoutId);
+    if (msg) {
+      const id = setTimeout(() => {
+        set({ toastMessage: null, toastTimeoutId: null });
+      }, 3000);
+      set({ toastMessage: msg, toastTimeoutId: id });
+    } else {
+      set({ toastMessage: null, toastTimeoutId: null });
+    }
+  },
   setMovingBrickId: (id) => set({ movingBrickId: id }),
   setIsDraggingBrick: (val) => set({ isDraggingBrick: val }),
   setJustSelectedBrick: (val) => set({ justSelectedBrick: val }),
@@ -651,7 +673,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const newBrick = { ...newBrickData, id: crypto.randomUUID() };
 
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: [...bricks, newBrick],
     });
@@ -671,14 +693,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         get().setToastMessage(
           "Cannot delete: brick has another brick above it.",
         );
-        setTimeout(() => {
-          if (
-            get().toastMessage ===
-            "Cannot delete: brick has another brick above it."
-          ) {
-            get().setToastMessage(null);
-          }
-        }, 3000);
       }
       return;
     }
@@ -686,7 +700,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const newBricks = bricks.filter((b) => b.id !== id);
 
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: newBricks,
     });
@@ -726,14 +740,13 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         get().setToastMessage(
           "Cannot delete: some bricks have others above them.",
         );
-        setTimeout(() => get().setToastMessage(null), 3000);
       }
       return;
     }
 
     const newBricks = bricks.filter((b) => !ids.includes(b.id));
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: newBricks,
     });
@@ -749,7 +762,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: newBricks,
     });
@@ -764,7 +777,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     );
 
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: newBricks,
     });
@@ -800,13 +813,15 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     } = get();
     set({ selectedColor });
 
-    if (mode === "Move" || mode === "Delete") {
+    if (mode === "Move") {
+      let didRecolor = false;
       if (selectionMode === "Multi" && multiSelectedBrickIds.length > 0) {
         const updates = multiSelectedBrickIds.map((id) => ({
           id: id,
           updates: { color: selectedColor },
         }));
         updateBricks(updates);
+        didRecolor = true;
       } else if (movingBrickId) {
         const movingBrick = bricks.find((b) => b.id === movingBrickId);
         if (movingBrick) {
@@ -817,12 +832,17 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
               updates: { color: selectedColor },
             }));
             updateBricks(updates);
+            didRecolor = true;
           } else {
             updateBricks([
               { id: movingBrick.id, updates: { color: selectedColor } },
             ]);
+            didRecolor = true;
           }
         }
+      }
+      if (didRecolor && typeof window !== "undefined") {
+        get().setToastMessage("Selected brick recolored.");
       }
     }
   },
@@ -836,8 +856,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     set({
       undoStack: newUndoStack,
-      redoStack: [...redoStack, { bricks: [...bricks] }],
+      redoStack: pushHistory(redoStack, bricks),
       bricks: prevState.bricks,
+      movingBrickId: null,
+      isDraggingBrick: false,
+      multiSelectedBrickIds: [],
+      justSelectedBrick: false,
     });
 
     localStorage.setItem("brickxr-save", JSON.stringify(prevState.bricks));
@@ -851,9 +875,13 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const newRedoStack = redoStack.slice(0, -1);
 
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: newRedoStack,
       bricks: nextState.bricks,
+      movingBrickId: null,
+      isDraggingBrick: false,
+      multiSelectedBrickIds: [],
+      justSelectedBrick: false,
     });
 
     localStorage.setItem("brickxr-save", JSON.stringify(nextState.bricks));
@@ -862,7 +890,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   clearAll: () => {
     const { bricks, undoStack } = get();
     set({
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: [],
     });
@@ -932,7 +960,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const newBricks = [...bricks, ...presetBricks];
     const updates: Partial<LegoStore> = {
-      undoStack: [...undoStack, { bricks: [...bricks] }],
+      undoStack: pushHistory(undoStack, bricks),
       redoStack: [],
       bricks: newBricks,
     };

@@ -31,33 +31,20 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
 };
 
-const VRLoadingScreen = () => {
-  const meshRef = useRef<THREE.Group>(null);
-  useFrame(({ gl }) => {
-    if (!gl.xr.isPresenting) return;
-    const xrCamera = gl.xr.getCamera();
-    if (meshRef.current) {
-      meshRef.current.position.copy(xrCamera.position);
-      meshRef.current.quaternion.copy(xrCamera.quaternion);
-    }
-  });
-
+const VRDebugVisibilityLayer = () => {
   return (
-    <group ref={meshRef} renderOrder={9999}>
-      <mesh>
-        <sphereGeometry args={[10, 16, 16]} />
-        <meshBasicMaterial
-          color="#000"
-          side={THREE.BackSide}
-          depthTest={false}
-          depthWrite={false}
-          transparent
-          opacity={0.99}
-        />
+    <group position={[0, 0, 0]}>
+      <mesh position={[0, 1, -2]}>
+        <boxGeometry args={[0.2, 0.2, 0.2]} />
+        <meshBasicMaterial color="#00ff00" wireframe={false} />
       </mesh>
-      <group position={[0, 0, -1]}>
-        <Text fontSize={0.06} color="white">
-          Entering Immersive VR...
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
+        <planeGeometry args={[10, 10]} />
+        <meshBasicMaterial color="#333333" wireframe={true} />
+      </mesh>
+      <group position={[0, 1.5, -2]}>
+        <Text fontSize={0.1} color="white">
+          XR rendering active
         </Text>
       </group>
     </group>
@@ -67,9 +54,26 @@ const VRLoadingScreen = () => {
 const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const { gl, scene, camera } = useThree();
   const [vrScale, setVrScale] = useState<VRScaleMode>("human");
+  const [isScreenshotting, setIsScreenshotting] = useState(false);
   const [xrSessionActive, setXrSessionActive] = useState(false);
   const [vrReady, setVrReady] = useState(true);
   const [clipboard, setClipboard] = useState<BrickData[]>([]);
+  // 14. Remove <Canvas preserveDrawingBuffer={true}> in App.tsx. This causes massive memory/performance drags in WebGL.
+  // We'll also disable shadow map completely in XR to save on draw calls.
+  useEffect(() => {
+    gl.shadowMap.enabled = !xrSessionActive;
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh && (child as any).material) {
+        let mat = (child as any).material;
+        if (Array.isArray(mat)) {
+          mat.forEach(m => { m.needsUpdate = true; });
+        } else {
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  }, [xrSessionActive, gl, scene]);
+
   const [marqueeStart, setMarqueeStart] = useState<{
     x: number;
     y: number;
@@ -208,12 +212,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     const onScreenshot = () => {
-      // Must render first to ensure canvas has content
-      gl.render(scene, camera);
-      const link = document.createElement("a");
-      link.download = "brickxr-screenshot.png";
-      link.href = gl.domElement.toDataURL("image/png");
-      link.click();
+      setIsScreenshotting(true);
+      setTimeout(() => {
+        // Must render first to ensure canvas has content
+        gl.render(scene, camera);
+        const link = document.createElement("a");
+        link.download = "brickxr-screenshot.png";
+        link.href = gl.domElement.toDataURL("image/png");
+        link.click();
+        setIsScreenshotting(false);
+      }, 50);
     };
     window.addEventListener("take-screenshot", onScreenshot);
     return () => window.removeEventListener("take-screenshot", onScreenshot);
@@ -271,14 +279,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!gl.xr.isPresenting) return;
     const session = gl.xr.getSession();
     if (!session) return;
-    const refSpace = await session.requestReferenceSpace("local-floor");
-    const transform = new XRRigidTransform(offsetPosition, {
-      x: 0,
-      y: 0,
-      z: 0,
-      w: 1,
-    });
-    gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
+    try {
+      if (typeof XRRigidTransform === "undefined") return;
+      const refSpace = await session.requestReferenceSpace("local-floor");
+      const transform = new XRRigidTransform(offsetPosition, {
+        x: 0,
+        y: 0,
+        z: 0,
+        w: 1,
+      });
+      gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
+      console.log("Teleport success to", offsetPosition);
+    } catch(err) {
+      console.warn("Teleport failed", err);
+    }
   }
 
   const toggleScale = () => {
@@ -346,12 +360,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const effW = isRot ? d : w;
     const effD = isRot ? w : d;
 
-    const alignSnap = (val: number, count: number, step: number) => {
-      if (count % 2 === 1) {
-        return Math.round(val / step) * step;
-      } else {
-        return Math.floor(val / step) * step + step / 2;
-      }
+    const alignSnap = (val: number, _count: number, step: number) => {
+      return Math.round(val / step) * step;
     };
 
     const nudge = 0.001;
@@ -368,7 +378,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     let targetY;
 
     if (Math.abs(normal.y) > 0.5) {
-      targetY = Math.floor(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
+      targetY = Math.round(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
     } else {
       targetY =
         Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) *
@@ -517,6 +527,38 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     setGhostPosition(computePlacementTarget(point, normal));
   };
 
+  const getPlacementHitFromEvent = (e: any) => {
+    if (!e.point) return null;
+    const p3 = new THREE.Vector3(e.point.x, e.point.y, e.point.z).divideScalar(
+      currentVRScale,
+    );
+    const normal = e.face?.normal
+      ? new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
+      : new THREE.Vector3(0, 1, 0);
+
+    let worldNormal: THREE.Vector3;
+
+    if (e.instanceId !== undefined && e.object instanceof THREE.InstancedMesh) {
+      const instanceMatrix = new THREE.Matrix4();
+      e.object.getMatrixAt(e.instanceId, instanceMatrix);
+      const instanceWorldMatrix = e.object.matrixWorld.clone().multiply(instanceMatrix);
+
+      worldNormal = normal.clone().transformDirection(instanceWorldMatrix).normalize();
+    } else {
+      worldNormal = normal.clone().transformDirection(e.object.matrixWorld).normalize();
+    }
+
+    return { point: p3, normal: worldNormal };
+  };
+
+  const updateGhostFromEvent = (e: any) => {
+    const hit = getPlacementHitFromEvent(e);
+    if (!hit) return false;
+    lastPointerHit.current = { point: hit.point, normal: hit.normal };
+    updateGhostPosition(hit.point, hit.normal);
+    return true;
+  };
+
   useEffect(() => {
     if (lastPointerHit.current) {
       updateGhostPosition(
@@ -541,36 +583,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         if (distance > threshold) {
           setIsDraggingBrick(true);
           useLegoStore.getState().setJustSelectedBrick(false); // Also clear click
-        } else {
-          return; // wait
         }
-      } else {
-        // pointer not down.
-        // We shouldn't track mouse unless we are in some active drag mode
-        // Wait, for mobile, tapping empty space moves ghost position without dragging?
-        // Let's only ignore if it's touch, or restrict tracking
-        // Actually we allow pointerMove to update ghost even if button not held if it's PC.
       }
     }
 
-    const point = e.point;
-    if (!point) return;
-
-    // Convert to Three Vector3 just in case, and unscale the coordinates (CRITICAL)
-    const p3 = new THREE.Vector3(point.x, point.y, point.z).divideScalar(
-      currentVRScale,
-    );
-    const normal = e.face?.normal
-      ? new THREE.Vector3(e.face.normal.x, e.face.normal.y, e.face.normal.z)
-      : new THREE.Vector3(0, 1, 0);
-
-    const worldNormal = normal
-      .clone()
-      .transformDirection(e.object.matrixWorld)
-      .normalize();
-
-    lastPointerHit.current = { point: p3, normal: worldNormal };
-    updateGhostPosition(p3, worldNormal);
+    updateGhostFromEvent(e);
   };
 
   const ghostGroupBricks = useMemo(() => {
@@ -939,8 +956,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // OrbitControls ignores event if it's not handled.
 
     // Check multi-touch
-    if (e.nativeEvent?.touches && e.nativeEvent.touches.length >= 2) {
+    const touchesCount = e.nativeEvent?.touches ? e.nativeEvent.touches.length : 0;
+    if (touchesCount >= 2) {
       isMultiTouchRef.current = true;
+      pointerDownPos.current = null;
+    } else if (touchesCount === 1) {
+      isMultiTouchRef.current = false;
     }
 
     if (mode === "Move" && movingBrick) {
@@ -974,6 +995,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     pointerDownPos.current = { x: coords.x, y: coords.y, isTouch };
+
+    const isBuilding = mode === "Build";
+    const isMoving = mode === "Move" && movingBrickId !== null;
+    const isPlacingPreset = activePreset !== null;
+    if (isBuilding || isMoving || isPlacingPreset) {
+      updateGhostFromEvent(e);
+    }
   };
 
   const executeCommit = (p3: THREE.Vector3, normal: THREE.Vector3) => {
@@ -1202,14 +1230,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const handlePointerUp = (e: any) => {
     isBrickInteractionRef.current = false;
 
-    const touchesCount = e.nativeEvent?.touches
-      ? e.nativeEvent.touches.length
-      : 0;
     const wasMultiTouch = isMultiTouchRef.current;
-
-    if (touchesCount === 0) {
-      isMultiTouchRef.current = false; // reset when all fingers off
-    }
 
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
 
@@ -1247,20 +1268,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       return;
     }
 
-    if (e.point && e.face?.normal) {
-      const p3 = new THREE.Vector3(
-        e.point.x,
-        e.point.y,
-        e.point.z,
-      ).divideScalar(currentVRScale);
-      const normal = new THREE.Vector3(
-        e.face.normal.x,
-        e.face.normal.y,
-        e.face.normal.z,
-      )
-        .transformDirection(e.object.matrixWorld)
-        .normalize();
-
+    const hit = getPlacementHitFromEvent(e);
+    if (hit) {
       // Only execute commit if it was a real click and not just selecting
       let shouldCommit = true;
       if (
@@ -1272,7 +1281,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         useLegoStore.getState().setJustSelectedBrick(false); // clear it
       }
       if (shouldCommit) {
-        executeCommit(p3, normal);
+        executeCommit(hit.point, hit.normal);
       } else {
         setIsDraggingBrick(false);
       }
@@ -1393,10 +1402,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         position={[10, 20, 10]}
         intensity={1.5}
         castShadow={!xrSessionActive}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-camera-near={0.5}
+        shadow-camera-far={100}
+        shadow-camera-left={-20}
+        shadow-camera-right={20}
+        shadow-camera-top={20}
+        shadow-camera-bottom={-20}
       />
 
       <Suspense fallback={null}>
-        {xrSessionActive && !vrReady && <VRLoadingScreen />}
+        {xrSessionActive && !vrReady && <VRDebugVisibilityLayer />}
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
             currentVRScale={currentVRScale}
@@ -1411,7 +1428,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             currentVRScale={currentVRScale}
           />
         )}
-        <group
+      </Suspense>
+      <group
           ref={sceneGroupRef}
           scale={currentVRScale}
           onPointerMove={handlePointerMove}
@@ -1432,7 +1450,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             );
           })}
 
-          {mode === "Build" && !activePreset && (
+          {!isScreenshotting && mode === "Build" && !activePreset && (
             <LegoBrick
               id="ghost"
               type={selectedType}
@@ -1443,7 +1461,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             />
           )}
 
-          {(mode === "Move" || mode === "Delete") &&
+          {!isScreenshotting && (mode === "Move" || mode === "Delete") &&
             movingGroupOriginalBricks.length > 0 && (
               <>
                 {/* The ghost preview that follows the mouse */}
@@ -1481,7 +1499,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               </>
             )}
 
-          {activePreset && (
+          {!isScreenshotting && activePreset && (
             <>
               {Object.entries(groupedPresetBricks).map(([key, group]) => {
                 const [type, color] = key.split("_");
@@ -1512,7 +1530,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <mesh
               ref={gridRef}
               name="Grid"
-              receiveShadow
+              receiveShadow={!xrSessionActive}
               rotation={[-Math.PI / 2, 0, 0]}
             >
               <planeGeometry args={[100, 100]} />
@@ -1524,7 +1542,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             />
           </group>
         </group>
-      </Suspense>
       <OrbitControls
         ref={controlsRef}
         makeDefault

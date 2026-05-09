@@ -496,7 +496,16 @@ const PRESET_OPTIONS: {
 
 const xrStore = createXRStore({
   hand: false,
+  frameRate: "mid",
+  frameBufferScaling: "low",
+  layers: false,
+  anchors: false,
+  meshDetection: false,
+  planeDetection: false,
+  hitTest: false,
+  domOverlay: false,
   controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
+  customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: [] }
 });
 
 const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
@@ -525,14 +534,24 @@ export default function App() {
     setIsCameraLocked,
   } = useLegoStore();
 
-  const [showHelp, setShowHelp] = useState(true);
+  const [showHelp, setShowHelp] = useState(() => {
+    return localStorage.getItem("brickxr-help-dismissed") !== "true";
+  });
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showVRPrompt, setShowVRPrompt] = useState(false);
   const [isFadingToVR, setIsFadingToVR] = useState(false);
   const [vrStatus, setVrStatus] = useState<"pending" | "ready" | "unsupported">(
     "pending",
   );
+  const [isXRActive, setIsXRActive] = useState(false);
+
+  useEffect(() => {
+    return xrStore.subscribe((state: any) => {
+      setIsXRActive(!!state.session);
+    });
+  }, []);
 
   useEffect(() => {
     if (navigator.xr && navigator.xr.isSessionSupported) {
@@ -542,10 +561,23 @@ export default function App() {
     } else {
       setVrStatus("unsupported");
     }
-    const handleGlobalClick = () => setShowPresetMenu(false);
-    window.addEventListener("pointerdown", handleGlobalClick);
-    return () => window.removeEventListener("pointerdown", handleGlobalClick);
   }, []);
+
+  useEffect(() => {
+    const handleGlobalClick = (e: any) => {
+      if (
+        showPresetMenu &&
+        presetMenuRef.current &&
+        !presetMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowPresetMenu(false);
+      }
+    };
+    if (showPresetMenu) {
+      window.addEventListener("pointerdown", handleGlobalClick);
+      return () => window.removeEventListener("pointerdown", handleGlobalClick);
+    }
+  }, [showPresetMenu]);
 
   // Load save on startup
   useEffect(() => {
@@ -604,11 +636,13 @@ export default function App() {
       <AnimatePresence>
         {isFadingToVR && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-[60] bg-black pointer-events-none"
-          />
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-10 left-1/2 -translate-x-1/2 z-[60] bg-[#111] border border-purple-500/50 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.4)] pointer-events-none"
+          >
+            <span className="text-white font-bold tracking-widest text-sm uppercase">Entering VR...</span>
+          </motion.div>
         )}
         {showVRPrompt && (
           <motion.div
@@ -681,16 +715,18 @@ export default function App() {
       >
         <Canvas
           shadows
-          camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
           gl={{ preserveDrawingBuffer: true }}
+          camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
         >
           <Scene xrStore={xrStore} />
         </Canvas>
       </div>
 
       {/* UI Overlay */}
-      <div className="absolute inset-0 z-10 pointer-events-none p-3 sm:p-6 flex flex-col justify-between">
-        {toastMessage && (
+      {!isXRActive && (
+        <>
+          <div className="absolute inset-0 z-10 pointer-events-none p-3 sm:p-6 flex flex-col justify-between">
+            {toastMessage && (
           <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-xs sm:text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
             <InfoIcon size={16} />
             {toastMessage}
@@ -706,6 +742,12 @@ export default function App() {
               <span className="font-light opacity-60 hidden sm:inline">XR</span>
             </div>
             <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
+              <div
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate bg-black/40 border-white/20 text-white/80`}
+              >
+                {bricks.length} {bricks.length === 1 ? "Brick" : "Bricks"}
+                {bricks.length > 200 && <span className="text-yellow-400 ml-1"> (High count)</span>}
+              </div>
               {vrStatus === "ready" && (
                 <button
                   onClick={() => setShowVRPrompt(true)}
@@ -767,7 +809,7 @@ export default function App() {
                 <OrbitCameraIcon size={16} />
               </button>
               <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
-              <button
+               <button
                 onClick={() => {
                   if (isCameraLocked) {
                     setIsCameraLocked(false);
@@ -777,7 +819,7 @@ export default function App() {
                   }
                 }}
                 className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
-                title="Lock Camera"
+                title={mode === "Move" ? "Lock Camera (\u2714 Required for drag-select)" : "Lock Camera"}
               >
                 <LockIcon size={16} />
               </button>
@@ -804,6 +846,12 @@ export default function App() {
             <ToolIconButton
               icon={<RotateIcon size={24} />}
               active={false}
+              disabled={
+                mode === "Delete" ||
+                (mode === "Move" &&
+                  !useLegoStore.getState().movingBrickId &&
+                  useLegoStore.getState().multiSelectedBrickIds.length === 0)
+              }
               onClick={() =>
                 window.dispatchEvent(new CustomEvent("rotate-ghost"))
               }
@@ -1066,14 +1114,14 @@ export default function App() {
       </div>
 
       {/* Preset Menu Overlay */}
-      <AnimatePresence>
+              <AnimatePresence>
         {showPresetMenu && (
           <motion.div
+            ref={presetMenuRef}
             initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
             animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
             exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            onPointerDown={(e) => e.stopPropagation()}
             className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)]"
           >
             {PRESET_OPTIONS.map((preset) => (
@@ -1129,7 +1177,10 @@ export default function App() {
               </p>
 
               <button
-                onClick={() => setShowHelp(false)}
+                onClick={() => {
+                  setShowHelp(false);
+                  localStorage.setItem("brickxr-help-dismissed", "true");
+                }}
                 title="Enter Workspace"
                 className="w-full bg-white text-black font-bold py-4 rounded-2xl transition-transform active:scale-[0.98] shadow-2xl"
               >
@@ -1178,6 +1229,8 @@ export default function App() {
           </motion.div>
         )}
       </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }

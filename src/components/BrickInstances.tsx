@@ -175,8 +175,16 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     };
   }, [type]);
 
-  const bodyCapacity = Math.max(1, bricks.length);
-  const studCapacity = Math.max(1, bricks.length * w * d);
+  const getCapacityTier = (count: number) => {
+    if (count <= 64) return 64;
+    if (count <= 128) return 128;
+    if (count <= 256) return 256;
+    if (count <= 512) return 512;
+    return Math.ceil(count / 256) * 256;
+  };
+
+  const bodyCapacity = getCapacityTier(bricks.length);
+  const studCapacity = Math.max(1, bodyCapacity * w * d);
 
   const bodyGeom = useMemo(() => {
     const geom = new THREE.BoxGeometry(
@@ -264,6 +272,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
     if (bodyMesh.instanceMatrix) bodyMesh.instanceMatrix.needsUpdate = true;
     if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
+    
+    bodyMesh.computeBoundingSphere();
+    studMesh.computeBoundingSphere();
+
     bodyMesh.count = count;
     studMesh.count = Math.max(0, count * w * d);
 
@@ -282,21 +294,25 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   return (
     <group>
       <instancedMesh
+        key={`body-${bodyCapacity}`}
         ref={bodyMeshRef}
         name="BrickBodyInstanced"
         args={[bodyGeom, material, bodyCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
+        frustumCulled={false}
         onPointerDown={isGhost ? undefined : handlePointerDown}
         onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}
       />
       <instancedMesh
+        key={`stud-${studCapacity}`}
         ref={studMeshRef}
         name="BrickStudsInstanced"
         args={[studGeom, material, studCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
+        frustumCulled={false}
         onPointerDown={isGhost ? undefined : handlePointerDown}
         onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}

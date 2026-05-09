@@ -6,6 +6,44 @@ import { useLegoStore } from "../Store";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
+const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, handleAction }: any) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+
+  React.useEffect(() => {
+    if (meshRef.current) {
+      vrTargetManager.register(meshRef.current);
+      meshRef.current.userData.isVRMenuItem = true;
+      meshRef.current.userData.label = seg.label;
+      meshRef.current.userData.onTrigger = () => handleAction(seg.action);
+    }
+    return () => {
+      if (meshRef.current) {
+        vrTargetManager.unregister(meshRef.current);
+      }
+    };
+  }, [seg, handleAction]);
+
+  return (
+    <>
+      <Box
+        ref={meshRef}
+        name="VRMenuItem"
+        args={[boxWidth, boxHeight, depth]}
+        material-color={isHovered ? "#ffffff" : seg.color}
+      />
+      <Text
+        position={[0, 0, depth + 0.001]}
+        fontSize={fontSize}
+        color={isHovered ? seg.color : "white"}
+        anchorX="center"
+        anchorY="middle"
+      >
+        {seg.label}
+      </Text>
+    </>
+  );
+};
+
 export const VRRadialMenu = ({
   vrScale,
   onToggle,
@@ -18,6 +56,25 @@ export const VRRadialMenu = ({
   const { gl } = useThree();
   const [visible, setVisible] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
+  const leftGripIndex = useRef<number | null>(null);
+
+  React.useEffect(() => {
+    const handleConn = (i: number) => (e: any) => {
+      if (e.data?.handedness === 'left') leftGripIndex.current = i;
+    };
+    const c0 = gl.xr.getControllerGrip(0);
+    const cb0 = handleConn(0);
+    c0.addEventListener('connected', cb0);
+    
+    const c1 = gl.xr.getControllerGrip(1);
+    const cb1 = handleConn(1);
+    c1.addEventListener('connected', cb1);
+    
+    return () => {
+      c0.removeEventListener('connected', cb0);
+      c1.removeEventListener('connected', cb1);
+    }
+  }, [gl.xr]);
 
   const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
@@ -34,38 +91,24 @@ export const VRRadialMenu = ({
     }
 
     let leftGrip: THREE.Group | null = null;
+    if (leftGripIndex.current !== null) {
+      leftGrip = gl.xr.getControllerGrip(leftGripIndex.current);
+    }
 
-    for (let i = 0; i < 2; i++) {
-      const inputSource = session.inputSources[i];
-      if (inputSource && inputSource.handedness === "left") {
-        leftGrip = gl.xr.getControllerGrip(i);
-        if (inputSource.gamepad) {
-          const xPressed =
-            !!inputSource.gamepad.buttons[3]?.pressed ||
-            !!inputSource.gamepad.buttons[4]?.pressed;
-          const yPressed =
-            !!inputSource.gamepad.buttons[4]?.pressed ||
-            !!inputSource.gamepad.buttons[5]?.pressed;
-
-          if (
-            (xPressed && !wasXPressed.current) ||
-            (yPressed && !wasYPressed.current)
-          ) {
-            setVisible(!visible);
-          }
-          wasXPressed.current = xPressed;
-          wasYPressed.current = yPressed;
+    for (const inputSource of session.inputSources) {
+      if (!inputSource) continue;
+      if (inputSource.handedness === "left" && inputSource.gamepad) {
+        const xPressed = !!inputSource.gamepad.buttons[4]?.pressed;
+        if (xPressed && !wasXPressed.current) {
+          setVisible(!visible);
         }
-      } else if (inputSource && inputSource.handedness === "right") {
-        if (inputSource.gamepad) {
-          const bPressed =
-            !!inputSource.gamepad.buttons[4]?.pressed ||
-            !!inputSource.gamepad.buttons[5]?.pressed;
-          if (bPressed && !wasBPressed.current) {
-            if (visible) setVisible(false);
-          }
-          wasBPressed.current = bPressed;
+        wasXPressed.current = xPressed;
+      } else if (inputSource.handedness === "right" && inputSource.gamepad) {
+        const bPressed = !!inputSource.gamepad.buttons[5]?.pressed;
+        if (bPressed && !wasBPressed.current) {
+          if (visible) setVisible(false);
         }
+        wasBPressed.current = bPressed;
       }
     }
 
@@ -159,28 +202,15 @@ export const VRRadialMenu = ({
           const depth = isHovered ? boxDepth * 1.5 : boxDepth;
           return (
             <group key={i} position={[x, y, 0]}>
-              <Box
-                ref={(node) => {
-                  if (node) {
-                    vrTargetManager.register(node);
-                    node.userData.isVRMenuItem = true;
-                    node.userData.label = seg.label;
-                    node.userData.onTrigger = () => handleAction(seg.action);
-                  }
-                }}
-                name="VRMenuItem"
-                args={[boxWidth, boxHeight, depth]}
-                material-color={isHovered ? "#ffffff" : seg.color}
-              />
-              <Text
-                position={[0, 0, depth + 0.001]}
+              <VRMenuItem
+                seg={seg}
+                depth={depth}
                 fontSize={fontSize}
-                color={isHovered ? seg.color : "white"}
-                anchorX="center"
-                anchorY="middle"
-              >
-                {seg.label}
-              </Text>
+                isHovered={isHovered}
+                boxWidth={boxWidth}
+                boxHeight={boxHeight}
+                handleAction={handleAction}
+              />
             </group>
           );
         })}
