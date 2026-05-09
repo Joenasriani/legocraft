@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { OrbitControls, Html, Text } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -30,27 +30,68 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   micro: 17.5,
 };
 
+const VRLoadingScreen = () => {
+  const meshRef = useRef<THREE.Group>(null);
+  useFrame(({ gl }) => {
+    if (!gl.xr.isPresenting) return;
+    const xrCamera = gl.xr.getCamera();
+    if (meshRef.current) {
+      meshRef.current.position.copy(xrCamera.position);
+      meshRef.current.quaternion.copy(xrCamera.quaternion);
+    }
+  });
+
+  return (
+    <group ref={meshRef} renderOrder={9999}>
+      <mesh>
+        <sphereGeometry args={[10, 16, 16]} />
+        <meshBasicMaterial
+          color="#000"
+          side={THREE.BackSide}
+          depthTest={false}
+          depthWrite={false}
+          transparent
+          opacity={0.99}
+        />
+      </mesh>
+      <group position={[0, 0, -1]}>
+        <Text fontSize={0.06} color="white">
+          Entering Immersive VR...
+        </Text>
+      </group>
+    </group>
+  );
+};
+
 const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const { gl, scene, camera } = useThree();
   const [vrScale, setVrScale] = useState<VRScaleMode>("human");
   const [xrSessionActive, setXrSessionActive] = useState(false);
+  const [vrReady, setVrReady] = useState(true);
   const currentVRScale = xrSessionActive ? VR_SCALE_VALUES[vrScale] : 1.0;
 
   useEffect(() => {
     if (!xrStore) return;
     return xrStore.subscribe((state: any) => {
-      setXrSessionActive(!!state.session);
-      if (!state.session) {
+      const active = !!state.session;
+      setXrSessionActive(active);
+      if (!active) {
         setVrScale("human");
+        setVrReady(true);
+      } else {
+        setVrReady(false);
       }
     });
   }, [xrStore]);
 
   useEffect(() => {
     if (xrSessionActive) {
-      // Push player back and up slightly so build is in front
-      // Give it a tiny delay to ensure session is active
-      setTimeout(() => teleportPlayer({ x: 0, y: 0.5, z: 0.8 }), 100);
+      // Warm-up wait: wait for controllers, session start, DOM to settle
+      const timer = setTimeout(() => {
+        teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+        setVrReady(true);
+      }, 1500);
+      return () => clearTimeout(timer);
     }
   }, [xrSessionActive]);
 
@@ -1147,6 +1188,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
 
       <Suspense fallback={null}>
+        {xrSessionActive && !vrReady && <VRLoadingScreen />}
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
             currentVRScale={currentVRScale}

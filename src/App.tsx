@@ -528,6 +528,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(true);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showVRPrompt, setShowVRPrompt] = useState(false);
+  const [isFadingToVR, setIsFadingToVR] = useState(false);
   const [vrStatus, setVrStatus] = useState<"pending" | "ready" | "unsupported">(
     "pending",
   );
@@ -599,6 +601,79 @@ export default function App() {
 
   return (
     <div className="w-full h-screen bg-bg text-white overflow-hidden font-sans relative viewport-gradient">
+      <AnimatePresence>
+        {isFadingToVR && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] bg-black pointer-events-none"
+          />
+        )}
+        {showVRPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pointer-events-auto"
+          >
+            <div className="bg-[#111] border border-purple-500/30 p-6 rounded-2xl max-w-sm text-center shadow-[0_0_40px_rgba(168,85,247,0.2)]">
+              <h2 className="text-xl font-bold text-white mb-2 uppercase tracking-wide">
+                Enter VR Mode
+              </h2>
+              <p className="text-sm text-gray-300 mb-4 text-left leading-relaxed">
+                Immersive VR will open in your Quest Browser.
+                <br />
+                <br />
+                <span className="text-purple-400 font-semibold">
+                  Controllers
+                </span>{" "}
+                are used for building and selection.
+                <br />
+                <br />
+                Please stay seated or ensure your physical play space is clear.
+              </p>
+              <div className="flex gap-3 justify-end items-center mt-6">
+                <button
+                  onClick={() => setShowVRPrompt(false)}
+                  className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-bold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowVRPrompt(false);
+                    setIsFadingToVR(true);
+                    setTimeout(() => {
+                      try {
+                        const p = xrStore.enterVR();
+                        if (p && p.catch) {
+                          p.catch(() => {
+                            useLegoStore
+                              .getState()
+                              .setToastMessage("VR failed to start.");
+                            setIsFadingToVR(false);
+                          });
+                        }
+                      } catch (e) {
+                        useLegoStore
+                          .getState()
+                          .setToastMessage("VR failed to start.");
+                        setIsFadingToVR(false);
+                      }
+                      setTimeout(() => setIsFadingToVR(false), 2000);
+                    }, 500);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-colors shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-400/50"
+                >
+                  Enter VR
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 3D Viewport */}
       <div className="absolute inset-0 z-0">
         <Canvas
@@ -630,23 +705,7 @@ export default function App() {
             <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
               {vrStatus === "ready" && (
                 <button
-                  onClick={() => {
-                    const xrErrorMsg = "VR not supported or no hardware found.";
-                    try {
-                      const p = xrStore.enterVR();
-                      if (p && p.catch) {
-                        p.catch(() =>
-                          useLegoStore
-                            .getState()
-                            .setToastMessage("VR failed to start."),
-                        );
-                      }
-                    } catch (e) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage("VR failed to start.");
-                    }
-                  }}
+                  onClick={() => setShowVRPrompt(true)}
                   className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
                   title="Enter VR Session"
                 >

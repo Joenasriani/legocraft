@@ -129,12 +129,6 @@ export const VRRadialMenu = ({
       action: () => useLegoStore.getState().clearAll(),
       theta: (-5 * Math.PI) / 6,
     },
-    {
-      label: vrScale === "human" ? "GO MICRO 🔬" : "GO HUMAN 🧍",
-      color: vrScale === "human" ? "#a78bfa" : "#00e676",
-      action: onToggle,
-      theta: (5 * Math.PI) / 6,
-    },
   ];
 
   if (!visible) return null;
