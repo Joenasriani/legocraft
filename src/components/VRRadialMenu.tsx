@@ -122,12 +122,11 @@ export const VRRadialMenu = ({
       // Hover menu slightly above wrist so hands don't clip
       groupRef.current.position.y += vrScale === "human" ? 0.05 : 1.5;
     }
-
-    // Store visibility in global state or window so locomotion can pause
-    if (window as any) {
-      (window as any).__vrMenuVisible = visible;
-    }
   });
+
+  React.useEffect(() => {
+    useLegoStore.getState().setVrMenuVisible(visible);
+  }, [visible]);
 
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [clearArmed, setClearArmed] = useState(false);

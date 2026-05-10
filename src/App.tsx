@@ -7,6 +7,7 @@ import {
   BrickType,
   PresetName,
   getGroupBricks,
+          isValidBrickData,
 } from "./Store";
 import { Scene } from "./components/Scene";
 import { createXRStore } from "@react-three/xr";
@@ -505,7 +506,7 @@ const xrStore = createXRStore({
   hitTest: false,
   domOverlay: false,
   controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
-  customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: [] }
+  customSessionInit: { optionalFeatures: ["local-floor", "bounded-floor"] }
 });
 
 const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
@@ -554,8 +555,14 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (navigator.xr && navigator.xr.isSessionSupported) {
+    const isSecureContext = window.isSecureContext;
+    if ((import.meta as any).env.DEV) {
+      console.log("[VR] secureContext:", isSecureContext);
+      console.log("[VR] navigator.xr exists:", !!navigator.xr);
+    }
+    if (isSecureContext && navigator.xr && navigator.xr.isSessionSupported) {
       navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
+        if ((import.meta as any).env.DEV) console.log("[VR] immersive-vr supported:", supported);
         setVrStatus(supported ? "ready" : "unsupported");
       });
     } else {
@@ -587,30 +594,7 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (!Array.isArray(parsed)) throw new Error("Not an array");
 
-        let isValid = true;
-        for (const item of parsed) {
-          if (!item || typeof item !== "object") isValid = false;
-          else if (typeof item.id !== "string") isValid = false;
-          else if (!BRICK_TYPES.includes(item.type)) isValid = false;
-          else if (typeof item.color !== "string") isValid = false;
-          else if (
-            !Array.isArray(item.position) ||
-            item.position.length !== 3 ||
-            !item.position.every(
-              (n: any) => typeof n === "number" && Number.isFinite(n),
-            )
-          )
-            isValid = false;
-          else if (
-            typeof item.rotation !== "number" ||
-            !Number.isFinite(item.rotation)
-          )
-            isValid = false;
-
-          if (!isValid) break;
-        }
-
-        if (isValid) {
+        if (Array.isArray(parsed) && parsed.every(isValidBrickData)) {
           setBricks(parsed);
         } else {
           throw new Error("Invalid save data format");
@@ -676,23 +660,28 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
+                    if ((import.meta as any).env.DEV) console.log("[VR] enterVR requested");
                     setShowVRPrompt(false);
                     setIsFadingToVR(true);
                     setTimeout(() => {
                       try {
                         const p = xrStore.enterVR();
-                        if (p && p.catch) {
-                          p.catch(() => {
+                        if (p && typeof p.catch === "function") {
+                          p.then(() => {
+                            if ((import.meta as any).env.DEV) console.log("[VR] enterVR success");
+                          }).catch((err: any) => {
+                            if ((import.meta as any).env.DEV) console.error("[VR] enterVR failed:", err);
                             useLegoStore
                               .getState()
-                              .setToastMessage("VR failed to start.");
+                              .setToastMessage("VR failed to start. Browser may not support WebXR.");
                             setIsFadingToVR(false);
                           });
                         }
                       } catch (e) {
+                        if ((import.meta as any).env.DEV) console.error("[VR] enterVR exception:", e);
                         useLegoStore
                           .getState()
-                          .setToastMessage("VR failed to start.");
+                          .setToastMessage("VR failed to start. Browser may not support WebXR.");
                         setIsFadingToVR(false);
                       }
                       setTimeout(() => setIsFadingToVR(false), 2000);
@@ -715,7 +704,6 @@ export default function App() {
       >
         <Canvas
           shadows
-          gl={{ preserveDrawingBuffer: true }}
           camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
         >
           <Scene xrStore={xrStore} />
@@ -758,7 +746,7 @@ export default function App() {
                 </button>
               )}
               <div
-                className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate ${
+                className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate max-w-full whitespace-normal break-words leading-tight ${
                   vrStatus === "ready"
                     ? "bg-green-500/20 border-green-500/40 text-green-400"
                     : vrStatus === "pending"
@@ -770,7 +758,7 @@ export default function App() {
                   ? "VR Ready"
                   : vrStatus === "pending"
                     ? "Checking VR..."
-                    : "Open in Quest Browser for VR"}
+                    : "VR requires Meta Quest Browser or another WebXR-capable browser over HTTPS."}
               </div>
             </div>
           </div>
@@ -782,6 +770,7 @@ export default function App() {
                 onClick={() => {
                   setCameraMode("Pan");
                   setIsCameraLocked(false);
+                  setMode("Move");
                 }}
                 className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
                 title="Pan Camera"
@@ -792,6 +781,7 @@ export default function App() {
                 onClick={() => {
                   setCameraMode("Zoom");
                   setIsCameraLocked(false);
+                  setMode("Move");
                 }}
                 className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
                 title="Zoom Camera"
@@ -802,6 +792,7 @@ export default function App() {
                 onClick={() => {
                   setCameraMode("Orbit");
                   setIsCameraLocked(false);
+                  setMode("Move");
                 }}
                 className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
                 title="Orbit Camera"
@@ -817,6 +808,7 @@ export default function App() {
                   } else {
                     setIsCameraLocked(true);
                   }
+                  setMode("Move");
                 }}
                 className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
                 title={mode === "Move" ? "Lock Camera (\u2714 Required for drag-select)" : "Lock Camera"}
@@ -983,7 +975,10 @@ export default function App() {
                 {BRICK_TYPES.map((type) => (
                   <button
                     key={type}
-                    onClick={() => setSelectedType(type)}
+                    onClick={() => {
+                      setSelectedType(type);
+                      setMode("Build");
+                    }}
                     className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all ${
                       selectedType === type
                         ? "bg-accent text-white"

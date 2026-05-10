@@ -6,6 +6,7 @@ import {
   hasBrickAbove,
   getGroupBricks,
 } from "../Store";
+import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT } from "../constants";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
@@ -15,11 +16,6 @@ interface BrickInstancesProps {
   bricks: any[];
   isGhost?: boolean;
 }
-
-const MODULE_SIZE = 0.08;
-const BRICK_HEIGHT = 0.096;
-const STUD_RADIUS = 0.024;
-const STUD_HEIGHT = 0.016;
 
 export const BrickInstances: React.FC<BrickInstancesProps> = ({
   type,
@@ -51,7 +47,9 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === "contextmenu";
     if (mode === "Delete" || mode === "Move" || isSqueeze) {
-      e.stopPropagation();
+      if (mode === "Delete" || isSqueeze) {
+        e.stopPropagation();
+      }
       const instanceId = e.instanceId;
       if (instanceId !== undefined) {
         // If they click on body or stud, the IDs map predictably
@@ -86,7 +84,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               e.nativeEvent?.target?.setPointerCapture?.(
                 e.nativeEvent.pointerId,
               );
-              e.stopPropagation();
               useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
               window.dispatchEvent(
@@ -130,7 +127,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               e.nativeEvent?.target?.setPointerCapture?.(
                 e.nativeEvent.pointerId,
               );
-              e.stopPropagation();
               useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
               window.dispatchEvent(
@@ -145,18 +141,25 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 );
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
+                const wasAlreadySelected = useLegoStore.getState().movingBrickId === brick.id;
                 setMovingBrickId(brick.id);
                 e.nativeEvent?.target?.setPointerCapture?.(
                   e.nativeEvent.pointerId,
                 );
-                e.stopPropagation();
                 useLegoStore.getState().setIsDraggingBrick(false);
-                useLegoStore.getState().setJustSelectedBrick(true);
-                window.dispatchEvent(
-                  new CustomEvent("set-ghost-rotation", {
-                    detail: brick.rotation,
-                  }),
-                );
+                if (!wasAlreadySelected) {
+                  useLegoStore.getState().setJustSelectedBrick(true);
+                  window.dispatchEvent(
+                    new CustomEvent("set-ghost-rotation", {
+                      detail: brick.rotation,
+                    }),
+                  );
+                  window.dispatchEvent(
+                    new CustomEvent("set-ghost-position", {
+                      detail: brick.position,
+                    }),
+                  );
+                }
               }
             }
           }
@@ -300,7 +303,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         args={[bodyGeom, material, bodyCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
-        frustumCulled={false}
         onPointerDown={isGhost ? undefined : handlePointerDown}
         onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}
@@ -312,7 +314,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         args={[studGeom, material, studCapacity]}
         castShadow={!isGhost}
         receiveShadow={!isGhost}
-        frustumCulled={false}
         onPointerDown={isGhost ? undefined : handlePointerDown}
         onContextMenu={isGhost ? undefined : handlePointerDown}
         raycast={isGhost ? () => null : undefined}

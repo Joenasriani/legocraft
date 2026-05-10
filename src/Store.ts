@@ -1,7 +1,9 @@
 import { create } from "zustand";
+import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT, HALF_MODULE } from "./constants";
 
 export type BrickType = "1x1" | "1x2" | "2x2" | "2x3" | "2x4";
 export const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
+export const PLACEMENT_EPSILON = 0.002;
 
 export interface BrickData {
   id: string;
@@ -26,22 +28,22 @@ export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
     Math.min(a1.maxZ, a2.maxZ) - Math.max(a1.minZ, a2.minZ),
   );
 
-  if (dy > 0.096 + 0.001) return false; // BRICK_HEIGHT
+  if (dy > BRICK_HEIGHT + PLACEMENT_EPSILON) return false;
 
-  if (dy < 0.001) {
+  if (dy < PLACEMENT_EPSILON) {
     const touchX =
-      Math.abs(a1.maxX - a2.minX) < 0.001 ||
-      Math.abs(a2.maxX - a1.minX) < 0.001;
+      Math.abs(a1.maxX - a2.minX) < PLACEMENT_EPSILON ||
+      Math.abs(a2.maxX - a1.minX) < PLACEMENT_EPSILON;
     const touchZ =
-      Math.abs(a1.maxZ - a2.minZ) < 0.001 ||
-      Math.abs(a2.maxZ - a1.minZ) < 0.001;
+      Math.abs(a1.maxZ - a2.minZ) < PLACEMENT_EPSILON ||
+      Math.abs(a2.maxZ - a1.minZ) < PLACEMENT_EPSILON;
     return (
-      (overlapX > 0.001 && touchZ) ||
-      (overlapZ > 0.001 && touchX) ||
-      (overlapX > 0.001 && overlapZ > 0.001)
+      (overlapX > PLACEMENT_EPSILON && touchZ) ||
+      (overlapZ > PLACEMENT_EPSILON && touchX) ||
+      (overlapX > PLACEMENT_EPSILON && overlapZ > PLACEMENT_EPSILON)
     );
   } else {
-    return overlapX > 0.001 && overlapZ > 0.001;
+    return overlapX > PLACEMENT_EPSILON && overlapZ > PLACEMENT_EPSILON;
   }
 };
 
@@ -132,8 +134,14 @@ export const getBrickAABB = (brick: Omit<BrickData, "color">): AABB => {
   };
 };
 
-export const getPresetInfo = (presetName: string) => {
-  const bricks = PRESETS[presetName as PresetName];
+export function getActivePresetBricks(presetName: ActivePresetName | string | null, clipboardBricks?: BrickData[]) {
+  if (!presetName) return null;
+  if (presetName === "clipboard") return clipboardBricks ?? [];
+  return PRESETS[presetName as PresetName] ?? null;
+}
+
+export const getPresetInfo = (presetName: string, clipboardBricks?: BrickData[]) => {
+  const bricks = getActivePresetBricks(presetName, clipboardBricks);
   if (!bricks) return { cx: 0, cz: 0, w: 1, d: 1 };
   
   const validBricks = bricks.filter(isValidBrickData);
@@ -159,7 +167,7 @@ export const getPresetInfo = (presetName: string) => {
 };
 
 
-export const doAABBsOverlap = (a: AABB, b: AABB, epsilon: number = 0.001) => {
+export const doAABBsOverlap = (a: AABB, b: AABB, epsilon: number = PLACEMENT_EPSILON) => {
   return (
     a.minX < b.maxX - epsilon &&
     a.maxX > b.minX + epsilon &&
@@ -173,7 +181,7 @@ export const checkPlacementValid = (
   ghostData: Omit<BrickData, "color">,
   moduleSize: number,
   brickHeight: number,
-  epsilon: number = 0.01,
+  epsilon: number = PLACEMENT_EPSILON,
   ignoreBrickId?: string,
 ) => {
   const ghostAABB = getBrickAABB(ghostData);
@@ -184,7 +192,7 @@ export const checkPlacementValid = (
       return false;
     if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
     const bAABB = getBrickAABB(b);
-    return doAABBsOverlap(ghostAABB, bAABB, 0.001);
+    return doAABBsOverlap(ghostAABB, bAABB);
   });
 
   if (isOverlap) return { valid: false, reason: "overlap" };
@@ -201,7 +209,7 @@ export const checkPlacementValid = (
     const dy = ghostData.position[1] - b.position[1];
     if (Math.abs(dy - brickHeight) < epsilon) {
       const bAABB = getBrickAABB(b);
-      return doAABBsOverlap(ghostAABB, bAABB, 0.001);
+      return doAABBsOverlap(ghostAABB, bAABB);
     }
     return false;
   });
@@ -216,7 +224,7 @@ export const hasBrickAbove = (
   bricks: Omit<BrickData, "color">[],
   moduleSize: number,
   brickHeight: number,
-  epsilon: number = 0.01,
+  epsilon: number = PLACEMENT_EPSILON,
 ) => {
   const targetTopY = brick.position[1] + brickHeight;
 
@@ -231,7 +239,7 @@ export const hasBrickAbove = (
     const bAABB = getBrickAABB(b);
 
     // 2. Do they truly overlap?
-    if (doAABBsOverlap(targetAABB, bAABB, 0.001)) {
+    if (doAABBsOverlap(targetAABB, bAABB)) {
       // 3. Check if removing selected brick removes the other brick's valid support
       const otherSupports = bricks.filter(
         (other) =>
@@ -242,7 +250,7 @@ export const hasBrickAbove = (
 
       let hasAlternateSupport = false;
       for (const other of otherSupports) {
-        if (doAABBsOverlap(bAABB, getBrickAABB(other), 0.001)) {
+        if (doAABBsOverlap(bAABB, getBrickAABB(other))) {
           hasAlternateSupport = true;
           break;
         }
@@ -262,7 +270,7 @@ export const checkStructureValid = (
   presetBricks: Omit<BrickData, "color">[],
   moduleSize: number,
   brickHeight: number,
-  epsilon: number = 0.01,
+  epsilon: number = PLACEMENT_EPSILON,
   presetName?: string,
 ): { valid: boolean; reason?: string } => {
   if (presetBricks.length === 0)
@@ -275,7 +283,7 @@ export const checkStructureValid = (
     const hasWorldOverlap = bricks.some(
       (b) =>
         Math.abs(b.position[1] - pb.position[1]) < epsilon &&
-        doAABBsOverlap(pbAABB, getBrickAABB(b), 0.001),
+        doAABBsOverlap(pbAABB, getBrickAABB(b)),
     );
     if (hasWorldOverlap) return { valid: false, reason: "overlap" };
 
@@ -284,7 +292,7 @@ export const checkStructureValid = (
       (otherPb) =>
         otherPb.id !== pb.id &&
         Math.abs(otherPb.position[1] - pb.position[1]) < epsilon &&
-        doAABBsOverlap(pbAABB, getBrickAABB(otherPb), 0.001),
+        doAABBsOverlap(pbAABB, getBrickAABB(otherPb)),
     );
     if (hasInternalOverlap) {
       return { valid: false, reason: "overlap" };
@@ -296,7 +304,7 @@ export const checkStructureValid = (
         if (b.id === pb.id) return false;
         const dy = pb.position[1] - b.position[1];
         if (Math.abs(dy - brickHeight) < epsilon) {
-          return doAABBsOverlap(pbAABB, getBrickAABB(b), 0.001);
+          return doAABBsOverlap(pbAABB, getBrickAABB(b));
         }
         return false;
       });
@@ -319,8 +327,8 @@ export type PresetName =
   | "sheep"
   | "car"
   | "road"
-  | "mountain"
-  | "_clipboard";
+  | "mountain";
+export type ActivePresetName = PresetName | "clipboard";
 export type AppMode = "Build" | "Move" | "Delete";
 export type CameraMode = "Orbit" | "Pan" | "Zoom";
 
@@ -350,6 +358,8 @@ interface LegoStore {
   multiSelectedBrickIds: string[];
   setMultiSelectedBrickIds: (ids: string[]) => void;
   toggleMultiSelectBrickId: (id: string) => void;
+  clipboardBricks: BrickData[];
+  setClipboardBricks: (bricks: BrickData[]) => void;
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
@@ -369,9 +379,11 @@ interface LegoStore {
   redo: () => void;
   clearAll: () => void;
   setBricks: (bricks: BrickData[]) => void;
-  loadPreset: (presetName: PresetName | null) => void;
+  loadPreset: (presetName: ActivePresetName | null) => void;
   commitPreset: (position: [number, number, number], rotation: number) => void;
-  activePreset: PresetName | null;
+  activePreset: ActivePresetName | null;
+  vrMenuVisible: boolean;
+  setVrMenuVisible: (visible: boolean) => void;
   toastTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
@@ -386,9 +398,8 @@ const COLORS = [
   "#9CA3AF", // Grey
 ];
 
-// Presets using accurate sizing
-const ms = 0.08; // MODULE_SIZE
-const bh = 0.096; // BRICK_HEIGHT
+const ms = MODULE_SIZE;
+const bh = BRICK_HEIGHT;
 
 const createBrick = (
   type: BrickType,
@@ -632,8 +643,42 @@ export const PRESETS: Record<PresetName, BrickData[]> = {
   round_water_well: generateRoundWaterWell(),
   pine_tree: generatePineTree(),
   walk_in_castle: generateWalkInCastle(),
-  _clipboard: [],
 };
+
+let _saveTimer: ReturnType<typeof setTimeout> | null = null;
+let _pendingBricks: BrickData[] | null = null;
+
+const flushSave = () => {
+  if (_saveTimer) {
+    clearTimeout(_saveTimer);
+    _saveTimer = null;
+  }
+  if (_pendingBricks !== null) {
+    localStorage.setItem("brickxr-save", JSON.stringify(_pendingBricks));
+    _pendingBricks = null;
+  }
+};
+
+const scheduleSave = (bricks: BrickData[], immediate: boolean = false) => {
+  _pendingBricks = bricks;
+  if (immediate) {
+    flushSave();
+    return;
+  }
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    flushSave();
+  }, 500);
+};
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeunload", flushSave);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      flushSave();
+    }
+  });
+}
 
 export const useLegoStore = create<LegoStore>((set, get) => ({
   bricks: [],
@@ -642,6 +687,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   selectedType: "2x2",
   selectedColor: COLORS[0],
   activePreset: null,
+  vrMenuVisible: false,
   undoStack: [],
   redoStack: [],
   toastMessage: null,
@@ -649,6 +695,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   movingBrickId: null,
   isDraggingBrick: false,
   justSelectedBrick: false,
+  clipboardBricks: [],
+  setClipboardBricks: (bricks) => set({ clipboardBricks: bricks }),
   isCameraLocked: false,
 
   setToastMessage: (msg) => {
@@ -679,7 +727,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     // Save to local storage
-    localStorage.setItem("brickxr-save", JSON.stringify([...bricks, newBrick]));
+    scheduleSave([...bricks, newBrick]);
   },
 
   removeBrick: (id) => {
@@ -705,7 +753,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       bricks: newBricks,
     });
 
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks);
   },
 
   selectionMode: "Solo",
@@ -750,7 +798,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: newBricks,
     });
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks);
   },
 
   updateBricks: (updates) => {
@@ -767,7 +815,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       bricks: newBricks,
     });
 
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks);
   },
 
   updateBrick: (id, updates) => {
@@ -782,7 +830,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       bricks: newBricks,
     });
 
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks);
   },
 
   setMode: (mode) =>
@@ -864,7 +912,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       justSelectedBrick: false,
     });
 
-    localStorage.setItem("brickxr-save", JSON.stringify(prevState.bricks));
+    scheduleSave(prevState.bricks);
   },
 
   redo: () => {
@@ -884,8 +932,10 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       justSelectedBrick: false,
     });
 
-    localStorage.setItem("brickxr-save", JSON.stringify(nextState.bricks));
+    scheduleSave(nextState.bricks);
   },
+  
+  setVrMenuVisible: (visible) => set({ vrMenuVisible: visible }),
 
   clearAll: () => {
     const { bricks, undoStack } = get();
@@ -894,12 +944,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: [],
     });
-    localStorage.removeItem("brickxr-save");
+    scheduleSave([], true);
   },
 
   setBricks: (newBricks) => {
     set({ bricks: newBricks, undoStack: [], redoStack: [] });
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks, true);
   },
 
   loadPreset: (presetName) => {
@@ -907,17 +957,20 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   },
 
   commitPreset: (position, rotation = 0) => {
-    const { activePreset, bricks, undoStack } = get();
+    const { activePreset, bricks, undoStack, clipboardBricks } = get();
     if (!activePreset) return;
 
-    const validPresetBricks = PRESETS[activePreset].filter((b) => {
+    const presetSource = getActivePresetBricks(activePreset, clipboardBricks);
+    if (!presetSource) return;
+
+    const validPresetBricks = presetSource.filter((b) => {
       const valid = isValidBrickData(b);
       if (!valid)
         console.warn(`Malformed brick found in preset ${activePreset}:`, b);
       return valid;
     });
 
-    const info = getPresetInfo(activePreset);
+    const info = getPresetInfo(activePreset, clipboardBricks);
 
     const groupId = crypto.randomUUID();
     const presetBricks = validPresetBricks.map((b) => {
@@ -952,7 +1005,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     // STRUCTURE PLACEMENT VALIDATION
-    const check = checkStructureValid(bricks, presetBricks, ms, bh, 0.01);
+    const check = checkStructureValid(bricks, presetBricks, ms, bh, PLACEMENT_EPSILON);
     if (!check.valid) {
       console.warn("Preset placement blocked:", check.reason);
       return;
@@ -965,7 +1018,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       bricks: newBricks,
     };
     
-    if (activePreset === "_clipboard") {
+    if (activePreset === "clipboard") {
       updates.activePreset = null;
       updates.mode = "Move";
       updates.selectionMode = "Multi";
@@ -973,7 +1026,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     }
 
     set(updates);
-    localStorage.setItem("brickxr-save", JSON.stringify(newBricks));
+    scheduleSave(newBricks);
   },
 }));
 

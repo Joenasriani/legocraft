@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import * as THREE from 'three';
 import { useLegoStore, BrickType, getBrickDimensions } from '../Store';
+import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT } from '../constants';
 
 interface LegoBrickProps {
   id: string;
@@ -11,11 +12,6 @@ interface LegoBrickProps {
   isPlacementGhost?: boolean;
   hideMesh?: boolean;
 }
-
-const MODULE_SIZE = 0.08; // 8cm per module - better for hand tracking
-const BRICK_HEIGHT = 0.096; // Standard lego proportion (1.2x width)
-const STUD_RADIUS = 0.024;
-const STUD_HEIGHT = 0.016;
 
 export const LegoBrick: React.FC<LegoBrickProps> = ({ 
   id, type, color, position, rotation, isPlacementGhost, hideMesh 

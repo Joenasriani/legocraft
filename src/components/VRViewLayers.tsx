@@ -34,11 +34,29 @@ export const HumanViewLayer = ({
 
   const isValidTarget = (obj: THREE.Object3D) => {
     let curr: THREE.Object3D | null = obj;
+    let isMenu = false;
     while (curr) {
-      if (curr.userData?.isGhost || curr.name?.includes("ghost")) return false;
+      if (
+        curr.userData?.isGhost ||
+        curr.name?.includes("ghost") ||
+        curr.name?.startsWith("presetPreview") ||
+        curr.name === "GridHelper" ||
+        curr.name === "Grid"
+      ) {
+        return false;
+      }
+      if (curr.userData?.isVRMenuItem) isMenu = true;
       curr = curr.parent;
     }
-    return true;
+    
+    // VR target priority
+    const menuVisible = useLegoStore.getState().vrMenuVisible;
+    if (menuVisible) {
+      return isMenu;
+    } else {
+      if (isMenu) return false;
+      return true;
+    }
   };
 
   const laserRef = useRef<THREE.Mesh>(null);
@@ -55,44 +73,10 @@ export const HumanViewLayer = ({
     n: THREE.Vector3;
   } | null>(null);
 
-  const leftControllerIndex = useRef<number | null>(null);
-  const rightControllerIndex = useRef<number | null>(null);
+  const latestValidPlacement = useRef<{p: THREE.Vector3, n: THREE.Vector3} | null>(null);
 
-  useEffect(() => {
-    const handleConnected = (index: number) => (event: any) => {
-      const handedness = event.data?.handedness;
-      if (handedness === 'left') leftControllerIndex.current = index;
-      if (handedness === 'right') rightControllerIndex.current = index;
-      console.log(`[XR] Controller ${index} connected:`, handedness, event.data?.profiles);
-    };
-    
-    const handleDisconnected = (index: number) => () => {
-      if (leftControllerIndex.current === index) leftControllerIndex.current = null;
-      if (rightControllerIndex.current === index) rightControllerIndex.current = null;
-    };
-
-    const c0 = gl.xr.getController(0);
-    const cb0_conn = handleConnected(0);
-    const cb0_disc = handleDisconnected(0);
-    c0.addEventListener('connected', cb0_conn);
-    c0.addEventListener('disconnected', cb0_disc);
-
-    const c1 = gl.xr.getController(1);
-    const cb1_conn = handleConnected(1);
-    const cb1_disc = handleDisconnected(1);
-    c1.addEventListener('connected', cb1_conn);
-    c1.addEventListener('disconnected', cb1_disc);
-
-    return () => {
-      c0.removeEventListener('connected', cb0_conn);
-      c0.removeEventListener('disconnected', cb0_disc);
-      c1.removeEventListener('connected', cb1_conn);
-      c1.removeEventListener('disconnected', cb1_disc);
-    };
-  }, [gl.xr]);
-
-  useFrame(() => {
-    const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
+  useFrame((state, delta) => {
+    const session = gl.xr.getSession();
     if (!session || !sceneGroupRef.current) return;
 
     let leftController: THREE.Group | null = null;
@@ -100,22 +84,20 @@ export const HumanViewLayer = ({
     let leftInput: XRInputSource | null = null;
     let rightInput: XRInputSource | null = null;
 
-    if (leftControllerIndex.current !== null) {
-      leftController = gl.xr.getController(leftControllerIndex.current);
-    }
-    if (rightControllerIndex.current !== null) {
-      rightController = gl.xr.getController(rightControllerIndex.current);
-    }
-
-    for (const source of session.inputSources) {
+    const inputSourcesArray = Array.from(session.inputSources);
+    for (const source of inputSourcesArray) {
       if (!source) continue;
-      if (source.handedness === "left") leftInput = source;
-      if (source.handedness === "right") rightInput = source;
+      if (source.handedness === 'left') leftInput = source;
+      if (source.handedness === 'right') rightInput = source;
     }
+    const rightIdx = inputSourcesArray.findIndex(s => s?.handedness === 'right');
+    const leftIdx = inputSourcesArray.findIndex(s => s?.handedness === 'left');
+    if (rightIdx >= 0) rightController = gl.xr.getController(rightIdx);
+    if (leftIdx >= 0) leftController = gl.xr.getController(leftIdx);
 
     // Handle Locomotion (Thumbsticks)
-    const dt = 1 / 60; // Approximate
-    const menuVisible = (window as any).__vrMenuVisible;
+    const dt = Math.min(delta, 0.05);
+    const menuVisible = useLegoStore.getState().vrMenuVisible;
 
     if (leftInput && leftInput.gamepad && !menuVisible) {
       const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
@@ -239,19 +221,45 @@ export const HumanViewLayer = ({
                 .normalize()
             : new THREE.Vector3(0, 1, 0);
 
-          updateGhostPosition(unscaledP3, normal);
+          let isValidPlacement = true;
+          let rejectReason = "";
+          // Reject side placement for Build mode
+          if (mode === "Build" && Math.abs(normal.y) < 0.5) {
+            isValidPlacement = false;
+            rejectReason = "Side placement blocked in Build mode";
+          }
+
+          if (isValidPlacement) {
+            latestValidPlacement.current = { p: unscaledP3, n: normal };
+            updateGhostPosition(unscaledP3, normal);
+          } else {
+            latestValidPlacement.current = null;
+          }
 
           if (triggerPressed && !wasTriggerPressed.current) {
-            window.dispatchEvent(
-              new CustomEvent("vr-controller-action", {
-                detail: {
-                  type: "trigger",
-                  action: "commit",
-                  point: unscaledP3,
-                  normal: normal,
-                },
-              }),
-            );
+            if (latestValidPlacement.current) {
+              if ((import.meta as any).env.DEV) {
+                console.log("[VR] Target count:", targets.length);
+                const activeNames = targets.filter(t => isValidTarget(t)).map(t => t.name).filter(Boolean);
+                console.log("[VR] Active target names:", Array.from(new Set(activeNames)));
+                console.log("[VR] Commit trigger. Point:", latestValidPlacement.current.p, "Normal:", latestValidPlacement.current.n, "Object:", hit.object?.name);
+              }
+              window.dispatchEvent(
+                new CustomEvent("vr-controller-action", {
+                  detail: {
+                    type: "trigger",
+                    action: "commit",
+                    point: latestValidPlacement.current.p,
+                    normal: latestValidPlacement.current.n,
+                  },
+                }),
+              );
+            } else {
+              if ((import.meta as any).env.DEV) {
+                console.log("[VR] Placement rejected:", rejectReason);
+              }
+              useLegoStore.getState().setToastMessage("Invalid placement surface.");
+            }
           }
 
           if (actionPressed && !wasActionPressed.current) {
