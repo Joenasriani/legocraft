@@ -20,6 +20,8 @@ body {
   overflow: hidden;
   background-color: var(--color-bg);
   font-family: var(--font-sans);
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 .glass-panel {

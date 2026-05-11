@@ -1,13 +1,37 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Billboard, Text, Box } from "@react-three/drei";
 import * as THREE from "three";
 import { useLegoStore } from "../Store";
+import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
 const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, handleAction }: any) => {
   const meshRef = useRef<THREE.Mesh>(null);
+  const textureRef = useRef<THREE.CanvasTexture | null>(null);
+
+  const labelTexture = useMemo(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = `bold 64px sans-serif`;
+      
+      // We'll update the texture when hovered changes by re-running this if we want,
+      // but for simplicity let's just make it white and use material color.
+      // Actually material color multiplies with texture.
+      // Let's make the texture have the text in white on transparent.
+      ctx.fillStyle = "white";
+      ctx.fillText(seg.label, canvas.width / 2, canvas.height / 2);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    textureRef.current = tex;
+    return tex;
+  }, [seg.label]);
 
   React.useEffect(() => {
     if (meshRef.current) {
@@ -24,23 +48,23 @@ const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, hand
   }, [seg, handleAction]);
 
   return (
-    <>
-      <Box
+    <group>
+      <mesh
         ref={meshRef}
         name="VRMenuItem"
-        args={[boxWidth, boxHeight, depth]}
-        material-color={isHovered ? "#ffffff" : seg.color}
-      />
-      <Text
-        position={[0, 0, depth + 0.001]}
-        fontSize={fontSize}
-        color={isHovered ? seg.color : "white"}
-        anchorX="center"
-        anchorY="middle"
       >
-        {seg.label}
-      </Text>
-    </>
+        <boxGeometry args={[boxWidth, boxHeight, depth]} />
+        <meshStandardMaterial color={isHovered ? "#ffffff" : seg.color} />
+      </mesh>
+      <mesh position={[0, 0, depth / 2 + 0.002]}>
+        <planeGeometry args={[boxWidth * 0.9, boxHeight * 0.9]} />
+        <meshBasicMaterial 
+          map={labelTexture} 
+          transparent={true} 
+          color={isHovered ? seg.color : "white"}
+        />
+      </mesh>
+    </group>
   );
 };
 
@@ -149,7 +173,19 @@ export const VRRadialMenu = ({
   const boxWidth = ((radius * Math.PI) / 3) * 1.5;
   const boxHeight = vrScale === "human" ? 0.06 : 1.0;
 
+  const showXRPerf = useLegoStore((s) => s.showXRPerf);
+  const setShowXRPerf = useLegoStore((s) => s.setShowXRPerf);
+
   const handleAction = (action: () => void) => {
+    // Try to trigger haptic feedback on right controller if selecting
+    const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
+    if (session) {
+      for (const source of session.inputSources) {
+        if (source.handedness === "right") {
+          triggerHaptics(source, HapticType.UI_CLICK);
+        }
+      }
+    }
     action();
     setVisible(false);
   };
@@ -159,19 +195,19 @@ export const VRRadialMenu = ({
       label: "BUILD",
       color: "#00e676",
       action: () => setMode("Build"),
-      theta: Math.PI / 2,
-    },
-    {
-      label: "DELETE",
-      color: "#ff4757",
-      action: () => setMode("Delete"),
-      theta: Math.PI, // Left
+      theta: Math.PI / 2, // Top
     },
     {
       label: "MOVE",
       color: "#4da6ff",
       action: () => setMode("Move"),
-      theta: 0, // Right
+      theta: Math.PI / 6, // Top Right
+    },
+    {
+      label: "RESET POS",
+      color: "#9b59b6",
+      action: () => window.dispatchEvent(new CustomEvent("vr-recenter")),
+      theta: -Math.PI / 6, // Bottom Right
     },
     {
       label: clearArmed ? "CONFIRM" : "CLEAR",
@@ -187,13 +223,32 @@ export const VRRadialMenu = ({
       },
       theta: -Math.PI / 2, // Down
     },
+    {
+      label: showXRPerf ? "HIDE STATS" : "SHOW STATS",
+      color: "#ffb8b8",
+      action: () => setShowXRPerf(!showXRPerf),
+      theta: -Math.PI * 5 / 6, // Bottom Left
+    },
+    {
+      label: "DELETE",
+      color: "#ff4757",
+      action: () => setMode("Delete"),
+      theta: Math.PI * 5 / 6, // Top Left
+    },
   ];
+
+  const billboardRef = useRef<THREE.Group>(null);
+  useFrame((state) => {
+    if (billboardRef.current && visible) {
+      billboardRef.current.quaternion.copy(state.camera.quaternion);
+    }
+  });
 
   if (!visible) return null;
 
   return (
     <group ref={groupRef}>
-      <Billboard follow={true} lockX={false} lockY={false} lockZ={false}>
+      <group ref={billboardRef}>
         {SEGMENTS.map((seg, i) => {
           const x = Math.cos(seg.theta) * radius;
           const y = Math.sin(seg.theta) * radius;
@@ -213,7 +268,7 @@ export const VRRadialMenu = ({
             </group>
           );
         })}
-      </Billboard>
+      </group>
     </group>
   );
 };

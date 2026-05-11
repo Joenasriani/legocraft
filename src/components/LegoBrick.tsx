@@ -11,10 +11,11 @@ interface LegoBrickProps {
   rotation: number;
   isPlacementGhost?: boolean;
   hideMesh?: boolean;
+  opacity?: number;
 }
 
 export const LegoBrick: React.FC<LegoBrickProps> = ({ 
-  id, type, color, position, rotation, isPlacementGhost, hideMesh 
+  id, type, color, position, rotation, isPlacementGhost, hideMesh, opacity = 0.3
 }) => {
   const { w, d } = getBrickDimensions(type);
   const [isGrabbed, setIsGrabbed] = useState(false);
@@ -76,7 +77,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                 roughness={0.1} 
                 metalness={0.1}
                 transparent={isPlacementGhost}
-                opacity={isPlacementGhost ? 0.3 : 1}
+                opacity={isPlacementGhost ? opacity : 1}
                 depthWrite={!isPlacementGhost}
                 depthTest={true}
                 toneMapped={!isPlacementGhost}
@@ -100,7 +101,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                     roughness={0.1} 
                     metalness={0.1}
                     transparent={isPlacementGhost}
-                    opacity={isPlacementGhost ? 0.3 : 1}
+                    opacity={isPlacementGhost ? opacity : 1}
                     depthWrite={!isPlacementGhost}
                     depthTest={true}
                     toneMapped={!isPlacementGhost}

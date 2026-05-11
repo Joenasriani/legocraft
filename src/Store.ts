@@ -1,5 +1,11 @@
 import { create } from "zustand";
-import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT, HALF_MODULE } from "./constants";
+import {
+  MODULE_SIZE,
+  BRICK_HEIGHT,
+  STUD_RADIUS,
+  STUD_HEIGHT,
+  HALF_MODULE,
+} from "./constants";
 
 export type BrickType = "1x1" | "1x2" | "2x2" | "2x3" | "2x4";
 export const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
@@ -134,22 +140,30 @@ export const getBrickAABB = (brick: Omit<BrickData, "color">): AABB => {
   };
 };
 
-export function getActivePresetBricks(presetName: ActivePresetName | string | null, clipboardBricks?: BrickData[]) {
+export function getActivePresetBricks(
+  presetName: ActivePresetName | string | null,
+  clipboardBricks?: BrickData[],
+) {
   if (!presetName) return null;
   if (presetName === "clipboard") return clipboardBricks ?? [];
   return PRESETS[presetName as PresetName] ?? null;
 }
 
-export const getPresetInfo = (presetName: string, clipboardBricks?: BrickData[]) => {
+export const getPresetInfo = (
+  presetName: string,
+  clipboardBricks?: BrickData[],
+) => {
   const bricks = getActivePresetBricks(presetName, clipboardBricks);
   if (!bricks) return { cx: 0, cz: 0, w: 1, d: 1 };
-  
+
   const validBricks = bricks.filter(isValidBrickData);
   if (validBricks.length === 0) return { cx: 0, cz: 0, w: 1, d: 1 };
 
-  let minX = Infinity, maxX = -Infinity;
-  let minZ = Infinity, maxZ = -Infinity;
-  
+  let minX = Infinity,
+    maxX = -Infinity;
+  let minZ = Infinity,
+    maxZ = -Infinity;
+
   for (const b of validBricks) {
     const aabb = getBrickAABB(b);
     if (aabb.minX < minX) minX = aabb.minX;
@@ -157,7 +171,7 @@ export const getPresetInfo = (presetName: string, clipboardBricks?: BrickData[])
     if (aabb.minZ < minZ) minZ = aabb.minZ;
     if (aabb.maxZ > maxZ) maxZ = aabb.maxZ;
   }
-  
+
   const cx = (minX + maxX) / 2;
   const cz = (minZ + maxZ) / 2;
   const w = Math.round((maxX - minX) / 0.08);
@@ -166,8 +180,11 @@ export const getPresetInfo = (presetName: string, clipboardBricks?: BrickData[])
   return { cx, cz, w, d };
 };
 
-
-export const doAABBsOverlap = (a: AABB, b: AABB, epsilon: number = PLACEMENT_EPSILON) => {
+export const doAABBsOverlap = (
+  a: AABB,
+  b: AABB,
+  epsilon: number = PLACEMENT_EPSILON,
+) => {
   return (
     a.minX < b.maxX - epsilon &&
     a.maxX > b.minX + epsilon &&
@@ -360,6 +377,32 @@ interface LegoStore {
   toggleMultiSelectBrickId: (id: string) => void;
   clipboardBricks: BrickData[];
   setClipboardBricks: (bricks: BrickData[]) => void;
+
+  // VR Locomotion Settings
+  snapTurnAngle: number;
+  setSnapTurnAngle: (angle: number) => void;
+  movementSpeed: number;
+  setMovementSpeed: (speed: number) => void;
+  locomotionMode: "Stationary" | "Smooth";
+  setLocomotionMode: (mode: "Stationary" | "Smooth") => void;
+
+  // VR Tools Settings
+  showXRPerf: boolean;
+  setShowXRPerf: (show: boolean) => void;
+  showXROnboarding: boolean;
+  setShowXROnboarding: (show: boolean) => void;
+
+  // Event Triggers
+  rotateGhostTrigger: number;
+  triggerRotateGhost: () => void;
+  cameraZoomTrigger: number;
+  cameraZoomDirection: "in" | "out" | null;
+  triggerCameraZoom: (direction: "in" | "out") => void;
+  cameraRecenterTrigger: number;
+  triggerCameraRecenter: () => void;
+  screenshotTrigger: number;
+  triggerScreenshot: () => void;
+
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
@@ -699,6 +742,38 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setClipboardBricks: (bricks) => set({ clipboardBricks: bricks }),
   isCameraLocked: false,
 
+  snapTurnAngle: 45,
+  setSnapTurnAngle: (snapTurnAngle) => set({ snapTurnAngle }),
+  movementSpeed: 1.5,
+  setMovementSpeed: (movementSpeed) => set({ movementSpeed }),
+  locomotionMode: "Stationary",
+  setLocomotionMode: (locomotionMode) => set({ locomotionMode }),
+
+  showXRPerf: false,
+  setShowXRPerf: (showXRPerf) => set({ showXRPerf }),
+  showXROnboarding: true,
+  setShowXROnboarding: (showXROnboarding) => set({ showXROnboarding }),
+
+  // Event Triggers
+  rotateGhostTrigger: 0,
+  triggerRotateGhost: () =>
+    set((state) => ({ rotateGhostTrigger: state.rotateGhostTrigger + 1 })),
+  cameraZoomTrigger: 0,
+  cameraZoomDirection: null,
+  triggerCameraZoom: (direction) =>
+    set((state) => ({
+      cameraZoomTrigger: state.cameraZoomTrigger + 1,
+      cameraZoomDirection: direction,
+    })),
+  cameraRecenterTrigger: 0,
+  triggerCameraRecenter: () =>
+    set((state) => ({
+      cameraRecenterTrigger: state.cameraRecenterTrigger + 1,
+    })),
+  screenshotTrigger: 0,
+  triggerScreenshot: () =>
+    set((state) => ({ screenshotTrigger: state.screenshotTrigger + 1 })),
+
   setToastMessage: (msg) => {
     const { toastTimeoutId } = get();
     if (toastTimeoutId) clearTimeout(toastTimeoutId);
@@ -934,7 +1009,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     scheduleSave(nextState.bricks);
   },
-  
+
   setVrMenuVisible: (visible) => set({ vrMenuVisible: visible }),
 
   clearAll: () => {
@@ -1005,7 +1080,13 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     });
 
     // STRUCTURE PLACEMENT VALIDATION
-    const check = checkStructureValid(bricks, presetBricks, ms, bh, PLACEMENT_EPSILON);
+    const check = checkStructureValid(
+      bricks,
+      presetBricks,
+      ms,
+      bh,
+      PLACEMENT_EPSILON,
+    );
     if (!check.valid) {
       console.warn("Preset placement blocked:", check.reason);
       return;
@@ -1017,12 +1098,12 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: newBricks,
     };
-    
+
     if (activePreset === "clipboard") {
       updates.activePreset = null;
       updates.mode = "Move";
       updates.selectionMode = "Multi";
-      updates.multiSelectedBrickIds = presetBricks.map(b => b.id);
+      updates.multiSelectedBrickIds = presetBricks.map((b) => b.id);
     }
 
     set(updates);

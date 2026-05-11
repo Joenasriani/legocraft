@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html, Text } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -21,12 +21,20 @@ import {
   doAABBsOverlap,
 } from "../Store";
 
-import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT, HALF_MODULE } from "../constants";
+import {
+  MODULE_SIZE,
+  BRICK_HEIGHT,
+  STUD_RADIUS,
+  STUD_HEIGHT,
+  HALF_MODULE,
+} from "../constants";
 
 import { VRRadialMenu } from "./VRRadialMenu";
 import { vrTargetManager } from "../lib/vrTargets";
 
 import { HumanViewLayer } from "./VRViewLayers";
+import { VRStats } from "./VRStats";
+import { VROnboarding } from "./VROnboarding";
 
 export type VRScaleMode = "human";
 
@@ -47,9 +55,10 @@ const VRDebugVisibilityLayer = () => {
         <meshBasicMaterial color="#333333" wireframe={true} />
       </mesh>
       <group position={[0, 1.5, -2]}>
-        <Text fontSize={0.1} color="white">
-          XR rendering active
-        </Text>
+        <mesh>
+          <planeGeometry args={[1, 0.2]} />
+          <meshBasicMaterial color="black" transparent opacity={0.5} />
+        </mesh>
       </group>
     </group>
   );
@@ -71,7 +80,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if ((child as THREE.Mesh).isMesh && (child as any).material) {
         let mat = (child as any).material;
         if (Array.isArray(mat)) {
-          mat.forEach(m => { m.needsUpdate = true; });
+          mat.forEach((m) => {
+            m.needsUpdate = true;
+          });
         } else {
           mat.needsUpdate = true;
         }
@@ -97,10 +108,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (!active) {
         setVrScale("human");
         setVrReady(true);
-        gl.setPixelRatio(window.devicePixelRatio);
       } else {
         setVrReady(false);
-        gl.setPixelRatio(1); // Standard VR performance optimization
       }
     });
   }, [xrStore, gl]);
@@ -115,7 +124,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         try {
           gl.compile(scene, camera);
         } catch (e) {
-          console.warn('[BrickXR] VR shader pre-compile warning:', e);
+          console.warn("[BrickXR] VR shader pre-compile warning:", e);
         }
 
         const targets = vrTargetManager.getValidTargets();
@@ -126,11 +135,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           const sess = gl.xr.getSession();
           if (sess) {
             hasTrackedController = Array.from(sess.inputSources).some(
-              (source) => source.targetRayMode === "tracked-pointer"
+              (source) => source.targetRayMode === "tracked-pointer",
             );
             if ((import.meta as any).env.DEV) {
               const info = Array.from(sess.inputSources).map(
-                (s) => `${s.handedness}/${s.targetRayMode}`
+                (s) => `${s.handedness}/${s.targetRayMode}`,
               );
               if (info.length > 0) {
                 // Log silently or avoid spam since this is RAF, log status change
@@ -144,7 +153,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           try {
             await teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
             setVrReady(true);
-            if ((import.meta as any).env.DEV) console.log("[VR] Status: VR ready");
+            if ((import.meta as any).env.DEV)
+              console.log("[VR] Status: VR ready");
           } catch (e) {
             // Wait longer if ref space request failed temporarily
             rafId = requestAnimationFrame(checkReady);
@@ -174,6 +184,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
   const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
   const selectionMode = useLegoStore((state) => state.selectionMode);
+  const showXRPerf = useLegoStore((state) => state.showXRPerf);
+  const showXROnboarding = useLegoStore((state) => state.showXROnboarding);
+
   const multiSelectedBrickIds = useLegoStore(
     (state) => state.multiSelectedBrickIds,
   );
@@ -181,8 +194,22 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const controlsRef = useRef<any>(null);
   const isBrickInteractionRef = useRef(false);
-  const interactionStartHitRef = useRef<{ point: THREE.Vector3; normal: THREE.Vector3; object: THREE.Object3D; hitPoint: THREE.Vector3; targetKind: string } | null>(null);
-  const latestPointerHitRef = useRef<{ point: THREE.Vector3; normal: THREE.Vector3; object: THREE.Object3D; hitPoint: THREE.Vector3; targetKind: string } | null>(null);
+  const interactionStartHitRef = useRef<{
+    point: THREE.Vector3;
+    normal: THREE.Vector3;
+    object: THREE.Object3D;
+    hitPoint: THREE.Vector3;
+    targetKind: string;
+    instanceId?: number;
+  } | null>(null);
+  const latestPointerHitRef = useRef<{
+    point: THREE.Vector3;
+    normal: THREE.Vector3;
+    object: THREE.Object3D;
+    hitPoint: THREE.Vector3;
+    targetKind: string;
+    instanceId?: number;
+  } | null>(null);
 
   const handlePointerUpRef = useRef<any>(null);
 
@@ -213,11 +240,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
     };
     window.addEventListener("vr-controller-action", handleVRControllerAction);
-    return () =>
+    const handleRecenter = () => {
+      teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+    };
+    window.addEventListener("vr-recenter", handleRecenter);
+
+    return () => {
       window.removeEventListener(
         "vr-controller-action",
         handleVRControllerAction,
       );
+      window.removeEventListener("vr-recenter", handleRecenter);
+    };
   }, []);
 
   useFrame((state) => {
@@ -237,22 +271,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
   });
 
+  const screenshotTrigger = useLegoStore((s) => s.screenshotTrigger);
+
   useEffect(() => {
-    const onScreenshot = () => {
-      setIsScreenshotting(true);
-      setTimeout(() => {
-        // Must render first to ensure canvas has content
-        gl.render(scene, camera);
-        const link = document.createElement("a");
-        link.download = "brickxr-screenshot.png";
-        link.href = gl.domElement.toDataURL("image/png");
-        link.click();
-        setIsScreenshotting(false);
-      }, 50);
-    };
-    window.addEventListener("take-screenshot", onScreenshot);
-    return () => window.removeEventListener("take-screenshot", onScreenshot);
-  }, [gl, scene, camera]);
+    if (screenshotTrigger === 0) return;
+    setIsScreenshotting(true);
+    setTimeout(() => {
+      // Must render first to ensure canvas has content
+      gl.render(scene, camera);
+      const link = document.createElement("a");
+      link.download = "brickxr-screenshot.png";
+      link.href = gl.domElement.toDataURL("image/png");
+      link.click();
+      setIsScreenshotting(false);
+    }, 50);
+  }, [screenshotTrigger, gl, scene, camera]);
 
   const movingBrick = useMemo(() => {
     return bricks.find((b) => b.id === movingBrickId) || null;
@@ -301,7 +334,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       setGhostPosition(e.detail);
     };
     window.addEventListener("set-ghost-position", handleSetGhostPosition);
-    return () => window.removeEventListener("set-ghost-position", handleSetGhostPosition);
+    return () =>
+      window.removeEventListener("set-ghost-position", handleSetGhostPosition);
   }, []);
 
   const sceneGroupRef = useRef<THREE.Group>(null);
@@ -316,23 +350,29 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!session) return;
     try {
       if (typeof XRRigidTransform === "undefined") return;
-      
+
       let refSpace: XRReferenceSpace | null = null;
       let refSpaceType = "";
-      const spaceTypes: XRReferenceSpaceType[] = ["local-floor", "local", "viewer"];
-      
+      const spaceTypes: XRReferenceSpaceType[] = [
+        "local-floor",
+        "local",
+        "viewer",
+      ];
+
       for (const spaceType of spaceTypes) {
         try {
           refSpace = await session.requestReferenceSpace(spaceType);
           refSpaceType = spaceType;
           break; // success
         } catch (e) {
-          if ((import.meta as any).env.DEV) console.log(`[VR] requestReferenceSpace('${spaceType}') failed`);
+          if ((import.meta as any).env.DEV)
+            console.log(`[VR] requestReferenceSpace('${spaceType}') failed`);
         }
       }
-      
+
       if (!refSpace) throw new Error("No usable reference space found");
-      if ((import.meta as any).env.DEV) console.log(`[VR] Selected reference space: ${refSpaceType}`);
+      if ((import.meta as any).env.DEV)
+        console.log(`[VR] Selected reference space: ${refSpaceType}`);
 
       const transform = new XRRigidTransform(offsetPosition, {
         x: 0,
@@ -342,7 +382,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       });
       gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
       // Teleport success
-    } catch(err) {
+    } catch (err) {
       console.warn("Teleport failed", err);
       throw err;
     }
@@ -352,13 +392,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // Disabled until Micro mode has interaction
   };
 
+  const rotateGhostTrigger = useLegoStore((state) => state.rotateGhostTrigger);
+
   useEffect(() => {
-    const handleRotate = () => setGhostRotation((r) => (r + 90) % 360);
+    if (rotateGhostTrigger > 0) {
+      setGhostRotation((r) => (r + 90) % 360);
+    }
+  }, [rotateGhostTrigger]);
+
+  useEffect(() => {
     const handleSetRotation = (e: any) => setGhostRotation(e.detail);
-    window.addEventListener("rotate-ghost", handleRotate);
     window.addEventListener("set-ghost-rotation", handleSetRotation);
     return () => {
-      window.removeEventListener("rotate-ghost", handleRotate);
       window.removeEventListener("set-ghost-rotation", handleSetRotation);
     };
   }, []);
@@ -381,8 +426,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const computePlacementTarget = (
     point: THREE.Vector3,
     normal: THREE.Vector3,
+    targetKind: string = "none",
   ): [number, number, number] => {
-    let w = 1, d = 1;
+    let w = 1,
+      d = 1;
     const activeType = activePreset
       ? "1x1"
       : movingBrick
@@ -390,7 +437,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         : selectedType;
 
     if (activePreset) {
-      const info = getPresetInfo(activePreset);
+      const info = getPresetInfo(activePreset, clipboard);
       w = info.w;
       d = info.d;
     } else {
@@ -405,93 +452,87 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const effD = isRot ? w : d;
 
     const alignSnap = (val: number, count: number, step: number) => {
-      if (count % 2 === 0) {
-        return Math.round((val - step / 2) / step) * step + step / 2;
+      const offset = count % 2 === 1 ? step / 2 : 0;
+      if (!isVR) {
+        return Math.round((val - offset) / step) * step + offset;
       }
-      return Math.round(val / step) * step;
+
+      // Magnetic Snapping (VR only)
+      // "More aggressive when close to grid line, less aggressive otherwise"
+      // Provides precision at grid centers and 1:1 flexibility at handover points.
+      const normalized = (val - offset) / step;
+      const nearestInteger = Math.round(normalized);
+      const fraction = normalized - nearestInteger; // -0.5 to 0.5
+      const absF = Math.abs(fraction);
+
+      // Curve f(x) = 4x^2 - 4x^3 on [0, 0.5]
+      // Characteristics: f(0)=0, f(0.5)=0.5, f'(0)=0 (snap), f'(0.5)=1 (flex)
+      const warpedFraction =
+        (4 * Math.pow(absF, 2) - 4 * Math.pow(absF, 3)) * Math.sign(fraction);
+
+      return (nearestInteger + warpedFraction) * step + offset;
     };
 
-    const nudge = 0.001;
+    // Use a slightly larger nudge for sides to prevent z-fighting/stuckness
+    const nudge =
+      targetKind === "brick-side" || targetKind === "brick-body" ? 0.05 : 0.001;
     const hitX = point.x + normal.x * nudge;
     let hitY = point.y;
+
+    // Superior vertical snapping
     if (normal.y > 0.5) hitY += nudge;
     else if (normal.y < -0.5) hitY -= nudge;
-    else hitY += 0;
 
     const hitZ = point.z + normal.z * nudge;
 
-    let targetX = alignSnap(hitX, effW, MODULE_SIZE);
-    let targetZ = alignSnap(hitZ, effD, MODULE_SIZE);
-    let targetY;
+    const baseSnappedX = alignSnap(hitX, effW, MODULE_SIZE);
+    const baseSnappedZ = alignSnap(hitZ, effD, MODULE_SIZE);
+    let baseSnappedY;
 
     if (Math.abs(normal.y) > 0.5) {
-      targetY = Math.round(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
+      baseSnappedY = Math.round(hitY / BRICK_HEIGHT) * BRICK_HEIGHT;
     } else {
-      targetY =
+      baseSnappedY =
         Math.floor(Math.max(0, point.y + BRICK_HEIGHT / 2) / BRICK_HEIGHT) *
         BRICK_HEIGHT;
     }
 
-    let finalX = targetX;
-    let finalY = Math.max(0, targetY);
-    let finalZ = targetZ;
-
-    // Floor clamp for moved groups or presets
-    if (
-      mode === "Move" &&
-      movingBrick &&
-      movingGroupOriginalBricks.length > 0
-    ) {
-      let minGroupY = Infinity;
-      movingGroupOriginalBricks.forEach((b) => {
-        if (b.position[1] < minGroupY) minGroupY = b.position[1];
-      });
-      const minYRequired = movingBrick.position[1] - minGroupY;
-      if (finalY < minYRequired) {
-        finalY = minYRequired;
-      }
-    } else {
-      const presetBricksData = getActivePresetBricks(activePreset, clipboard);
-      if (activePreset && presetBricksData) {
-        let minGroupY = Infinity;
-        presetBricksData.filter(isValidBrickData).forEach((b) => {
-          if (b.position[1] < minGroupY) minGroupY = b.position[1];
-        });
-        if (finalY + minGroupY < 0) {
-          finalY = -minGroupY;
-        }
-      }
-    }
-
-    const checkPos = (x: number, y: number, z: number) => {
+    const validatePos = (x: number, y: number, z: number) => {
       if (activePreset) {
         const presetBricksData = getActivePresetBricks(activePreset, clipboard);
-        if (!presetBricksData)
-          return { valid: false, reason: "invalid-preset" };
+        if (!presetBricksData) return { valid: false };
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const info = getPresetInfo(activePreset, clipboard);
-        const testPresetBricks = presetBricksData
+        const testBricks = presetBricksData
           .filter(isValidBrickData)
           .map((b) => {
             let ox = b.position[0] - info.cx;
             let oz = b.position[2] - info.cz;
-            let nx = ox, nz = oz;
+            let nx = ox,
+              nz = oz;
             if (rotMod === 90 || rotMod === -270) {
-              nx = -oz; nz = ox;
+              nx = -oz;
+              nz = ox;
             } else if (Math.abs(rotMod) === 180) {
-              nx = -ox; nz = -oz;
+              nx = -ox;
+              nz = -oz;
             } else if (rotMod === 270 || rotMod === -90) {
-              nx = oz; nz = -ox;
+              nx = oz;
+              nz = -ox;
             }
             return {
               ...b,
               rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-              position: [nx + x, b.position[1] + y, nz + z] as [number, number, number],
+              position: [nx + x, b.position[1] + y, nz + z] as [
+                number,
+                number,
+                number,
+              ],
             };
           });
         return checkStructureValid(
           bricks,
-          testPresetBricks,
+          testBricks,
           MODULE_SIZE,
           BRICK_HEIGHT,
         );
@@ -499,25 +540,24 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const oxA = movingBrick.position[0] - movingGroupPivot[0];
         const ozA = movingBrick.position[2] - movingGroupPivot[2];
-        let rotatedOxA = oxA,
-          rotatedOzA = ozA;
+        let rXA = oxA,
+          rZA = ozA;
         if (rotMod === 90 || rotMod === -270) {
-          rotatedOxA = -ozA;
-          rotatedOzA = oxA;
+          rXA = -ozA;
+          rZA = oxA;
         } else if (Math.abs(rotMod) === 180) {
-          rotatedOxA = -oxA;
-          rotatedOzA = -ozA;
+          rXA = -oxA;
+          rZA = -ozA;
         } else if (rotMod === 270 || rotMod === -90) {
-          rotatedOxA = ozA;
-          rotatedOzA = -oxA;
+          rXA = ozA;
+          rZA = -oxA;
         }
 
-        const currentPivotX = x - rotatedOxA;
-        const currentPivotZ = z - rotatedOzA;
-        const currentPivotY =
-          y - (movingBrick.position[1] - movingGroupPivot[1]);
+        const cPX = x - rXA;
+        const cPZ = z - rZA;
+        const cPY = y - (movingBrick.position[1] - movingGroupPivot[1]);
 
-        const testGroupBricks = movingGroupOriginalBricks.map((b) => {
+        const testBricks = movingGroupOriginalBricks.map((b) => {
           const ox = b.position[0] - movingGroupPivot[0];
           const oz = b.position[2] - movingGroupPivot[2];
           let nx = ox,
@@ -532,56 +572,80 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             nx = oz;
             nz = -ox;
           }
-
           return {
             ...b,
             rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
             position: [
-              currentPivotX + nx,
-              currentPivotY + (b.position[1] - movingGroupPivot[1]),
-              currentPivotZ + nz,
+              cPX + nx,
+              cPY + (b.position[1] - movingGroupPivot[1]),
+              cPZ + nz,
             ] as [number, number, number],
           };
         });
-
-        const otherBricks = bricks.filter(
+        const others = bricks.filter(
           (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
         );
         return checkStructureValid(
-          otherBricks,
-          testGroupBricks,
+          others,
+          testBricks,
           MODULE_SIZE,
           BRICK_HEIGHT,
         );
       } else {
-        const testBrickData = {
-          id: movingBrickId || "ghost",
-          type: activeType,
-          position: [x, y, z] as [number, number, number],
-          rotation: ghostRotation,
-        };
         return checkPlacementValid(
           bricks,
-          testBrickData,
+          {
+            id: "ghost",
+            type: activeType,
+            position: [x, y, z],
+            rotation: ghostRotation,
+          },
           MODULE_SIZE,
           BRICK_HEIGHT,
         );
       }
     };
 
-    let res = checkPos(finalX, finalY, finalZ);
+    // Final result search logic
+    const initialCheck = validatePos(baseSnappedX, baseSnappedY, baseSnappedZ);
+    if (initialCheck.valid) {
+      return [baseSnappedX, baseSnappedY, baseSnappedZ];
+    }
 
-    return [finalX, finalY, finalZ];
+    if (initialCheck.reason === "overlap") {
+      const neighbors = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ];
+      for (const [dx, dz] of neighbors) {
+        const tx = baseSnappedX + dx * MODULE_SIZE;
+        const tz = baseSnappedZ + dz * MODULE_SIZE;
+        if (validatePos(tx, baseSnappedY, tz).valid) {
+          return [tx, baseSnappedY, tz];
+        }
+      }
+    }
+
+    return [baseSnappedX, baseSnappedY, baseSnappedZ];
   };
 
-  const updateGhostPosition = (point: THREE.Vector3, normal: THREE.Vector3) => {
-    setGhostPosition(computePlacementTarget(point, normal));
+  const updateGhostPosition = (
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+    targetKind: string = "none",
+  ) => {
+    setGhostPosition(computePlacementTarget(point, normal, targetKind));
   };
 
   const getPointerCoords = (e: any) => {
-    const getTouchOpt = (touches?: any[]) => (touches && touches.length > 0 ? touches[0] : null);
+    const getTouchOpt = (touches?: any[]) =>
+      touches && touches.length > 0 ? touches[0] : null;
     const eventParams = e.nativeEvent || e;
-    const touch = getTouchOpt(eventParams.changedTouches) || getTouchOpt(eventParams.touches);
+    const touch =
+      getTouchOpt(eventParams.changedTouches) ||
+      getTouchOpt(eventParams.touches);
     if (touch && typeof touch.clientX === "number") {
       return { x: touch.clientX, y: touch.clientY };
     }
@@ -592,38 +656,48 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return null;
   };
 
-  const getCanonicalHit = (e: any): { point: THREE.Vector3; normal: THREE.Vector3; object: THREE.Object3D; hitPoint: THREE.Vector3; targetKind: string; instanceId?: number } | null => {
-    let hitPoint: THREE.Vector3 | null = null;
-    let hitNormal: THREE.Vector3 | null = null;
-    let hitObject: THREE.Object3D | null = null;
-    let instanceId: number | undefined;
-
+  const getCanonicalHit = (
+    e: any,
+  ): {
+    point: THREE.Vector3;
+    normal: THREE.Vector3;
+    object: THREE.Object3D;
+    hitPoint: THREE.Vector3;
+    targetKind: string;
+    instanceId?: number;
+  } | null => {
     if (!sceneGroupRef.current) return null;
 
-    const coords = getPointerCoords(e);
-    if (!coords) return null;
+    let intersects = e.intersections;
 
-    const rect = gl.domElement.getBoundingClientRect();
-    const nx = ((coords.x - rect.left) / rect.width) * 2 - 1;
-    const ny = -((coords.y - rect.top) / rect.height) * 2 + 1;
-    placementRaycaster.setFromCamera(new THREE.Vector2(nx, ny), camera);
+    // For Desktop/Mobile, use R3F's existing raycaster which is well-managed for viewport offsets
+    if (!xrSessionActive) {
+      // Use the scene-wide raycaster which is updated automatically by R3F
+      intersects = raycaster.intersectObject(sceneGroupRef.current, true);
+    }
 
-    const intersects = placementRaycaster.intersectObject(sceneGroupRef.current, true);
+    if (!intersects || intersects.length === 0) return null;
 
     for (const hit of intersects) {
       if (!hit.object) continue;
-      
+
       let isGhost = false;
       let isIgnored = false;
       let ptr: THREE.Object3D | null = hit.object;
-      while(ptr) {
-        if (ptr.name === "ghost" || (ptr as any).isPlacementGhost) isGhost = true;
-        if (ptr.name === "GridHelper" || ptr.name === "VRMenu" || ptr.name.startsWith("presetPreview")) isIgnored = true;
+      while (ptr) {
+        if (ptr.name === "ghost" || (ptr as any).isPlacementGhost)
+          isGhost = true;
+        if (
+          ptr.name === "GridHelper" ||
+          ptr.name === "VRMenu" ||
+          ptr.name.startsWith("presetPreview")
+        )
+          isIgnored = true;
         ptr = ptr.parent;
       }
-      
+
       if (isGhost || isIgnored || hit.object.name === "GridHelper") continue;
-      
+
       let targetKind = "none";
       if (hit.object.name === "FloorPlacementCollider") {
         targetKind = "floor";
@@ -633,7 +707,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         targetKind = "brick-stud";
       }
 
-      const worldNormal = hit.face?.normal?.clone().transformDirection(hit.object.matrixWorld).normalize() || new THREE.Vector3(0,1,0);
+      const worldNormal =
+        hit.face?.normal
+          ?.clone()
+          .transformDirection(hit.object.matrixWorld)
+          .normalize() || new THREE.Vector3(0, 1, 0);
 
       if (targetKind === "brick-body" || targetKind === "brick-stud") {
         if (worldNormal.y > 0.7) {
@@ -649,22 +727,26 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         continue;
       }
 
-      hitPoint = hit.point;
-      hitNormal = worldNormal;
-      hitObject = hit.object;
-      instanceId = hit.instanceId;
-      
-      const p3 = new THREE.Vector3(hitPoint.x, hitPoint.y, hitPoint.z).divideScalar(currentVRScale);
+      const currentHitPoint = hit.point.clone();
+      const currentHitObject = hit.object;
+      const currentInstanceId = hit.instanceId;
 
-      // console.log("[hit]", targetKind, p3, hitNormal);
-      
+      let p3 = currentHitPoint.clone();
+      if (sceneGroupRef.current) {
+        sceneGroupRef.current.worldToLocal(p3);
+      } else {
+        p3.divideScalar(currentVRScale);
+      }
+
+      // console.log("[hit]", targetKind, p3, worldNormal);
+
       return {
         point: p3,
-        normal: hitNormal,
-        object: hitObject,
-        instanceId,
+        normal: worldNormal,
+        object: currentHitObject,
+        instanceId: currentInstanceId,
         targetKind,
-        hitPoint
+        hitPoint: currentHitPoint,
       };
     }
     return null;
@@ -673,14 +755,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const getPlacementTargetFromEvent = (e: any) => {
     const hit = getCanonicalHit(e);
     if (!hit) return null;
-    return computePlacementTarget(hit.point, hit.normal);
+    return computePlacementTarget(hit.point, hit.normal, hit.targetKind);
   };
 
   const updateGhostFromEvent = (e: any) => {
     const hit = getCanonicalHit(e);
     if (!hit) return false;
     latestPointerHitRef.current = hit;
-    updateGhostPosition(hit.point, hit.normal);
+    updateGhostPosition(hit.point, hit.normal, hit.targetKind);
     return true;
   };
 
@@ -688,7 +770,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // Clear refs on state change
     interactionStartHitRef.current = null;
     latestPointerHitRef.current = null;
-    
+
     // Fallback simple position reset based on grid center if needed, but we typically rely on ghost update from pointer
   }, [selectedType, ghostRotation, mode, movingBrickId, activePreset]);
 
@@ -703,6 +785,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const currentMovingBrickId = useLegoStore.getState().movingBrickId;
     const isMoving = mode === "Move" && currentMovingBrickId !== null;
     const isPlacingPreset = activePreset !== null;
+
+    // On screen, always update ghost if we are in an active tool mode,
+    // even if not strictly "building" at this microsecond, to ensure responsiveness.
     if (!isBuilding && !isMoving && !isPlacingPreset) return;
 
     if (pointerDownPos.current) {
@@ -712,14 +797,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         const dy = coords.y - pointerDownPos.current.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const threshold = pointerDownPos.current.isTouch ? 30 : 5;
-        
+
         if (distance > threshold) {
           if (isMoving && !useLegoStore.getState().isDraggingBrick) {
             setIsDraggingBrick(true);
             useLegoStore.getState().setJustSelectedBrick(false);
           }
         } else {
-          // Still within the click/tap threshold, do not visually update the ghost yet 
+          // Still within the click/tap threshold, do not visually update the ghost yet
           // because if they release now, it will safely commit at interactionStartHitRef.
           return;
         }
@@ -1070,11 +1155,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const handlePointerDown = (e: any) => {
     // Check multi-touch
-    const touchesCount = e.nativeEvent?.touches ? e.nativeEvent.touches.length : 0;
+    const touchesCount = e.nativeEvent?.touches
+      ? e.nativeEvent.touches.length
+      : 0;
     if (touchesCount >= 2) {
       isMultiTouchRef.current = true;
       pointerDownPos.current = null;
-      return; 
+      return;
     } else if (touchesCount === 1) {
       isMultiTouchRef.current = false;
     }
@@ -1125,7 +1212,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         e.stopPropagation();
         interactionStartHitRef.current = hit;
         latestPointerHitRef.current = hit;
-        updateGhostPosition(hit.point, hit.normal);
+        updateGhostPosition(hit.point, hit.normal, hit.targetKind);
       }
     }
   };
@@ -1137,12 +1224,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (now - lastPlacementRef.current < 50) return;
     lastPlacementRef.current = now;
 
-    const currentGhostPos = computePlacementTarget(p3, normal);
+    const currentGhostPos = computePlacementTarget(
+      p3,
+      normal,
+      latestPointerHitRef.current?.targetKind || "none",
+    );
     setGhostPosition(currentGhostPos);
 
     const checkCurrentPlacement = () => {
       if (mode === "Move") {
-        if (!movingBrick) return { status: { valid: false, reason: "no moving brick" }, ghostGroupBricks: [] as any[] };
+        if (!movingBrick)
+          return {
+            status: { valid: false, reason: "no moving brick" },
+            ghostGroupBricks: [] as any[],
+          };
         // validate the whole group
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const oxA = movingBrick!.position[0] - movingGroupPivot[0];
@@ -1351,7 +1446,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       // Always clear justSelected on any action release
       useLegoStore.getState().setJustSelectedBrick(false);
     }
-    
+
     interactionStartHitRef.current = null;
     latestPointerHitRef.current = null;
   };
@@ -1406,8 +1501,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       return;
     }
 
-    const hit = isClick && interactionStartHitRef.current ? interactionStartHitRef.current : (getCanonicalHit(e) || latestPointerHitRef.current);
-    
+    const hit =
+      isClick && interactionStartHitRef.current
+        ? interactionStartHitRef.current
+        : getCanonicalHit(e) || latestPointerHitRef.current;
+
     if (isClick && mode === "Move" && cameraMode === "Zoom") {
       if (controlsRef.current && camera) {
         const isZoomOut = e.shiftKey || e.button === 2;
@@ -1429,7 +1527,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         shouldCommit = false;
         useLegoStore.getState().setJustSelectedBrick(false);
       }
-      
+
       if ((import.meta as any).env.DEV) {
         const rect = gl.domElement.getBoundingClientRect();
         const coords = getPointerCoords(e) || { x: 0, y: 0 };
@@ -1449,7 +1547,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           snappedPosition: snappedPos,
           ghostPosition: ghostPosition,
           committedPosition: shouldCommit ? snappedPos : null,
-          mode: mode
+          mode: mode,
         });
       }
 
@@ -1459,7 +1557,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         setIsDraggingBrick(false);
       }
     } else {
-      if ((import.meta as any).env.DEV) console.log("[HIT] null - no viable target found");
+      if ((import.meta as any).env.DEV)
+        console.log("[HIT] null - no viable target found");
     }
     interactionStartHitRef.current = null;
   };
@@ -1544,9 +1643,40 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       case "Pan":
         return { ONE: THREE.TOUCH.PAN as any, TWO: THREE.TOUCH.DOLLY_PAN };
       case "Zoom":
-        return { ONE: THREE.TOUCH.PAN as any, TWO: THREE.TOUCH.DOLLY_PAN };
+        // For zoom mode, we want one finger to potentially zoom if we implemented it,
+        // but since OrbitControls doesn't support it for ONE, we set it to undefined
+        // to avoid "moving" (panning) which confused the user.
+        return { ONE: undefined as any, TWO: THREE.TOUCH.DOLLY_PAN };
     }
   }, [cameraMode]);
+
+  const cameraZoomTrigger = useLegoStore((state) => state.cameraZoomTrigger);
+  const cameraZoomDirection = useLegoStore(
+    (state) => state.cameraZoomDirection,
+  );
+  const cameraRecenterTrigger = useLegoStore(
+    (state) => state.cameraRecenterTrigger,
+  );
+
+  useEffect(() => {
+    if (cameraZoomTrigger === 0) return;
+    if (!controlsRef.current) return;
+    if (cameraZoomDirection === "in") {
+      controlsRef.current.dollyIn(1.15);
+    } else {
+      controlsRef.current.dollyOut(1.15);
+    }
+    controlsRef.current.update();
+  }, [cameraZoomTrigger, cameraZoomDirection]);
+
+  useEffect(() => {
+    if (cameraRecenterTrigger === 0) return;
+    if (!controlsRef.current) return;
+    controlsRef.current.reset();
+    controlsRef.current.target.set(0, 0.2, 0);
+    camera.position.set(2.8, 2.2, 3.2);
+    controlsRef.current.update();
+  }, [cameraRecenterTrigger, camera]);
 
   const [isVR, setIsVR] = useState(false);
 
@@ -1598,6 +1728,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       />
 
       <Suspense fallback={null}>
+        {xrSessionActive && showXRPerf && <VRStats />}
+        {xrSessionActive && showXROnboarding && <VROnboarding />}
         {xrSessionActive && !vrReady && <VRDebugVisibilityLayer />}
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
@@ -1615,31 +1747,32 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         )}
       </Suspense>
       <group
-          ref={sceneGroupRef}
-          scale={currentVRScale}
-          onPointerMove={handlePointerMove}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          onPointerOut={() => {
-            interactionStartHitRef.current = null;
-            latestPointerHitRef.current = null;
-          }}
-          onContextMenu={handleContextMenu}
-        >
-          {/* Visualized Bricks using InstancedMesh */}
-          {Object.entries(groupedBricks).map(([key, group]) => {
-            const [type, color] = key.split("_");
-            return (
-              <BrickInstances
-                key={key}
-                type={type as any}
-                color={color}
-                bricks={group}
-              />
-            );
-          })}
+        ref={sceneGroupRef}
+        scale={currentVRScale}
+        onPointerMove={handlePointerMove}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerOut={() => {
+          interactionStartHitRef.current = null;
+          latestPointerHitRef.current = null;
+        }}
+        onContextMenu={handleContextMenu}
+      >
+        {/* Visualized Bricks using InstancedMesh */}
+        {Object.entries(groupedBricks).map(([key, group]) => {
+          const [type, color] = key.split("_");
+          return (
+            <BrickInstances
+              key={key}
+              type={type as any}
+              color={color}
+              bricks={group}
+            />
+          );
+        })}
 
-          {!isScreenshotting && mode === "Build" && !activePreset && (
+        {!isScreenshotting && mode === "Build" && !activePreset && (
+          <group>
             <LegoBrick
               id="ghost"
               type={selectedType}
@@ -1647,114 +1780,137 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               position={ghostPosition}
               rotation={ghostRotation}
               isPlacementGhost
+              opacity={xrSessionActive ? 0.3 : 0.6}
             />
-          )}
-
-          {!isScreenshotting && (mode === "Move" || mode === "Delete") &&
-            movingGroupOriginalBricks.length > 0 && (
-              <>
-                {/* The ghost preview that follows the mouse */}
-                {mode === "Move" &&
-                  isDraggingBrick &&
-                  Object.entries(groupedGhostGroupBricks).map(
-                    ([key, group]) => {
-                      const [type, color] = key.split("_");
-                      return (
-                        <BrickInstances
-                          key={`moving-ghost-${key}`}
-                          type={type as any}
-                          color={color}
-                          bricks={group}
-                          isGhost
-                        />
-                      );
-                    },
-                  )}
-                {/* The original bricks left in place (visual only) */}
-                {Object.entries(groupedOriginalSelectedBricks).map(
-                  ([key, group]) => {
-                    const [type, color] = key.split("_");
-                    return (
-                      <BrickInstances
-                        key={`original-ghost-${key}`}
-                        type={type as any}
-                        color={color}
-                        bricks={group}
-                        isGhost={true}
-                      />
-                    );
-                  },
-                )}
-              </>
-            )}
-
-          {!isScreenshotting && activePreset && (
-            <>
-              {Object.entries(groupedPresetBricks).map(([key, group]) => {
-                const [type, color] = key.split("_");
-                return (
-                  <BrickInstances
-                    key={`preset-ghost-${key}`}
-                    type={type as any}
-                    color={color}
-                    bricks={group}
-                    isGhost
-                  />
-                );
-              })}
-              {/* Tiny anchor marker for the preset origin */}
-              <mesh position={ghostPosition} raycast={() => null}>
-                <sphereGeometry args={[0.015, 8, 8]} />
+            {!xrSessionActive && (
+              <mesh
+                position={ghostPosition}
+                rotation={[-Math.PI / 2, 0, 0]}
+                raycast={() => null}
+              >
+                <ringGeometry args={[0.04, 0.05, 32]} />
                 <meshBasicMaterial
-                  color="#ffffff"
+                  color={selectedColor}
                   transparent
-                  opacity={0.6}
-                  depthTest={false}
+                  opacity={0.8}
                 />
               </mesh>
+            )}
+          </group>
+        )}
+
+        {!isScreenshotting &&
+          (mode === "Move" || mode === "Delete") &&
+          movingGroupOriginalBricks.length > 0 && (
+            <>
+              {/* The ghost preview that follows the mouse */}
+              {mode === "Move" &&
+                isDraggingBrick &&
+                Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
+                  const [type, color] = key.split("_");
+                  return (
+                    <BrickInstances
+                      key={`moving-ghost-${key}`}
+                      type={type as any}
+                      color={color}
+                      bricks={group}
+                      isGhost
+                    />
+                  );
+                })}
+              {/* The original bricks left in place (visual only) */}
+              {Object.entries(groupedOriginalSelectedBricks).map(
+                ([key, group]) => {
+                  const [type, color] = key.split("_");
+                  return (
+                    <BrickInstances
+                      key={`original-ghost-${key}`}
+                      type={type as any}
+                      color={color}
+                      bricks={group}
+                      isGhost={true}
+                    />
+                  );
+                },
+              )}
             </>
           )}
 
-          <group>
-            <mesh
-              name="FloorPlacementCollider"
-              rotation={[-Math.PI / 2, 0, 0]}
-              position={[0, 0, 0]}
-            >
-              <planeGeometry args={[100, 100]} />
-              <meshBasicMaterial transparent opacity={0} depthWrite={false} colorWrite={false} />
+        {!isScreenshotting && activePreset && (
+          <>
+            {Object.entries(groupedPresetBricks).map(([key, group]) => {
+              const [type, color] = key.split("_");
+              return (
+                <BrickInstances
+                  key={`preset-ghost-${key}`}
+                  type={type as any}
+                  color={color}
+                  bricks={group}
+                  isGhost
+                />
+              );
+            })}
+            {/* Tiny anchor marker for the preset origin */}
+            <mesh position={ghostPosition} raycast={() => null}>
+              <sphereGeometry args={[0.015, 8, 8]} />
+              <meshBasicMaterial
+                color="#ffffff"
+                transparent
+                opacity={0.6}
+                depthTest={false}
+              />
             </mesh>
-            <mesh
-              ref={vrFloorRef}
-              name="VRFloorCollider"
-              rotation={[-Math.PI / 2, 0, 0]}
-              position={[0, 0, 0]}
-              visible={false}
-            >
-              <planeGeometry args={[40, 40]} />
-              <meshBasicMaterial />
-            </mesh>
-            <mesh
-              ref={gridRef}
-              name="Grid"
-              receiveShadow={!xrSessionActive}
-              rotation={[-Math.PI / 2, 0, 0]}
-            >
-              <planeGeometry args={[100, 100]} />
-              <meshStandardMaterial color="#002D04" />
-            </mesh>
-            <gridHelper
-              args={[40, 500, "#004010", "#003A0A"]}
-              position={[0, 0.001, 0]}
+          </>
+        )}
+
+        <group>
+          <mesh
+            name="FloorPlacementCollider"
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, 0, 0]}
+          >
+            <planeGeometry args={[100, 100]} />
+            <meshBasicMaterial
+              transparent
+              opacity={0}
+              depthWrite={false}
+              colorWrite={false}
             />
-          </group>
+          </mesh>
+          <mesh
+            ref={vrFloorRef}
+            name="VRFloorCollider"
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[0, 0, 0]}
+            visible={false}
+          >
+            <planeGeometry args={[40, 40]} />
+            <meshBasicMaterial />
+          </mesh>
+          <mesh
+            ref={gridRef}
+            name="Grid"
+            receiveShadow={!xrSessionActive}
+            rotation={[-Math.PI / 2, 0, 0]}
+          >
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial color="#002D04" />
+          </mesh>
+          <gridHelper
+            args={[40, 500, "#004010", "#003A0A"]}
+            position={[0, 0.001, 0]}
+          />
         </group>
+      </group>
       <OrbitControls
         ref={controlsRef}
         makeDefault
         target={[0, 0.2, 0]}
         maxPolarAngle={Math.PI / 2 - 0.05}
-        minPolarAngle={0.15}
+        minDistance={0.5}
+        maxDistance={100}
+        enableDamping={true}
+        dampingFactor={0.1}
         enabled={!isCameraLocked && !isVR && !isDraggingBrick && !marqueeStart}
         mouseButtons={mouseButtons as any}
         touches={touches as any}

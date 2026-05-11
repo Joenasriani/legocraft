@@ -2,6 +2,8 @@ import React, { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLegoStore, getGroupBricks } from "../Store";
+import { audioService } from "../services/AudioService";
+import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
@@ -12,7 +14,11 @@ export const HumanViewLayer = ({
 }: {
   currentVRScale: number;
   sceneGroupRef: React.RefObject<THREE.Group>;
-  updateGhostPosition: (p: THREE.Vector3, n: THREE.Vector3) => void;
+  updateGhostPosition: (
+    p: THREE.Vector3,
+    n: THREE.Vector3,
+    tk?: string,
+  ) => void;
 }) => {
   const { gl, scene } = useThree();
   const raycaster = new THREE.Raycaster();
@@ -26,6 +32,9 @@ export const HumanViewLayer = ({
   const setIsDraggingBrick = useLegoStore((s) => s.setIsDraggingBrick);
   const setJustSelectedBrick = useLegoStore((s) => s.setJustSelectedBrick);
   const selectionMode = useLegoStore((s) => s.selectionMode);
+  const locomotionMode = useLegoStore((s) => s.locomotionMode);
+  const movementSpeed = useLegoStore((s) => s.movementSpeed);
+  const snapTurnAngle = useLegoStore((s) => s.snapTurnAngle);
 
   const wasTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
@@ -48,7 +57,7 @@ export const HumanViewLayer = ({
       if (curr.userData?.isVRMenuItem) isMenu = true;
       curr = curr.parent;
     }
-    
+
     // VR target priority
     const menuVisible = useLegoStore.getState().vrMenuVisible;
     if (menuVisible) {
@@ -73,7 +82,10 @@ export const HumanViewLayer = ({
     n: THREE.Vector3;
   } | null>(null);
 
-  const latestValidPlacement = useRef<{p: THREE.Vector3, n: THREE.Vector3} | null>(null);
+  const latestValidPlacement = useRef<{
+    p: THREE.Vector3;
+    n: THREE.Vector3;
+  } | null>(null);
 
   useFrame((state, delta) => {
     const session = gl.xr.getSession();
@@ -87,11 +99,16 @@ export const HumanViewLayer = ({
     const inputSourcesArray = Array.from(session.inputSources);
     for (const source of inputSourcesArray) {
       if (!source) continue;
-      if (source.handedness === 'left') leftInput = source;
-      if (source.handedness === 'right') rightInput = source;
+      if (source.handedness === "left") leftInput = source;
+      if (source.handedness === "right") rightInput = source;
     }
-    const rightIdx = inputSourcesArray.findIndex(s => s?.handedness === 'right');
-    const leftIdx = inputSourcesArray.findIndex(s => s?.handedness === 'left');
+
+    const rightIdx = inputSourcesArray.findIndex(
+      (s) => s?.handedness === "right",
+    );
+    const leftIdx = inputSourcesArray.findIndex(
+      (s) => s?.handedness === "left",
+    );
     if (rightIdx >= 0) rightController = gl.xr.getController(rightIdx);
     if (leftIdx >= 0) leftController = gl.xr.getController(leftIdx);
 
@@ -102,30 +119,33 @@ export const HumanViewLayer = ({
     if (leftInput && leftInput.gamepad && !menuVisible) {
       const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
       const zAxis = leftInput.gamepad.axes[3] || 0; // z forward/back
-      if (Math.abs(xAxis) > 0.1 || Math.abs(zAxis) > 0.1) {
-        const speed = 2.0 * dt; // 2 m/s
-        const camForward = new THREE.Vector3(0, 0, -1)
-          .transformDirection(gl.xr.getCamera().matrixWorld)
-          .setY(0)
-          .normalize();
-        const camRight = new THREE.Vector3(1, 0, 0)
-          .transformDirection(gl.xr.getCamera().matrixWorld)
-          .setY(0)
-          .normalize();
 
-        const moveVec = new THREE.Vector3()
-          .addScaledVector(camRight, xAxis * speed)
-          .addScaledVector(camForward, zAxis * speed);
+      if (locomotionMode === "Smooth") {
+        if (Math.abs(xAxis) > 0.1 || Math.abs(zAxis) > 0.1) {
+          const speed = movementSpeed * dt;
+          const camForward = new THREE.Vector3(0, 0, -1)
+            .transformDirection(gl.xr.getCamera().matrixWorld)
+            .setY(0)
+            .normalize();
+          const camRight = new THREE.Vector3(1, 0, 0)
+            .transformDirection(gl.xr.getCamera().matrixWorld)
+            .setY(0)
+            .normalize();
 
-        const refSpace = gl.xr.getReferenceSpace();
-        if (refSpace) {
-          const transform = new XRRigidTransform({
-            x: -moveVec.x,
-            y: -moveVec.y,
-            z: -moveVec.z,
-          });
-          const newRefSpace = refSpace.getOffsetReferenceSpace(transform);
-          gl.xr.setReferenceSpace(newRefSpace);
+          const moveVec = new THREE.Vector3()
+            .addScaledVector(camRight, xAxis * speed)
+            .addScaledVector(camForward, zAxis * speed);
+
+          const refSpace = gl.xr.getReferenceSpace();
+          if (refSpace) {
+            const transform = new XRRigidTransform({
+              x: -moveVec.x,
+              y: -moveVec.y,
+              z: -moveVec.z,
+            });
+            const newRefSpace = refSpace.getOffsetReferenceSpace(transform);
+            gl.xr.setReferenceSpace(newRefSpace);
+          }
         }
       }
     }
@@ -135,7 +155,8 @@ export const HumanViewLayer = ({
       if (Math.abs(xAxis) > 0.5) {
         if (!snapTurnCooldown.current) {
           snapTurnCooldown.current = true;
-          const turnAngle = xAxis > 0 ? -Math.PI / 4 : Math.PI / 4;
+          const turnAngleRad = (snapTurnAngle * Math.PI) / 180;
+          const turnAngle = xAxis > 0 ? -turnAngleRad : turnAngleRad;
           const refSpace = gl.xr.getReferenceSpace();
           if (refSpace) {
             const rotTransform = new XRRigidTransform(
@@ -149,6 +170,8 @@ export const HumanViewLayer = ({
             );
             const newRefSpace = refSpace.getOffsetReferenceSpace(rotTransform);
             gl.xr.setReferenceSpace(newRefSpace);
+            triggerHaptics(rightInput, HapticType.SNAP_TURN);
+            audioService.playSelect();
           }
         }
       } else {
@@ -210,6 +233,8 @@ export const HumanViewLayer = ({
         if (isMenuItem && onTriggerFn) {
           if (triggerPressed && !wasTriggerPressed.current) {
             onTriggerFn();
+            triggerHaptics(rightInput, HapticType.UI_CLICK);
+            audioService.playMenu();
           }
         } else {
           // Normal brick interaction
@@ -229,20 +254,59 @@ export const HumanViewLayer = ({
             rejectReason = "Side placement blocked in Build mode";
           }
 
+          let targetKind = "none";
+          if (hit.object.name === "FloorPlacementCollider")
+            targetKind = "floor";
+          else if (Math.abs(normal.y) > 0.7) targetKind = "brick-top";
+          else targetKind = "brick-side";
+
           if (isValidPlacement) {
             latestValidPlacement.current = { p: unscaledP3, n: normal };
-            updateGhostPosition(unscaledP3, normal);
+            updateGhostPosition(unscaledP3, normal, targetKind);
           } else {
             latestValidPlacement.current = null;
           }
 
           if (triggerPressed && !wasTriggerPressed.current) {
-            if (latestValidPlacement.current) {
+            if (mode === "Delete") {
+              const instId = hit.instanceId;
+              const ud = hit.object.userData;
+              if (instId !== undefined && ud && ud.bricks) {
+                const brickIndex = ud.isStud
+                  ? Math.floor(instId / (ud.w * ud.d))
+                  : instId;
+                const b = ud.bricks[brickIndex];
+                if (b) {
+                  if (selectionMode === "Group") {
+                    const allb = useLegoStore.getState().bricks;
+                    const g = getGroupBricks(b, allb);
+                    removeBricks(g.map((bz: any) => bz.id));
+                  } else {
+                    removeBrick(b.id);
+                  }
+                  triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                  audioService.playDelete();
+                }
+              }
+            } else if (latestValidPlacement.current) {
               if ((import.meta as any).env.DEV) {
                 console.log("[VR] Target count:", targets.length);
-                const activeNames = targets.filter(t => isValidTarget(t)).map(t => t.name).filter(Boolean);
-                console.log("[VR] Active target names:", Array.from(new Set(activeNames)));
-                console.log("[VR] Commit trigger. Point:", latestValidPlacement.current.p, "Normal:", latestValidPlacement.current.n, "Object:", hit.object?.name);
+                const activeNames = targets
+                  .filter((t) => isValidTarget(t))
+                  .map((t) => t.name)
+                  .filter(Boolean);
+                console.log(
+                  "[VR] Active target names:",
+                  Array.from(new Set(activeNames)),
+                );
+                console.log(
+                  "[VR] Commit trigger. Point:",
+                  latestValidPlacement.current.p,
+                  "Normal:",
+                  latestValidPlacement.current.n,
+                  "Object:",
+                  hit.object?.name,
+                );
               }
               window.dispatchEvent(
                 new CustomEvent("vr-controller-action", {
@@ -254,11 +318,38 @@ export const HumanViewLayer = ({
                   },
                 }),
               );
+              triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+              audioService.playPlace();
             } else {
               if ((import.meta as any).env.DEV) {
-                console.log("[VR] Placement rejected:", rejectReason);
+                console.log("[VR] Placement rejected");
               }
-              useLegoStore.getState().setToastMessage("Invalid placement surface.");
+              useLegoStore
+                .getState()
+                .setToastMessage("Invalid placement surface.");
+              triggerHaptics(rightInput, HapticType.ERROR);
+              audioService.playInvalid();
+            }
+          }
+
+          // Handle squeeze release for "Release to Drop" in Move mode
+          if (!squeezePressed && wasSqueezePressed.current) {
+            if (mode === "Move" && movingBrickId) {
+              // We only commit if we were actually dragging (to avoid tiny accidental clicks committing)
+              if (latestValidPlacement.current) {
+                window.dispatchEvent(
+                  new CustomEvent("vr-controller-action", {
+                    detail: {
+                      type: "trigger",
+                      action: "commit",
+                      point: latestValidPlacement.current.p,
+                      normal: latestValidPlacement.current.n,
+                    },
+                  }),
+                );
+                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                audioService.playPlace();
+              }
             }
           }
 
@@ -271,8 +362,12 @@ export const HumanViewLayer = ({
               );
               setMovingBrickId(null);
               setIsDraggingBrick(false);
+              triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+              audioService.playSelect();
             } else if (mode === "Build" || mode === "Move") {
-              window.dispatchEvent(new CustomEvent("rotate-ghost"));
+              useLegoStore.getState().triggerRotateGhost();
+              triggerHaptics(rightInput, HapticType.ROTATE);
+              audioService.playRotate();
             }
           }
 
@@ -295,10 +390,14 @@ export const HumanViewLayer = ({
                     } else {
                       removeBrick(b.id);
                     }
+                    triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                    audioService.playDelete();
                   } else if (mode === "Move" && !movingBrickId) {
                     setMovingBrickId(b.id);
                     setIsDraggingBrick(true);
                     setJustSelectedBrick(true);
+                    triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+                    audioService.playSelect();
                     window.dispatchEvent(
                       new CustomEvent("set-ghost-rotation", {
                         detail: b.rotation,
