@@ -24,6 +24,46 @@ body {
   overscroll-behavior: none;
 }
 
+.safe-screen {
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  padding-left: max(12px, env(safe-area-inset-left));
+}
+
+.safe-area-left {
+  left: max(8px, env(safe-area-inset-left));
+}
+@media (min-width: 640px) {
+  .safe-area-left {
+    left: max(24px, env(safe-area-inset-left));
+  }
+}
+
+.safe-area-right {
+  right: max(8px, env(safe-area-inset-right));
+}
+@media (min-width: 640px) {
+  .safe-area-right {
+    right: max(24px, env(safe-area-inset-right));
+  }
+}
+
+.scroll-panel {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-height: 520px) and (orientation: landscape) {
+  .mobile-landscape-compact {
+    gap: 0.25rem;
+  }
+
+  .mobile-landscape-panel {
+    max-height: 42vh;
+  }
+}
+
 .glass-panel {
   background: var(--glass);
   backdrop-filter: blur(20px);

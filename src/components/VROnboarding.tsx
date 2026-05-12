@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 
 export const VROnboarding = () => {
@@ -11,14 +11,14 @@ export const VROnboarding = () => {
     { key: "R Grip Hold", action: "Pick up / Drag" },
     { key: "R Grip Release", action: "Drop / Place" },
     { key: "A Button", action: "Rotate / Cancel" },
-    { key: "R Stick", action: "Snap Turn" },
+    { key: "Right Stick", action: "Snap Turn" },
     { key: "RESET POS", action: "available inside radial menu" },
   ];
 
   const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
   const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
-  useMemo(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     canvas.width = 1024;
     canvas.height = 1024;
@@ -47,9 +47,14 @@ export const VROnboarding = () => {
     }
     if (textureRef.current) {
       textureRef.current.needsUpdate = true;
-    } else {
-      textureRef.current = new THREE.CanvasTexture(canvas);
     }
+  }, []);
+
+  const texture = useMemo(() => {
+    if (!textureRef.current) {
+      textureRef.current = new THREE.CanvasTexture(canvasRef.current);
+    }
+    return textureRef.current;
   }, []);
 
   return (

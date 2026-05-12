@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html } from "@react-three/drei";
+import { OrbitControls, Html, Text } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -41,6 +41,23 @@ export type VRScaleMode = "human";
 
 const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
+};
+
+const VRWaitingPanel = () => {
+  return (
+    <group position={[0, 1.5, -2]}>
+      <Text
+        color="white"
+        fontSize={0.15}
+        maxWidth={2}
+        textAlign="center"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {"Waiting for Quest controllers...\nPress any button on your controllers.\nIf this continues, exit VR and re-enter."}
+      </Text>
+    </group>
+  );
 };
 
 const VRDebugVisibilityLayer = () => {
@@ -274,13 +291,22 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (screenshotTrigger === 0) return;
     setIsScreenshotting(true);
     setTimeout(() => {
-      // Must render first to ensure canvas has content
-      gl.render(scene, camera);
-      const link = document.createElement("a");
-      link.download = "brickxr-screenshot.png";
-      link.href = gl.domElement.toDataURL("image/png");
-      link.click();
-      setIsScreenshotting(false);
+      try {
+        // Must render first to ensure canvas has content
+        gl.render(scene, camera);
+        const dataUrl = gl.domElement.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.download = "brickxr-screenshot.png";
+        link.href = dataUrl;
+        link.click();
+      } catch (err) {
+        console.warn("[BrickXR] Screenshot capture failed:", err);
+        useLegoStore
+          .getState()
+          .setToastMessage("Screenshot capture may be unavailable on some browsers.");
+      } finally {
+        setIsScreenshotting(false);
+      }
     }, 50);
   }, [screenshotTrigger, gl, scene, camera]);
 
@@ -1720,7 +1746,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       <Suspense fallback={null}>
         {xrSessionActive && showXRPerf && <VRStats />}
         {xrSessionActive && showXROnboarding && <VROnboarding />}
-        {xrSessionActive && !vrReady && <VRDebugVisibilityLayer />}
+        {xrSessionActive && !vrReady && (
+          <>
+            <VRWaitingPanel />
+            <VRDebugVisibilityLayer />
+          </>
+        )}
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
             currentVRScale={currentVRScale}
