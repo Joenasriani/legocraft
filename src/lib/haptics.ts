@@ -9,7 +9,10 @@ export enum HapticType {
   SNAP_TURN = "snap_turn",
 }
 
-const HAPTIC_PROFILES: Record<HapticType, { intensity: number; duration: number }> = {
+const HAPTIC_PROFILES: Record<
+  HapticType,
+  { intensity: number; duration: number }
+> = {
   [HapticType.UI_HOVER]: { intensity: 0.2, duration: 10 },
   [HapticType.UI_CLICK]: { intensity: 0.4, duration: 30 },
   [HapticType.BRICK_SELECT]: { intensity: 0.4, duration: 30 },
@@ -43,7 +46,10 @@ export function triggerHaptics(
   let finalIntensity = 0.5;
   let finalDuration = duration;
 
-  if (typeof typeOrIntensity === "string" && typeOrIntensity in HAPTIC_PROFILES) {
+  if (
+    typeof typeOrIntensity === "string" &&
+    typeOrIntensity in HAPTIC_PROFILES
+  ) {
     const profile = HAPTIC_PROFILES[typeOrIntensity as HapticType];
     finalIntensity = profile.intensity;
     finalDuration = profile.duration;

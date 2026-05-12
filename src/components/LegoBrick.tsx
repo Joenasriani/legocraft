@@ -1,7 +1,12 @@
-import React, { useState } from 'react';
-import * as THREE from 'three';
-import { useLegoStore, BrickType, getBrickDimensions } from '../Store';
-import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT } from '../constants';
+import React, { useState } from "react";
+import * as THREE from "three";
+import { useLegoStore, BrickType, getBrickDimensions } from "../Store";
+import {
+  MODULE_SIZE,
+  BRICK_HEIGHT,
+  STUD_RADIUS,
+  STUD_HEIGHT,
+} from "../constants";
 
 interface LegoBrickProps {
   id: string;
@@ -14,8 +19,15 @@ interface LegoBrickProps {
   opacity?: number;
 }
 
-export const LegoBrick: React.FC<LegoBrickProps> = ({ 
-  id, type, color, position, rotation, isPlacementGhost, hideMesh, opacity = 0.3
+export const LegoBrick: React.FC<LegoBrickProps> = ({
+  id,
+  type,
+  color,
+  position,
+  rotation,
+  isPlacementGhost,
+  hideMesh,
+  opacity = 0.3,
 }) => {
   const { w, d } = getBrickDimensions(type);
   const [isGrabbed, setIsGrabbed] = useState(false);
@@ -27,10 +39,10 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   const depth = d * MODULE_SIZE;
 
   const handleSelectStart = (e: any) => {
-    if (mode === 'Delete') {
+    if (mode === "Delete") {
       e.stopPropagation();
       removeBrick(id);
-    } else if (mode === 'Move') {
+    } else if (mode === "Move") {
       e.stopPropagation();
       setIsGrabbed(true);
       e.target?.setPointerCapture?.(e.pointerId);
@@ -55,10 +67,10 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   const ghostRaycast = isPlacementGhost ? () => null : undefined;
 
   return (
-    <group 
+    <group
       position={position}
       rotation={[0, (rotation * Math.PI) / 180, 0]}
-      onPointerDown={isPlacementGhost ? undefined : handleSelectStart} 
+      onPointerDown={isPlacementGhost ? undefined : handleSelectStart}
       onPointerUp={isPlacementGhost ? undefined : handleSelectEnd}
       onContextMenu={isPlacementGhost ? undefined : handleRotate}
     >
@@ -71,10 +83,12 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
         ) : (
           <>
             <mesh raycast={ghostRaycast}>
-              <boxGeometry args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]} />
-              <meshStandardMaterial 
-                color={color} 
-                roughness={0.1} 
+              <boxGeometry
+                args={[width - 0.002, BRICK_HEIGHT, depth - 0.002]}
+              />
+              <meshStandardMaterial
+                color={color}
+                roughness={0.1}
                 metalness={0.1}
                 transparent={isPlacementGhost}
                 opacity={isPlacementGhost ? opacity : 1}
@@ -84,21 +98,23 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                 envMapIntensity={1.5}
               />
             </mesh>
-            {Array.from({ length: w }).map((_, i) => (
+            {Array.from({ length: w }).map((_, i) =>
               Array.from({ length: d }).map((_, j) => (
-                <mesh 
-                  key={`${i}-${j}`} 
+                <mesh
+                  key={`${i}-${j}`}
                   raycast={ghostRaycast}
                   position={[
                     (i - (w - 1) / 2) * MODULE_SIZE,
                     BRICK_HEIGHT / 2 + STUD_HEIGHT / 2,
-                    (j - (d - 1) / 2) * MODULE_SIZE
+                    (j - (d - 1) / 2) * MODULE_SIZE,
                   ]}
                 >
-                  <cylinderGeometry args={[STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 16]} />
-                  <meshStandardMaterial 
-                    color={color} 
-                    roughness={0.1} 
+                  <cylinderGeometry
+                    args={[STUD_RADIUS, STUD_RADIUS, STUD_HEIGHT, 16]}
+                  />
+                  <meshStandardMaterial
+                    color={color}
+                    roughness={0.1}
                     metalness={0.1}
                     transparent={isPlacementGhost}
                     opacity={isPlacementGhost ? opacity : 1}
@@ -107,8 +123,8 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                     toneMapped={!isPlacementGhost}
                   />
                 </mesh>
-              ))
-            ))}
+              )),
+            )}
           </>
         )}
       </group>

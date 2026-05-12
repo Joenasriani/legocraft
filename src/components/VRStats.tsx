@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLegoStore } from "../Store";
@@ -25,9 +25,11 @@ export const VRStats = () => {
     const time = performance.now();
 
     if (time >= lastUpdate.current + 1000) {
-      const fps = Math.round((frames.current * 1000) / (time - lastUpdate.current));
+      const fps = Math.round(
+        (frames.current * 1000) / (time - lastUpdate.current),
+      );
       const frameTime = (time - prevTime.current).toFixed(2);
-      
+
       const info = gl.info;
       setStats({
         fps,
@@ -70,7 +72,7 @@ export const VRStats = () => {
     ].join("\n");
 
     if (warnings.length > 0) {
-      base += "\n\n" + warnings.map(w => `⚠️ ${w}`).join("\n");
+      base += "\n\n" + warnings.map((w) => `⚠️ ${w}`).join("\n");
     }
     return base;
   }, [stats, warnings]);
@@ -78,7 +80,7 @@ export const VRStats = () => {
   const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
   const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
-  useMemo(() => {
+  useEffect(() => {
     const canvas = canvasRef.current;
     canvas.width = 512;
     canvas.height = 512;
@@ -89,7 +91,7 @@ export const VRStats = () => {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "white";
       ctx.font = "bold 32px sans-serif";
-      
+
       const lines = text.split("\n");
       lines.forEach((line, i) => {
         if (line.includes("⚠️")) {
@@ -102,12 +104,18 @@ export const VRStats = () => {
     }
     if (textureRef.current) {
       textureRef.current.needsUpdate = true;
-    } else {
-      textureRef.current = new THREE.CanvasTexture(canvas);
     }
   }, [text]);
 
   const panelHeight = 0.4 + (warnings.length > 0 ? warnings.length * 0.04 : 0);
+
+  // Initialize texture eagerly so it's not null on first render
+  const texture = useMemo(() => {
+    if (!textureRef.current) {
+      textureRef.current = new THREE.CanvasTexture(canvasRef.current);
+    }
+    return textureRef.current;
+  }, []);
 
   return (
     <group position={[-0.8, 1.2, -1]} rotation={[0, 0.4, 0]}>

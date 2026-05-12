@@ -9,7 +9,12 @@ interface PresetMenuOverlayProps {
   presets: any[];
 }
 
-const PresetMenuOverlay = ({ show, onClose, presetMenuRef, presets }: PresetMenuOverlayProps) => {
+const PresetMenuOverlay = ({
+  show,
+  onClose,
+  presetMenuRef,
+  presets,
+}: PresetMenuOverlayProps) => {
   return (
     <AnimatePresence>
       {show && (

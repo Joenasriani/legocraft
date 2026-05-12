@@ -226,9 +226,7 @@ export const HumanViewLayer = ({
           currentHitObj = currentHitObj.parent;
         }
 
-        window.dispatchEvent(
-          new CustomEvent("vr-menu-hover", { detail: hitMenuLabel }),
-        );
+        useLegoStore.getState().setVRMenuHoverContent(hitMenuLabel);
 
         if (isMenuItem && onTriggerFn) {
           if (triggerPressed && !wasTriggerPressed.current) {
@@ -308,16 +306,12 @@ export const HumanViewLayer = ({
                   hit.object?.name,
                 );
               }
-              window.dispatchEvent(
-                new CustomEvent("vr-controller-action", {
-                  detail: {
-                    type: "trigger",
-                    action: "commit",
-                    point: latestValidPlacement.current.p,
-                    normal: latestValidPlacement.current.n,
-                  },
-                }),
-              );
+              useLegoStore.getState().triggerVRControllerAction({
+                type: "trigger",
+                action: "commit",
+                point: latestValidPlacement.current.p,
+                normal: latestValidPlacement.current.n,
+              });
               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
               audioService.playPlace();
             } else {
@@ -337,16 +331,12 @@ export const HumanViewLayer = ({
             if (mode === "Move" && movingBrickId) {
               // We only commit if we were actually dragging (to avoid tiny accidental clicks committing)
               if (latestValidPlacement.current) {
-                window.dispatchEvent(
-                  new CustomEvent("vr-controller-action", {
-                    detail: {
-                      type: "trigger",
-                      action: "commit",
-                      point: latestValidPlacement.current.p,
-                      normal: latestValidPlacement.current.n,
-                    },
-                  }),
-                );
+                useLegoStore.getState().triggerVRControllerAction({
+                  type: "trigger",
+                  action: "commit",
+                  point: latestValidPlacement.current.p,
+                  normal: latestValidPlacement.current.n,
+                });
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
                 audioService.playPlace();
               }
@@ -355,11 +345,9 @@ export const HumanViewLayer = ({
 
           if (actionPressed && !wasActionPressed.current) {
             if (mode === "Move" && movingBrickId) {
-              window.dispatchEvent(
-                new CustomEvent("vr-controller-action", {
-                  detail: { type: "cancelMove" },
-                }),
-              );
+              useLegoStore
+                .getState()
+                .triggerVRControllerAction({ type: "cancelMove" });
               setMovingBrickId(null);
               setIsDraggingBrick(false);
               triggerHaptics(rightInput, HapticType.BRICK_SELECT);
@@ -398,11 +386,7 @@ export const HumanViewLayer = ({
                     setJustSelectedBrick(true);
                     triggerHaptics(rightInput, HapticType.BRICK_SELECT);
                     audioService.playSelect();
-                    window.dispatchEvent(
-                      new CustomEvent("set-ghost-rotation", {
-                        detail: b.rotation,
-                      }),
-                    );
+                    useLegoStore.getState().triggerSetGhostRotation(b.rotation);
                   }
                 }
               }
@@ -412,7 +396,7 @@ export const HumanViewLayer = ({
       } else {
         // Not aimed at valid target, clear action states without logic
         // if users click trigger, nothing happens.
-        window.dispatchEvent(new CustomEvent("vr-menu-hover", { detail: "" }));
+        useLegoStore.getState().setVRMenuHoverContent("");
       }
 
       // Always track state

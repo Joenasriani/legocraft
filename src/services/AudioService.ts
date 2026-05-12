@@ -3,11 +3,18 @@ class AudioService {
 
   private init() {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.ctx = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
     }
   }
 
-  private playTone(freq: number, type: OscillatorType, duration: number, volume: number) {
+  private playTone(
+    freq: number,
+    type: OscillatorType,
+    duration: number,
+    volume: number,
+  ) {
     this.init();
     if (!this.ctx) return;
 
@@ -18,7 +25,10 @@ class AudioService {
     osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
 
     gain.gain.setValueAtTime(volume, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+    gain.gain.exponentialRampToValueAtTime(
+      0.01,
+      this.ctx.currentTime + duration,
+    );
 
     osc.connect(gain);
     gain.connect(this.ctx.destination);

@@ -7,7 +7,11 @@ interface ClearConfirmModalProps {
   onConfirm: () => void;
 }
 
-const ClearConfirmModal = ({ show, onClose, onConfirm }: ClearConfirmModalProps) => {
+const ClearConfirmModal = ({
+  show,
+  onClose,
+  onConfirm,
+}: ClearConfirmModalProps) => {
   return (
     <AnimatePresence>
       {show && (
@@ -23,8 +27,12 @@ const ClearConfirmModal = ({ show, onClose, onConfirm }: ClearConfirmModalProps)
             exit={{ scale: 0.95, opacity: 0, y: -10 }}
             className="bg-zinc-900 border border-white/10 p-6 rounded-2xl max-w-sm w-[90%] flex flex-col items-center text-center shadow-2xl"
           >
-            <h3 className="text-xl font-bold mb-2 text-white">Clear all bricks?</h3>
-            <p className="text-white/70 text-sm mb-6">This can be undone if you have a save.</p>
+            <h3 className="text-xl font-bold mb-2 text-white">
+              Clear all bricks?
+            </h3>
+            <p className="text-white/70 text-sm mb-6">
+              This can be undone if you have a save.
+            </p>
             <div className="flex gap-3 w-full">
               <button
                 onClick={onClose}

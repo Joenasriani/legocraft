@@ -30,6 +30,7 @@ import {
 } from "../constants";
 
 import { VRRadialMenu } from "./VRRadialMenu";
+import { VRPalette } from "./VRPalette";
 import { vrTargetManager } from "../lib/vrTargets";
 
 import { HumanViewLayer } from "./VRViewLayers";
@@ -65,8 +66,7 @@ const VRDebugVisibilityLayer = () => {
 };
 
 const SceneContents = ({ xrStore }: { xrStore?: any }) => {
-  const { gl, scene, camera, raycaster } = useThree();
-  const placementRaycaster = useMemo(() => new THREE.Raycaster(), []);
+  const { gl, scene, camera } = useThree();
   const [vrScale, setVrScale] = useState<VRScaleMode>("human");
   const [isScreenshotting, setIsScreenshotting] = useState(false);
   const [xrSessionActive, setXrSessionActive] = useState(false);
@@ -221,38 +221,35 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // It's hoisted or we can just keep executeCommitRef and update it right after executeCommit is defined later down.
   });
 
+  const vrControllerActionTrigger = useLegoStore(
+    (s) => s.vrControllerActionTrigger,
+  );
+  const vrControllerActionDetail = useLegoStore(
+    (s) => s.vrControllerActionDetail,
+  );
+
   useEffect(() => {
-    const handleVRControllerAction = (e: any) => {
-      const { type, point, normal, action } = e.detail;
+    if (vrControllerActionTrigger === 0 || !vrControllerActionDetail) return;
+    const { type, point, normal, action } = vrControllerActionDetail;
 
-      if (type === "cancelMove") {
-        // handle cancel move, already handled via event but we can centralise
+    if (type === "cancelMove") {
+      // cancel move logic if any
+    }
+
+    if (type === "trigger") {
+      pointerDownPos.current = null;
+      if (action === "commit" && executeCommitRef.current) {
+        executeCommitRef.current(point, normal);
       }
+    }
+  }, [vrControllerActionTrigger, vrControllerActionDetail]);
 
-      if (type === "trigger") {
-        pointerDownPos.current = null;
+  const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
 
-        if (action === "commit") {
-          if (executeCommitRef.current) {
-            executeCommitRef.current(point, normal);
-          }
-        }
-      }
-    };
-    window.addEventListener("vr-controller-action", handleVRControllerAction);
-    const handleRecenter = () => {
-      teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
-    };
-    window.addEventListener("vr-recenter", handleRecenter);
-
-    return () => {
-      window.removeEventListener(
-        "vr-controller-action",
-        handleVRControllerAction,
-      );
-      window.removeEventListener("vr-recenter", handleRecenter);
-    };
-  }, []);
+  useEffect(() => {
+    if (vrRecenterTrigger === 0) return;
+    teleportPlayer({ x: 0, y: 0.5, z: 0.8 });
+  }, [vrRecenterTrigger]);
 
   useFrame((state) => {
     if (controlsRef.current) {
@@ -329,14 +326,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   ]);
   const [ghostRotation, setGhostRotation] = useState<number>(0);
 
+  const ghostPosTrigger = useLegoStore((s) => s.ghostPosTrigger);
+  const ghostPosData = useLegoStore((s) => s.ghostPosData);
+
   useEffect(() => {
-    const handleSetGhostPosition = (e: any) => {
-      setGhostPosition(e.detail);
-    };
-    window.addEventListener("set-ghost-position", handleSetGhostPosition);
-    return () =>
-      window.removeEventListener("set-ghost-position", handleSetGhostPosition);
-  }, []);
+    if (ghostPosTrigger === 0 || !ghostPosData) return;
+    setGhostPosition(ghostPosData);
+  }, [ghostPosTrigger, ghostPosData]);
 
   const sceneGroupRef = useRef<THREE.Group>(null);
 
@@ -400,13 +396,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
   }, [rotateGhostTrigger]);
 
+  const ghostRotTrigger = useLegoStore((s) => s.ghostRotTrigger);
+  const ghostRotData = useLegoStore((s) => s.ghostRotData);
+
   useEffect(() => {
-    const handleSetRotation = (e: any) => setGhostRotation(e.detail);
-    window.addEventListener("set-ghost-rotation", handleSetRotation);
-    return () => {
-      window.removeEventListener("set-ghost-rotation", handleSetRotation);
-    };
-  }, []);
+    if (ghostRotTrigger === 0 || ghostRotData === null) return;
+    setGhostRotation(ghostRotData);
+  }, [ghostRotTrigger, ghostRotData]);
 
   const snapToGrid = (val: number, step: number) =>
     Math.round(val / step) * step;
@@ -669,12 +665,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!sceneGroupRef.current) return null;
 
     let intersects = e.intersections;
-
-    // For Desktop/Mobile, use R3F's existing raycaster which is well-managed for viewport offsets
-    if (!xrSessionActive) {
-      // Use the scene-wide raycaster which is updated automatically by R3F
-      intersects = raycaster.intersectObject(sceneGroupRef.current, true);
-    }
 
     if (!intersects || intersects.length === 0) return null;
 
@@ -1479,7 +1469,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         const dy = coords.y - pointerDownPos.current.y;
         distance = Math.sqrt(dx * dx + dy * dy);
 
-        const threshold = pointerDownPos.current.isTouch ? 30 : 5;
+        const threshold = pointerDownPos.current.isTouch ? 80 : 10;
         isClick = distance <= threshold;
       } else {
         isClick = true; // No coordinates fallback for pointer up? Assuming it was a click anyway
@@ -1739,11 +1729,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           />
         )}
         {xrSessionActive && (
-          <VRRadialMenu
-            vrScale={vrScale}
-            onToggle={toggleScale}
-            currentVRScale={currentVRScale}
-          />
+          <>
+            <VRRadialMenu
+              vrScale={vrScale}
+              currentVRScale={currentVRScale}
+            />
+            <VRPalette />
+          </>
         )}
       </Suspense>
       <group

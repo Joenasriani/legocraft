@@ -563,11 +563,20 @@ const xrStore = createXRStore({
   hitTest: false,
   domOverlay: false,
   hand: false, // Hand tracking disabled (unimplemented)
-  controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
+  screenInput: false,
+  transientPointer: false,
+  controller: { rayPointer: false, teleportPointer: false, grabPointer: false }, // Disables library pointers but enables standard controller models because we use our custom VRViewLayers
   customSessionInit: { optionalFeatures: ["local-floor", "bounded-floor"] },
 });
 
 export default function App() {
+  useEffect(() => {
+    console.log(
+      "[Brick XR Builder] Build verification - App started at " +
+        new Date().toISOString(),
+    );
+  }, []);
+
   const {
     bricks,
     mode,
@@ -725,14 +734,20 @@ export default function App() {
         )}
         {isFadingToVR && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="absolute top-10 left-1/2 -translate-x-1/2 z-[60] bg-[#111] border border-purple-500/50 px-6 py-3 rounded-full shadow-[0_0_20px_rgba(168,85,247,0.4)] pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-[60] bg-black/80 flex items-center justify-center backdrop-blur-md"
           >
-            <span className="text-white font-bold tracking-widest text-sm uppercase">
-              Entering VR...
-            </span>
+            <div className="bg-[#111] border border-purple-500/50 px-8 py-6 rounded-3xl shadow-[0_0_40px_rgba(168,85,247,0.4)] flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+              <span className="text-white font-bold tracking-widest text-lg uppercase">
+                Entering VR...
+              </span>
+              <span className="text-white/60 text-sm text-center">
+                Put on your headset
+              </span>
+            </div>
           </motion.div>
         )}
         {showVRPrompt && (
@@ -822,6 +837,7 @@ export default function App() {
           shadows
           camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
           style={{ touchAction: "none" }}
+          gl={{ preserveDrawingBuffer: true, antialias: true }}
         >
           <Suspense fallback={null}>
             <Scene xrStore={xrStore} />
@@ -832,7 +848,7 @@ export default function App() {
       {/* UI Overlay */}
       {!isXRActive && (
         <>
-          <div className="absolute inset-0 z-10 pointer-events-none p-3 sm:p-6 flex flex-col justify-between">
+          <div className="absolute inset-0 z-10 pointer-events-none p-3 sm:p-6 pb-[max(12px,env(safe-area-inset-bottom))] pl-[max(12px,env(safe-area-inset-left))] pr-[max(12px,env(safe-area-inset-right))] pt-[max(12px,env(safe-area-inset-top))] flex flex-col justify-between">
             {toastMessage && (
               <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 border border-red-400 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-xs sm:text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 z-50">
                 <InfoIcon size={16} />
@@ -970,7 +986,7 @@ export default function App() {
                       }
                       setMode("Move");
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
+                    className={`p-1.5 rounded-md transition-colors ${isCameraLocked || mode === "Build" ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
                     title={
                       mode === "Move"
                         ? "Lock Camera (\u2714 Required for drag-select)"
@@ -985,7 +1001,7 @@ export default function App() {
 
             {/* Absolute Floating Docks (Anchored to middle) */}
             {/* Left Tools */}
-            <div className="absolute left-2 sm:left-6 top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
+            <div className="absolute left-[max(8px,env(safe-area-inset-left))] sm:left-[max(24px,env(safe-area-inset-left))] top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
               <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar">
                 <ToolIconButton
                   icon={<BuildIcon size={24} />}
@@ -1096,7 +1112,7 @@ export default function App() {
             </div>
 
             {/* Right Colors */}
-            <div className="absolute right-2 sm:right-6 top-[55%] -translate-y-1/2 pointer-events-none z-20">
+            <div className="absolute right-[max(8px,env(safe-area-inset-right))] sm:right-[max(24px,env(safe-area-inset-right))] top-[55%] -translate-y-1/2 pointer-events-none z-20">
               <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl max-h-[85vh] overflow-y-auto no-scrollbar">
                 <div className="grid grid-cols-2 gap-1 sm:gap-2">
                   {LEGO_COLORS.map((color) => (

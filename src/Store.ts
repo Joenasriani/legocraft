@@ -403,6 +403,34 @@ interface LegoStore {
   screenshotTrigger: number;
   triggerScreenshot: () => void;
 
+  vrControllerActionTrigger: number;
+  vrControllerActionDetail: {
+    type: string;
+    action?: string;
+    point?: any;
+    normal?: any;
+  } | null;
+  triggerVRControllerAction: (detail: {
+    type: string;
+    action?: string;
+    point?: any;
+    normal?: any;
+  }) => void;
+
+  vrMenuHoverContent: string | null;
+  setVRMenuHoverContent: (content: string | null) => void;
+
+  vrRecenterTrigger: number;
+  triggerVRRecenter: () => void;
+
+  ghostPosTrigger: number;
+  ghostPosData: [number, number, number] | null;
+  triggerSetGhostPosition: (pos: [number, number, number]) => void;
+
+  ghostRotTrigger: number;
+  ghostRotData: number | null;
+  triggerSetGhostRotation: (rot: number) => void;
+
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
   removeBrick: (id: string) => void;
@@ -773,6 +801,38 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   screenshotTrigger: 0,
   triggerScreenshot: () =>
     set((state) => ({ screenshotTrigger: state.screenshotTrigger + 1 })),
+
+  vrControllerActionTrigger: 0,
+  vrControllerActionDetail: null,
+  triggerVRControllerAction: (detail) =>
+    set((state) => ({
+      vrControllerActionTrigger: state.vrControllerActionTrigger + 1,
+      vrControllerActionDetail: detail,
+    })),
+
+  vrMenuHoverContent: null,
+  setVRMenuHoverContent: (content: string | null) =>
+    set({ vrMenuHoverContent: content }),
+
+  vrRecenterTrigger: 0,
+  triggerVRRecenter: () =>
+    set((state) => ({ vrRecenterTrigger: state.vrRecenterTrigger + 1 })),
+
+  ghostPosTrigger: 0,
+  ghostPosData: null,
+  triggerSetGhostPosition: (pos: [number, number, number]) =>
+    set((state) => ({
+      ghostPosTrigger: state.ghostPosTrigger + 1,
+      ghostPosData: pos,
+    })),
+
+  ghostRotTrigger: 0,
+  ghostRotData: null,
+  triggerSetGhostRotation: (rot: number) =>
+    set((state) => ({
+      ghostRotTrigger: state.ghostRotTrigger + 1,
+      ghostRotData: rot,
+    })),
 
   setToastMessage: (msg) => {
     const { toastTimeoutId } = get();

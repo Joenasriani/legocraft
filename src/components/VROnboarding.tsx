@@ -4,7 +4,8 @@ import * as THREE from "three";
 export const VROnboarding = () => {
   const instructions = [
     { key: "Default", action: "Stationary Mode" },
-    { key: "X Button", action: "Toggle Menu" },
+    { key: "X Button", action: "Toggle Build Menu" },
+    { key: "Y Button", action: "Toggle Bricks/Colors" },
     { key: "B Button", action: "Close Menu" },
     { key: "R Trigger", action: "Place / Delete / Select" },
     { key: "R Grip Hold", action: "Pick up / Drag" },
@@ -26,7 +27,7 @@ export const VROnboarding = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "rgba(17, 17, 17, 0.8)";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       ctx.fillStyle = "#a855f7";
       ctx.font = "bold 60px sans-serif";
       ctx.textAlign = "center";

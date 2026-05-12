@@ -6,7 +6,12 @@ import {
   hasBrickAbove,
   getGroupBricks,
 } from "../Store";
-import { MODULE_SIZE, BRICK_HEIGHT, STUD_RADIUS, STUD_HEIGHT } from "../constants";
+import {
+  MODULE_SIZE,
+  BRICK_HEIGHT,
+  STUD_RADIUS,
+  STUD_HEIGHT,
+} from "../constants";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
@@ -86,11 +91,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               );
               useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
-              window.dispatchEvent(
-                new CustomEvent("set-ghost-rotation", {
-                  detail: brick.rotation,
-                }),
-              );
+              useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
             } else if (selectionMode === "Multi") {
               const stateBefore = useLegoStore.getState();
               const isTouch =
@@ -129,11 +130,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               );
               useLegoStore.getState().setIsDraggingBrick(false);
               useLegoStore.getState().setJustSelectedBrick(true);
-              window.dispatchEvent(
-                new CustomEvent("set-ghost-rotation", {
-                  detail: brick.rotation,
-                }),
-              );
+              useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
             } else {
               if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
                 setToastMessage(
@@ -141,7 +138,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 );
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
-                const wasAlreadySelected = useLegoStore.getState().movingBrickId === brick.id;
+                const wasAlreadySelected =
+                  useLegoStore.getState().movingBrickId === brick.id;
                 setMovingBrickId(brick.id);
                 e.nativeEvent?.target?.setPointerCapture?.(
                   e.nativeEvent.pointerId,
@@ -149,16 +147,12 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 useLegoStore.getState().setIsDraggingBrick(false);
                 if (!wasAlreadySelected) {
                   useLegoStore.getState().setJustSelectedBrick(true);
-                  window.dispatchEvent(
-                    new CustomEvent("set-ghost-rotation", {
-                      detail: brick.rotation,
-                    }),
-                  );
-                  window.dispatchEvent(
-                    new CustomEvent("set-ghost-position", {
-                      detail: brick.position,
-                    }),
-                  );
+                  useLegoStore
+                    .getState()
+                    .triggerSetGhostRotation(brick.rotation);
+                  useLegoStore
+                    .getState()
+                    .triggerSetGhostPosition(brick.position);
                 }
               }
             }
@@ -275,7 +269,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
     if (bodyMesh.instanceMatrix) bodyMesh.instanceMatrix.needsUpdate = true;
     if (studMesh.instanceMatrix) studMesh.instanceMatrix.needsUpdate = true;
-    
+
     bodyMesh.computeBoundingSphere();
     studMesh.computeBoundingSphere();
 

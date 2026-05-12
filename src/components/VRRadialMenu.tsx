@@ -6,7 +6,15 @@ import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
 
-const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, handleAction }: any) => {
+const VRMenuItem = ({
+  seg,
+  depth,
+  fontSize,
+  isHovered,
+  boxWidth,
+  boxHeight,
+  handleAction,
+}: any) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
@@ -20,7 +28,7 @@ const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, hand
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = `bold 64px sans-serif`;
-      
+
       // We'll update the texture when hovered changes by re-running this if we want,
       // but for simplicity let's just make it white and use material color.
       // Actually material color multiplies with texture.
@@ -49,18 +57,15 @@ const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, hand
 
   return (
     <group>
-      <mesh
-        ref={meshRef}
-        name="VRMenuItem"
-      >
+      <mesh ref={meshRef} name="VRMenuItem">
         <boxGeometry args={[boxWidth, boxHeight, depth]} />
         <meshStandardMaterial color={isHovered ? "#ffffff" : seg.color} />
       </mesh>
       <mesh position={[0, 0, depth / 2 + 0.002]}>
         <planeGeometry args={[boxWidth * 0.9, boxHeight * 0.9]} />
-        <meshBasicMaterial 
-          map={labelTexture} 
-          transparent={true} 
+        <meshBasicMaterial
+          map={labelTexture}
+          transparent={true}
           color={isHovered ? seg.color : "white"}
         />
       </mesh>
@@ -70,11 +75,9 @@ const VRMenuItem = ({ seg, depth, fontSize, isHovered, boxWidth, boxHeight, hand
 
 export const VRRadialMenu = ({
   vrScale,
-  onToggle,
   currentVRScale,
 }: {
   vrScale: "human" | "micro";
-  onToggle: () => void;
   currentVRScale: number;
 }) => {
   const { gl } = useThree();
@@ -84,20 +87,20 @@ export const VRRadialMenu = ({
 
   React.useEffect(() => {
     const handleConn = (i: number) => (e: any) => {
-      if (e.data?.handedness === 'left') leftGripIndex.current = i;
+      if (e.data?.handedness === "left") leftGripIndex.current = i;
     };
     const c0 = gl.xr.getControllerGrip(0);
     const cb0 = handleConn(0);
-    c0.addEventListener('connected', cb0);
-    
+    c0.addEventListener("connected", cb0);
+
     const c1 = gl.xr.getControllerGrip(1);
     const cb1 = handleConn(1);
-    c1.addEventListener('connected', cb1);
-    
+    c1.addEventListener("connected", cb1);
+
     return () => {
-      c0.removeEventListener('connected', cb0);
-      c1.removeEventListener('connected', cb1);
-    }
+      c0.removeEventListener("connected", cb0);
+      c1.removeEventListener("connected", cb1);
+    };
   }, [gl.xr]);
 
   const mode = useLegoStore((s) => s.mode);
@@ -137,14 +140,16 @@ export const VRRadialMenu = ({
     }
 
     if (leftGrip && groupRef.current && visible) {
-      // Track the left wrist but do NOT tie visibility to dot product
+      // Track the left wrist exactly
       const wristPos = new THREE.Vector3().setFromMatrixPosition(
         leftGrip.matrixWorld,
       );
       groupRef.current.position.copy(wristPos);
-
-      // Hover menu slightly above wrist so hands don't clip
-      groupRef.current.position.y += vrScale === "human" ? 0.05 : 1.5;
+      
+      // Use controller's local up vector to offset the menu slightly above the wrist
+      const up = new THREE.Vector3(0, 1, 0).transformDirection(leftGrip.matrixWorld).normalize();
+      const offset = vrScale === "human" ? 0.05 : 1.5;
+      groupRef.current.position.addScaledVector(up, offset);
     }
   });
 
@@ -152,14 +157,8 @@ export const VRRadialMenu = ({
     useLegoStore.getState().setVrMenuVisible(visible);
   }, [visible]);
 
-  const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
+  const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
-
-  React.useEffect(() => {
-    const handleHover = (e: any) => setHoveredLabel(e.detail);
-    window.addEventListener("vr-menu-hover", handleHover);
-    return () => window.removeEventListener("vr-menu-hover", handleHover);
-  }, []);
 
   React.useEffect(() => {
     if (!visible) {
@@ -206,7 +205,7 @@ export const VRRadialMenu = ({
     {
       label: "RESET POS",
       color: "#9b59b6",
-      action: () => window.dispatchEvent(new CustomEvent("vr-recenter")),
+      action: () => useLegoStore.getState().triggerVRRecenter(),
       theta: -Math.PI / 6, // Bottom Right
     },
     {
@@ -218,7 +217,6 @@ export const VRRadialMenu = ({
         } else {
           useLegoStore.getState().clearAll();
           setClearArmed(false);
-          onToggle(); // Close menu
         }
       },
       theta: -Math.PI / 2, // Down
@@ -227,13 +225,13 @@ export const VRRadialMenu = ({
       label: showXRPerf ? "HIDE STATS" : "SHOW STATS",
       color: "#ffb8b8",
       action: () => setShowXRPerf(!showXRPerf),
-      theta: -Math.PI * 5 / 6, // Bottom Left
+      theta: (-Math.PI * 5) / 6, // Bottom Left
     },
     {
       label: "DELETE",
       color: "#ff4757",
       action: () => setMode("Delete"),
-      theta: Math.PI * 5 / 6, // Top Left
+      theta: (Math.PI * 5) / 6, // Top Left
     },
   ];
 
