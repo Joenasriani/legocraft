@@ -137,9 +137,18 @@ export const VRPalette = () => {
       if (inputSource.handedness === "left" && inputSource.gamepad) {
         const yPressed = !!inputSource.gamepad.buttons[5]?.pressed; // Left Y Button
         if (yPressed && !wasYPressed.current) {
-          setVisible(!visible);
+          const menuVisible = useLegoStore.getState().vrMenuVisible;
+          if (!menuVisible) {
+            setVisible(!visible);
+          }
         }
         wasYPressed.current = yPressed;
+      } else if (inputSource.handedness === "right" && inputSource.gamepad) {
+        const bPressed = !!inputSource.gamepad.buttons[5]?.pressed; // Right B button
+        // B closes everything, including palette, if visible
+        if (bPressed && visible) {
+          setVisible(false);
+        }
       }
     }
 

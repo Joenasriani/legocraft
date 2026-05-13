@@ -83,73 +83,123 @@ export const VRRadialMenu = ({
   const { gl } = useThree();
   const [visible, setVisible] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
-  const leftGripIndex = useRef<number | null>(null);
-
-  React.useEffect(() => {
-    const handleConn = (i: number) => (e: any) => {
-      if (e.data?.handedness === "left") leftGripIndex.current = i;
-    };
-    const c0 = gl.xr.getControllerGrip(0);
-    const cb0 = handleConn(0);
-    c0.addEventListener("connected", cb0);
-
-    const c1 = gl.xr.getControllerGrip(1);
-    const cb1 = handleConn(1);
-    c1.addEventListener("connected", cb1);
-
-    return () => {
-      c0.removeEventListener("connected", cb0);
-      c1.removeEventListener("connected", cb1);
-    };
-  }, [gl.xr]);
-
+  
   const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
 
   const wasXPressed = useRef(false);
   const wasYPressed = useRef(false);
+  const wasAPressed = useRef(false);
   const wasBPressed = useRef(false);
+
+  const fallbackAnchorRef = useRef<THREE.Vector3>(new THREE.Vector3());
 
   useFrame((state) => {
     const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
-    if (!session) {
+    const frame = state.gl.xr.getFrame();
+    const refSpace = state.gl.xr.getReferenceSpace();
+
+    if (!session || !frame || !refSpace) {
       if (visible) setVisible(false);
       return;
     }
 
-    let leftGrip: THREE.Group | null = null;
-    if (leftGripIndex.current !== null) {
-      leftGrip = gl.xr.getControllerGrip(leftGripIndex.current);
-    }
+    let AnyButton4Pressed = false; // X on left, A on right
+    let AnyButton5Pressed = false; // Y on left, B on right
+
+    let isLeftTracked = false;
+    let leftWristPos: THREE.Vector3 | null = null;
+    let leftWristQuat: THREE.Quaternion | null = null;
 
     for (const inputSource of session.inputSources) {
       if (!inputSource) continue;
-      if (inputSource.handedness === "left" && inputSource.gamepad) {
-        const xPressed = !!inputSource.gamepad.buttons[4]?.pressed;
-        if (xPressed && !wasXPressed.current) {
-          setVisible(!visible);
+      
+      if (inputSource.handedness === "left") {
+        isLeftTracked = true;
+        if (inputSource.gripSpace) {
+          const pose = frame.getPose(inputSource.gripSpace, refSpace);
+          if (pose) {
+            leftWristPos = new THREE.Vector3(
+              pose.transform.position.x,
+              pose.transform.position.y,
+              pose.transform.position.z
+            );
+            leftWristQuat = new THREE.Quaternion(
+              pose.transform.orientation.x,
+              pose.transform.orientation.y,
+              pose.transform.orientation.z,
+              pose.transform.orientation.w
+            );
+          }
         }
-        wasXPressed.current = xPressed;
-      } else if (inputSource.handedness === "right" && inputSource.gamepad) {
-        const bPressed = !!inputSource.gamepad.buttons[5]?.pressed;
-        if (bPressed && !wasBPressed.current) {
-          if (visible) setVisible(false);
+      }
+
+      if (inputSource.gamepad) {
+        if (inputSource.handedness === "left") {
+          const xPressed = !!inputSource.gamepad.buttons[4]?.pressed;
+          if (xPressed && !wasXPressed.current) {
+            setVisible(!visible);
+            if (!visible && (!leftWristPos)) {
+              // about to become visible without a left controller to anchor to
+              const camPos = new THREE.Vector3().setFromMatrixPosition(state.camera.matrixWorld);
+              const forward = new THREE.Vector3(0, 0, -1).transformDirection(state.camera.matrixWorld).normalize();
+              forward.y = 0;
+              forward.normalize();
+              const distance = vrScale === "human" ? 1.4 : 10;
+              fallbackAnchorRef.current.copy(camPos).addScaledVector(forward, distance);
+              fallbackAnchorRef.current.y = camPos.y - (vrScale === "human" ? 0.1 : 4);
+            }
+          }
+          wasXPressed.current = xPressed;
+        } else if (inputSource.handedness === "right") {
+          const bPressed = !!inputSource.gamepad.buttons[5]?.pressed;
+          if (bPressed && !wasBPressed.current && visible) {
+            setVisible(false);
+          }
+          wasBPressed.current = bPressed;
         }
-        wasBPressed.current = bPressed;
       }
     }
 
-    if (leftGrip && groupRef.current && visible) {
-      // Track the left wrist exactly
-      const wristPos = new THREE.Vector3().setFromMatrixPosition(
-        leftGrip.matrixWorld,
-      );
-      groupRef.current.position.copy(wristPos);
+    if (groupRef.current && visible) {
+      const camPos = new THREE.Vector3().setFromMatrixPosition(state.camera.matrixWorld);
       
-      // Use controller's local up vector to offset the menu slightly above the wrist
-      const up = new THREE.Vector3(0, 1, 0).transformDirection(leftGrip.matrixWorld).normalize();
-      const offset = vrScale === "human" ? 0.05 : 1.5;
-      groupRef.current.position.addScaledVector(up, offset);
+      if (leftWristPos && leftWristQuat) {
+        // Track the left wrist exactly
+        groupRef.current.position.copy(leftWristPos);
+        
+        // Use controller's local up and forward vectors 
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(leftWristQuat).normalize();
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(leftWristQuat).normalize();
+        
+        const offsetUp = vrScale === "human" ? 0.2 : 1.5;
+        const offsetForward = vrScale === "human" ? 0.2 : 1.5;
+        
+        groupRef.current.position.addScaledVector(up, offsetUp);
+        groupRef.current.position.addScaledVector(forward, offsetForward);
+        
+        if ((import.meta as any).env.DEV) {
+          const now = Date.now();
+          if (!(window as any)._lastVRMenuAnchorLog || now - (window as any)._lastVRMenuAnchorLog > 5000) {
+            (window as any)._lastVRMenuAnchorLog = now;
+            console.log("[VR Menu] Anchored to Left Controller", leftWristPos);
+          }
+        }
+      } else {
+        // Fallback: Camera anchored statically where it was opened
+        groupRef.current.position.copy(fallbackAnchorRef.current);
+        
+        if ((import.meta as any).env.DEV) {
+          const now = Date.now();
+          if (!(window as any)._lastVRMenuAnchorLog || now - (window as any)._lastVRMenuAnchorLog > 5000) {
+            (window as any)._lastVRMenuAnchorLog = now;
+            console.log("[VR Menu] Anchored to Camera Fallback", groupRef.current.position);
+          }
+        }
+      }
+      
+      // Face the camera specifically
+      groupRef.current.lookAt(camPos.x, groupRef.current.position.y, camPos.z);
     }
   });
 
@@ -166,11 +216,11 @@ export const VRRadialMenu = ({
     }
   }, [visible]);
 
-  const radius = vrScale === "human" ? 0.15 : 2.2;
-  const boxDepth = vrScale === "human" ? 0.01 : 0.1;
-  const fontSize = vrScale === "human" ? 0.03 : 0.5;
+  const radius = vrScale === "human" ? 0.22 : 2.2;
+  const boxDepth = vrScale === "human" ? 0.015 : 0.1;
+  const fontSize = vrScale === "human" ? 0.035 : 0.5;
   const boxWidth = ((radius * Math.PI) / 3) * 1.5;
-  const boxHeight = vrScale === "human" ? 0.06 : 1.0;
+  const boxHeight = vrScale === "human" ? 0.08 : 1.0;
 
   const showXRPerf = useLegoStore((s) => s.showXRPerf);
   const setShowXRPerf = useLegoStore((s) => s.setShowXRPerf);

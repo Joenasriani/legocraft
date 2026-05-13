@@ -1,7 +1,8 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { useLegoStore, getGroupBricks } from "../Store";
+import { useLegoStore, getGroupBricks, hasBrickAbove } from "../Store";
+import { MODULE_SIZE, BRICK_HEIGHT } from "../constants";
 import { audioService } from "../services/AudioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
@@ -22,6 +23,28 @@ export const HumanViewLayer = ({
 }) => {
   const { gl, scene } = useThree();
   const raycaster = new THREE.Raycaster();
+
+  useEffect(() => {
+    const attachHandedness = (event: any) => {
+      event.target.userData.handedness = event.data.handedness;
+      if ((import.meta as any).env.DEV) {
+        console.log(`[VR] Controller Connected!`, {
+          handedness: event.data.handedness,
+          targetRayMode: event.data.targetRayMode,
+          gamepad: !!event.data.gamepad,
+          profiles: event.data.profiles,
+        });
+      }
+    };
+    const c0 = gl.xr.getController(0);
+    const c1 = gl.xr.getController(1);
+    c0.addEventListener("connected", attachHandedness);
+    c1.addEventListener("connected", attachHandedness);
+    return () => {
+      c0.removeEventListener("connected", attachHandedness);
+      c1.removeEventListener("connected", attachHandedness);
+    };
+  }, [gl.xr]);
 
   const mode = useLegoStore((s) => s.mode);
   const bricks = useLegoStore((s) => s.bricks);
@@ -85,6 +108,7 @@ export const HumanViewLayer = ({
   const latestValidPlacement = useRef<{
     p: THREE.Vector3;
     n: THREE.Vector3;
+    tk: string;
   } | null>(null);
 
   useFrame((state, delta) => {
@@ -103,14 +127,26 @@ export const HumanViewLayer = ({
       if (source.handedness === "right") rightInput = source;
     }
 
-    const rightIdx = inputSourcesArray.findIndex(
-      (s) => s?.handedness === "right",
-    );
-    const leftIdx = inputSourcesArray.findIndex(
-      (s) => s?.handedness === "left",
-    );
-    if (rightIdx >= 0) rightController = gl.xr.getController(rightIdx);
-    if (leftIdx >= 0) leftController = gl.xr.getController(leftIdx);
+    for (let i = 0; i < 2; i++) {
+      const c = gl.xr.getController(i);
+      if (c && c.userData && c.userData.handedness === "left") {
+        leftController = c;
+      }
+      if (c && c.userData && c.userData.handedness === "right") {
+        rightController = c;
+      }
+    }
+
+    if ((import.meta as any).env.DEV) {
+      if (leftController && !(leftController as any)._hasLogged) {
+        console.log("[VR] left controller found in useFrame");
+        (leftController as any)._hasLogged = true;
+      }
+      if (rightController && !(rightController as any)._hasLogged) {
+        console.log("[VR] right controller found in useFrame");
+        (rightController as any)._hasLogged = true;
+      }
+    }
 
     // Handle Locomotion (Thumbsticks)
     const dt = Math.min(delta, 0.05);
@@ -200,6 +236,20 @@ export const HumanViewLayer = ({
         }
       }
 
+      if ((import.meta as any).env.DEV) {
+        const now = Date.now();
+        if (!(window as any)._lastVRLaserLog || now - (window as any)._lastVRLaserLog > 1000) {
+          (window as any)._lastVRLaserLog = now;
+          console.log("[VR] Ray diagnostics", {
+            origin: pos.toArray().map((v) => v.toFixed(3)),
+            direction: fwd.toArray().map((v) => v.toFixed(3)),
+            gridRegistered: targets.some(t => t.name === "Grid"),
+            hitTarget: hit?.object?.name || null,
+            hitPoint: hit?.point?.toArray().map((v) => v.toFixed(3)) || null,
+          });
+        }
+      }
+
       let laserDistance = 0.5; // Short length when not hitting anything
       const gp = rightInput.gamepad;
       const triggerPressed = gp.buttons[0]?.pressed || false;
@@ -259,10 +309,11 @@ export const HumanViewLayer = ({
           else targetKind = "brick-side";
 
           if (isValidPlacement) {
-            latestValidPlacement.current = { p: unscaledP3, n: normal };
+            latestValidPlacement.current = { p: unscaledP3, n: normal, tk: targetKind };
             updateGhostPosition(unscaledP3, normal, targetKind);
           } else {
             latestValidPlacement.current = null;
+            updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
           }
 
           if (triggerPressed && !wasTriggerPressed.current) {
@@ -279,11 +330,23 @@ export const HumanViewLayer = ({
                     const allb = useLegoStore.getState().bricks;
                     const g = getGroupBricks(b, allb);
                     removeBricks(g.map((bz: any) => bz.id));
+                  } else if (selectionMode === "Multi") {
+                    const allb = useLegoStore.getState().bricks;
+                    if (hasBrickAbove(b, allb, MODULE_SIZE, BRICK_HEIGHT)) {
+                      useLegoStore.getState().setToastMessage("Cannot select: brick has another brick above it.");
+                      setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                      triggerHaptics(rightInput, HapticType.ERROR);
+                      audioService.playInvalid();
+                    } else {
+                      useLegoStore.getState().toggleMultiSelectBrickId(b.id);
+                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                      audioService.playDelete();
+                    }
                   } else {
                     removeBrick(b.id);
+                    triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                    audioService.playDelete();
                   }
-                  triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                  audioService.playDelete();
                 }
               }
             } else if (latestValidPlacement.current) {
@@ -311,6 +374,7 @@ export const HumanViewLayer = ({
                 action: "commit",
                 point: latestValidPlacement.current.p,
                 normal: latestValidPlacement.current.n,
+                targetKind: latestValidPlacement.current.tk
               });
               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
               audioService.playPlace();
@@ -336,6 +400,7 @@ export const HumanViewLayer = ({
                   action: "commit",
                   point: latestValidPlacement.current.p,
                   normal: latestValidPlacement.current.n,
+                  targetKind: latestValidPlacement.current.tk
                 });
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
                 audioService.playPlace();
@@ -375,18 +440,64 @@ export const HumanViewLayer = ({
                       const allb = useLegoStore.getState().bricks;
                       const g = getGroupBricks(b, allb);
                       removeBricks(g.map((bz: any) => bz.id));
+                    } else if (selectionMode === "Multi") {
+                      const allb = useLegoStore.getState().bricks;
+                      if (hasBrickAbove(b, allb, MODULE_SIZE, BRICK_HEIGHT)) {
+                        useLegoStore.getState().setToastMessage("Cannot select: brick has another brick above it.");
+                        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                        triggerHaptics(rightInput, HapticType.ERROR);
+                        audioService.playInvalid();
+                      } else {
+                        useLegoStore.getState().toggleMultiSelectBrickId(b.id);
+                        triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                        audioService.playDelete();
+                      }
                     } else {
                       removeBrick(b.id);
+                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                      audioService.playDelete();
                     }
-                    triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                    audioService.playDelete();
                   } else if (mode === "Move" && !movingBrickId) {
-                    setMovingBrickId(b.id);
-                    setIsDraggingBrick(true);
-                    setJustSelectedBrick(true);
-                    triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.playSelect();
-                    useLegoStore.getState().triggerSetGhostRotation(b.rotation);
+                    if (selectionMode === "Group") {
+                      setMovingBrickId(b.id);
+                      setIsDraggingBrick(true);
+                      setJustSelectedBrick(true);
+                      triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+                      audioService.playSelect();
+                      useLegoStore.getState().triggerSetGhostRotation(b.rotation);
+                    } else if (selectionMode === "Multi") {
+                      const stateBefore = useLegoStore.getState();
+                      if (hasBrickAbove(b, stateBefore.bricks, MODULE_SIZE, BRICK_HEIGHT)) {
+                        stateBefore.setToastMessage("Cannot select: brick has another brick above it.");
+                        setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                        triggerHaptics(rightInput, HapticType.ERROR);
+                        audioService.playInvalid();
+                      } else {
+                        // Squeeze multi behaves like touch: simple toggle
+                        stateBefore.toggleMultiSelectBrickId(b.id);
+                        const stateAfter = useLegoStore.getState();
+                        const isNowSelected = stateAfter.multiSelectedBrickIds.includes(b.id);
+                        if (isNowSelected) {
+                          setMovingBrickId(b.id);
+                          setIsDraggingBrick(true); // VR squeeze immediately starts dragging
+                        } else if (stateBefore.movingBrickId === b.id) {
+                          const newAnchor = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
+                          setMovingBrickId(newAnchor || null);
+                          setIsDraggingBrick(!!newAnchor);
+                        }
+                        setJustSelectedBrick(true);
+                        triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+                        audioService.playSelect();
+                        useLegoStore.getState().triggerSetGhostRotation(b.rotation);
+                      }
+                    } else {
+                      setMovingBrickId(b.id);
+                      setIsDraggingBrick(true);
+                      setJustSelectedBrick(true);
+                      triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+                      audioService.playSelect();
+                      useLegoStore.getState().triggerSetGhostRotation(b.rotation);
+                    }
                   }
                 }
               }
@@ -397,12 +508,9 @@ export const HumanViewLayer = ({
         // Not aimed at valid target, clear action states without logic
         // if users click trigger, nothing happens.
         useLegoStore.getState().setVRMenuHoverContent("");
+        updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+        latestValidPlacement.current = null;
       }
-
-      // Always track state
-      wasActionPressed.current = actionPressed;
-      wasTriggerPressed.current = triggerPressed;
-      wasSqueezePressed.current = squeezePressed;
 
       // Render laser
       if (laserRef.current) {
@@ -418,11 +526,16 @@ export const HumanViewLayer = ({
       if (hoverMarkerRef.current) {
         if (
           hit &&
-          (hit.object.name === "BrickBodyInstanced" ||
-            hit.object.name === "BrickStudsInstanced")
+          (hit.object.name === "Grid" ||
+            hit.object.name === "GridHelper" ||
+            hit.object.name === "FloorPlacementCollider" ||
+            hit.object.name.includes("BrickBody") ||
+            hit.object.name.includes("BrickStuds") ||
+            hit.object.name.includes("VRMenuBtn"))
         ) {
           hoverMarkerRef.current.visible = true;
           hoverMarkerRef.current.position.copy(hit.point);
+          // Nudge marker slightly along normal to avoid Z-fighting
           const normal = hit.face?.normal
             ? hit.face.normal
                 .clone()
@@ -430,7 +543,8 @@ export const HumanViewLayer = ({
                 .normalize()
             : new THREE.Vector3(0, 1, 0);
 
-          // Align marker with the normal
+          hoverMarkerRef.current.position.addScaledVector(normal, 0.001);
+
           const quaternion = new THREE.Quaternion().setFromUnitVectors(
             new THREE.Vector3(0, 0, 1),
             normal,
@@ -440,6 +554,11 @@ export const HumanViewLayer = ({
           hoverMarkerRef.current.visible = false;
         }
       }
+
+      // Always track state
+      wasActionPressed.current = actionPressed;
+      wasTriggerPressed.current = triggerPressed;
+      wasSqueezePressed.current = squeezePressed;
     } else {
       if (laserRef.current) laserRef.current.visible = false;
       if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
@@ -447,7 +566,7 @@ export const HumanViewLayer = ({
   });
 
   return (
-    <>
+    <group>
       <mesh ref={laserRef} geometry={laserGeo} visible={false}>
         <meshBasicMaterial
           color="#aaaaaa"
@@ -465,6 +584,6 @@ export const HumanViewLayer = ({
           depthTest={false}
         />
       </mesh>
-    </>
+    </group>
   );
 };

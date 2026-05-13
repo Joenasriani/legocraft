@@ -409,12 +409,14 @@ interface LegoStore {
     action?: string;
     point?: any;
     normal?: any;
+    targetKind?: string;
   } | null;
   triggerVRControllerAction: (detail: {
     type: string;
     action?: string;
     point?: any;
     normal?: any;
+    targetKind?: string;
   }) => void;
 
   vrMenuHoverContent: string | null;

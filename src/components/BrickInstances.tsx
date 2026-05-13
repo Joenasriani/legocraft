@@ -78,7 +78,14 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
                 .getState()
                 .removeBricks(groupBricks.map((b) => b.id));
             } else if (selectionMode === "Multi") {
-              useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
+              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+                setToastMessage(
+                  "Cannot select: brick has another brick above it.",
+                );
+                setTimeout(() => setToastMessage(null), 3000);
+              } else {
+                useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
+              }
             } else {
               removeBrick(brick.id);
             }
@@ -93,67 +100,67 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               useLegoStore.getState().setJustSelectedBrick(true);
               useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
             } else if (selectionMode === "Multi") {
-              const stateBefore = useLegoStore.getState();
-              const isTouch =
-                e.pointerType === "touch" ||
-                e.nativeEvent?.pointerType === "touch" ||
-                e.nativeEvent?.type?.includes("touch");
-
-              if (isTouch) {
-                stateBefore.toggleMultiSelectBrickId(brick.id);
-              } else {
-                if (e.shiftKey) {
-                  stateBefore.toggleMultiSelectBrickId(brick.id);
-                } else {
-                  if (!stateBefore.multiSelectedBrickIds.includes(brick.id)) {
-                    stateBefore.setMultiSelectedBrickIds([brick.id]);
-                  }
-                }
-              }
-
-              const stateAfter = useLegoStore.getState();
-              const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
-                brick.id,
-              );
-              if (isNowSelected) {
-                setMovingBrickId(brick.id);
-              } else if (stateBefore.movingBrickId === brick.id) {
-                // If it was the anchor, find a new anchor or clear it
-                const newAnchor =
-                  stateAfter.multiSelectedBrickIds[
-                    stateAfter.multiSelectedBrickIds.length - 1
-                  ];
-                setMovingBrickId(newAnchor || null);
-              }
-              e.nativeEvent?.target?.setPointerCapture?.(
-                e.nativeEvent.pointerId,
-              );
-              useLegoStore.getState().setIsDraggingBrick(false);
-              useLegoStore.getState().setJustSelectedBrick(true);
-              useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
-            } else {
               if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
                 setToastMessage(
-                  "Cannot move: brick has another brick above it.",
+                  "Cannot select: brick has another brick above it.",
                 );
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
-                const wasAlreadySelected =
-                  useLegoStore.getState().movingBrickId === brick.id;
-                setMovingBrickId(brick.id);
+                const stateBefore = useLegoStore.getState();
+                const isTouch =
+                  e.pointerType === "touch" ||
+                  e.nativeEvent?.pointerType === "touch" ||
+                  e.nativeEvent?.type?.includes("touch");
+
+                if (isTouch) {
+                  stateBefore.toggleMultiSelectBrickId(brick.id);
+                } else {
+                  if (e.shiftKey) {
+                    stateBefore.toggleMultiSelectBrickId(brick.id);
+                  } else {
+                    if (!stateBefore.multiSelectedBrickIds.includes(brick.id)) {
+                      stateBefore.setMultiSelectedBrickIds([brick.id]);
+                    }
+                  }
+                }
+
+                const stateAfter = useLegoStore.getState();
+                const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
+                  brick.id,
+                );
+                if (isNowSelected) {
+                  setMovingBrickId(brick.id);
+                } else if (stateBefore.movingBrickId === brick.id) {
+                  // If it was the anchor, find a new anchor or clear it
+                  const newAnchor =
+                    stateAfter.multiSelectedBrickIds[
+                      stateAfter.multiSelectedBrickIds.length - 1
+                    ];
+                  setMovingBrickId(newAnchor || null);
+                }
                 e.nativeEvent?.target?.setPointerCapture?.(
                   e.nativeEvent.pointerId,
                 );
                 useLegoStore.getState().setIsDraggingBrick(false);
-                if (!wasAlreadySelected) {
-                  useLegoStore.getState().setJustSelectedBrick(true);
-                  useLegoStore
-                    .getState()
-                    .triggerSetGhostRotation(brick.rotation);
-                  useLegoStore
-                    .getState()
-                    .triggerSetGhostPosition(brick.position);
-                }
+                useLegoStore.getState().setJustSelectedBrick(true);
+                useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
+              }
+            } else {
+              const wasAlreadySelected =
+                useLegoStore.getState().movingBrickId === brick.id;
+              setMovingBrickId(brick.id);
+              e.nativeEvent?.target?.setPointerCapture?.(
+                e.nativeEvent.pointerId,
+              );
+              useLegoStore.getState().setIsDraggingBrick(false);
+              if (!wasAlreadySelected) {
+                useLegoStore.getState().setJustSelectedBrick(true);
+                useLegoStore
+                  .getState()
+                  .triggerSetGhostRotation(brick.rotation);
+                useLegoStore
+                  .getState()
+                  .triggerSetGhostPosition(brick.position);
               }
             }
           }

@@ -786,37 +786,35 @@ export default function App() {
                       console.log("[VR] enterVR requested");
                     setShowVRPrompt(false);
                     setIsFadingToVR(true);
-                    setTimeout(() => {
-                      try {
-                        const p = xrStore.enterVR();
-                        if (p && typeof p.catch === "function") {
-                          p.then(() => {
-                            if ((import.meta as any).env.DEV)
-                              console.log("[VR] enterVR success");
-                          }).catch((err: any) => {
-                            if ((import.meta as any).env.DEV)
-                              console.error("[VR] enterVR failed:", err);
-                            let msg =
-                              "VR failed to start. Browser may not support WebXR.";
-                            if (err?.name === "NotAllowedError")
-                              msg =
-                                "WebXR session request was denied. Check site permissions.";
-                            if (err?.name === "SecurityError")
-                              msg = "VR session restricted by security policy.";
-                            setXrError(msg);
-                            setIsFadingToVR(false);
-                          });
-                        }
-                      } catch (e: any) {
-                        if ((import.meta as any).env.DEV)
-                          console.error("[VR] enterVR exception:", e);
-                        setXrError(
-                          `Unexpected XR error: ${e.message || "Unknown error"}`,
-                        );
-                        setIsFadingToVR(false);
+                    try {
+                      const p = xrStore.enterVR();
+                      if (p && typeof p.catch === "function") {
+                        p.then(() => {
+                          if ((import.meta as any).env.DEV)
+                            console.log("[VR] enterVR success");
+                        }).catch((err: any) => {
+                          if ((import.meta as any).env.DEV)
+                            console.error("[VR] enterVR failed:", err);
+                          let msg =
+                            "VR failed to start. Browser may not support WebXR.";
+                          if (err?.name === "NotAllowedError")
+                            msg =
+                              "WebXR session request was denied. Check site permissions.";
+                          if (err?.name === "SecurityError")
+                            msg = "VR session restricted by security policy.";
+                          setXrError(msg);
+                          setIsFadingToVR(false);
+                        });
                       }
-                      setTimeout(() => setIsFadingToVR(false), 2000);
-                    }, 500);
+                    } catch (e: any) {
+                      if ((import.meta as any).env.DEV)
+                        console.error("[VR] enterVR exception:", e);
+                      setXrError(
+                        `Unexpected XR error: ${e.message || "Unknown error"}`,
+                      );
+                      setIsFadingToVR(false);
+                    }
+                    setTimeout(() => setIsFadingToVR(false), 2000);
                   }}
                   className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold transition-colors shadow-[0_0_15px_rgba(168,85,247,0.4)] border border-purple-400/50"
                 >
