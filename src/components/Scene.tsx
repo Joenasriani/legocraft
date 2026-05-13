@@ -19,6 +19,7 @@ import {
   LEGO_COLORS,
   getBrickAABB,
   doAABBsOverlap,
+  hasBrickAbove,
 } from "../Store";
 
 import {
@@ -876,7 +877,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!hit) return false;
     const position = computePlacementTarget(hit.point, hit.normal, hit.targetKind);
     latestPlacementCandidateRef.current = { hit, position };
-    setGhostPosition(position);
+
+    const state = useLegoStore.getState();
+    const isDragging = state.isDraggingBrick;
+    const isBuilding = state.mode === "Build";
+    const isPlacingPreset = state.activePreset !== null;
+
+    if (isDragging || isBuilding || isPlacingPreset) {
+      setGhostPosition(position);
+    } else if (state.mode === "Move" && movingBrick) {
+      // Keep ghost at anchor if not dragging yet
+      setGhostPosition(movingBrick.position);
+    }
     return true;
   };
 
@@ -914,6 +926,33 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
         if (distance > threshold) {
           if (isMoving && !useLegoStore.getState().isDraggingBrick) {
+            // Check if the selection can be moved
+            const { bricks, movingBrickId, selectionMode, multiSelectedBrickIds } = useLegoStore.getState();
+            const anchor = bricks.find(b => b.id === movingBrickId);
+            if (anchor) {
+              let selectionIds = [anchor.id];
+              let selectionBricks = [anchor];
+              if (selectionMode === "Group") {
+                selectionBricks = getGroupBricks(anchor, bricks);
+                selectionIds = selectionBricks.map(b => b.id);
+              } else if (selectionMode === "Multi") {
+                selectionIds = multiSelectedBrickIds;
+                selectionBricks = bricks.filter(b => selectionIds.includes(b.id));
+              }
+
+              const isBlocked = selectionBricks.some(b => 
+                hasBrickAbove(b, bricks, MODULE_SIZE, BRICK_HEIGHT, selectionIds)
+              );
+
+              if (isBlocked) {
+                useLegoStore.getState().setToastMessage("Cannot move: selection is blocked by other bricks on top.");
+                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                // Reset pointerDownPos so we don't keep trying to start dragging
+                pointerDownPos.current = null;
+                return;
+              }
+            }
+
             setIsDraggingBrick(true);
             useLegoStore.getState().setJustSelectedBrick(false);
           }
@@ -1882,11 +1921,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <LegoBrick
               id="ghost"
               type={selectedType}
-              color={selectedColor}
+              color="#4da6ff"
               position={ghostPosition}
               rotation={ghostRotation}
               isPlacementGhost
-              opacity={xrSessionActive ? 0.3 : 0.6}
+              opacity={xrSessionActive ? 0.2 : 0.4}
             />
             {!xrSessionActive && (
               <mesh

@@ -27,7 +27,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   rotation,
   isPlacementGhost,
   hideMesh,
-  opacity = 0.3,
+  opacity = 0.35,
 }) => {
   const { w, d } = getBrickDimensions(type);
   const [isGrabbed, setIsGrabbed] = useState(false);
@@ -88,8 +88,8 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
               />
               <meshStandardMaterial
                 color={color}
-                roughness={0.1}
-                metalness={0.1}
+                roughness={0.0}
+                metalness={0.5}
                 transparent={isPlacementGhost}
                 opacity={isPlacementGhost ? opacity : 1}
                 depthWrite={!isPlacementGhost}
@@ -114,8 +114,8 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
                   />
                   <meshStandardMaterial
                     color={color}
-                    roughness={0.1}
-                    metalness={0.1}
+                    roughness={0.0}
+                    metalness={0.5}
                     transparent={isPlacementGhost}
                     opacity={isPlacementGhost ? opacity : 1}
                     depthWrite={!isPlacementGhost}

@@ -218,17 +218,12 @@ export const checkPlacementValid = (
   if (ghostData.position[1] <= epsilon)
     return { valid: true, reason: "grounded" };
 
-  // Connection check (Support from below)
+  // Connection check (Support from below or connected to existing)
   const isSupported = bricks.some((b) => {
     if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
       return false;
 
-    const dy = ghostData.position[1] - b.position[1];
-    if (Math.abs(dy - brickHeight) < epsilon) {
-      const bAABB = getBrickAABB(b);
-      return doAABBsOverlap(ghostAABB, bAABB);
-    }
-    return false;
+    return areBricksConnected(ghostData as BrickData, b as BrickData);
   });
 
   return isSupported
@@ -241,41 +236,25 @@ export const hasBrickAbove = (
   bricks: Omit<BrickData, "color">[],
   moduleSize: number,
   brickHeight: number,
+  ignoreIds: string[] = [],
   epsilon: number = PLACEMENT_EPSILON,
 ) => {
   const targetTopY = brick.position[1] + brickHeight;
 
-  // 1. Find bricks exactly one layer above the selected brick
+  // Find bricks exactly one layer above the selected brick
   const bricksDirectlyAbove = bricks.filter(
-    (b) => Math.abs(b.position[1] - targetTopY) < epsilon,
+    (b) =>
+      b.id !== brick.id &&
+      !ignoreIds.includes(b.id) &&
+      Math.abs(b.position[1] - targetTopY) < epsilon,
   );
 
   const targetAABB = getBrickAABB(brick);
 
   for (const b of bricksDirectlyAbove) {
     const bAABB = getBrickAABB(b);
-
-    // 2. Do they truly overlap?
     if (doAABBsOverlap(targetAABB, bAABB)) {
-      // 3. Check if removing selected brick removes the other brick's valid support
-      const otherSupports = bricks.filter(
-        (other) =>
-          other.id !== brick.id &&
-          other.id !== b.id &&
-          Math.abs(other.position[1] - brick.position[1]) < epsilon,
-      );
-
-      let hasAlternateSupport = false;
-      for (const other of otherSupports) {
-        if (doAABBsOverlap(bAABB, getBrickAABB(other))) {
-          hasAlternateSupport = true;
-          break;
-        }
-      }
-
-      if (!hasAlternateSupport) {
-        return true;
-      }
+      return true;
     }
   }
 
@@ -319,11 +298,7 @@ export const checkStructureValid = (
     if (pb.position[1] > epsilon) {
       const isSupported = [...bricks, ...presetBricks].some((b) => {
         if (b.id === pb.id) return false;
-        const dy = pb.position[1] - b.position[1];
-        if (Math.abs(dy - brickHeight) < epsilon) {
-          return doAABBsOverlap(pbAABB, getBrickAABB(b));
-        }
-        return false;
+        return areBricksConnected(pb as BrickData, b as BrickData);
       });
       if (!isSupported) {
         return { valid: false, reason: "unsupported" };

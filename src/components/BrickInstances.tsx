@@ -74,20 +74,32 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
           if (mode === "Delete" || isSqueeze) {
             if (selectionMode === "Group") {
               const groupBricks = getGroupBricks(brick, allBricks);
-              useLegoStore
-                .getState()
-                .removeBricks(groupBricks.map((b) => b.id));
-            } else if (selectionMode === "Multi") {
-              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+              const groupIds = groupBricks.map((b) => b.id);
+              const isBlocked = groupBricks.some((b) =>
+                hasBrickAbove(b, allBricks, MODULE_SIZE, BRICK_HEIGHT, groupIds),
+              );
+              if (isBlocked) {
                 setToastMessage(
-                  "Cannot select: brick has another brick above it.",
+                  "Cannot delete: one or more bricks in the group have other bricks above them.",
                 );
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
-                useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
+                useLegoStore.getState().removeBricks(groupIds);
               }
+            } else if (selectionMode === "Multi") {
+              // In Delete mode, we toggle multi-select too?
+              // Or should it delete the selection?
+              // The original code was just toggling.
+              useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
             } else {
-              removeBrick(brick.id);
+              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+                setToastMessage(
+                  "Cannot delete: brick has another brick above it.",
+                );
+                setTimeout(() => setToastMessage(null), 3000);
+              } else {
+                removeBrick(brick.id);
+              }
             }
           } else if (mode === "Move") {
             if (selectionMode === "Group") {
@@ -100,51 +112,44 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               useLegoStore.getState().setJustSelectedBrick(true);
               useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
             } else if (selectionMode === "Multi") {
-              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
-                setToastMessage(
-                  "Cannot select: brick has another brick above it.",
-                );
-                setTimeout(() => setToastMessage(null), 3000);
-              } else {
-                const stateBefore = useLegoStore.getState();
-                const isTouch =
-                  e.pointerType === "touch" ||
-                  e.nativeEvent?.pointerType === "touch" ||
-                  e.nativeEvent?.type?.includes("touch");
+              const stateBefore = useLegoStore.getState();
+              const isTouch =
+                e.pointerType === "touch" ||
+                e.nativeEvent?.pointerType === "touch" ||
+                e.nativeEvent?.type?.includes("touch");
 
-                if (isTouch) {
+              if (isTouch) {
+                stateBefore.toggleMultiSelectBrickId(brick.id);
+              } else {
+                if (e.shiftKey) {
                   stateBefore.toggleMultiSelectBrickId(brick.id);
                 } else {
-                  if (e.shiftKey) {
-                    stateBefore.toggleMultiSelectBrickId(brick.id);
-                  } else {
-                    if (!stateBefore.multiSelectedBrickIds.includes(brick.id)) {
-                      stateBefore.setMultiSelectedBrickIds([brick.id]);
-                    }
+                  if (!stateBefore.multiSelectedBrickIds.includes(brick.id)) {
+                    stateBefore.setMultiSelectedBrickIds([brick.id]);
                   }
                 }
-
-                const stateAfter = useLegoStore.getState();
-                const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
-                  brick.id,
-                );
-                if (isNowSelected) {
-                  setMovingBrickId(brick.id);
-                } else if (stateBefore.movingBrickId === brick.id) {
-                  // If it was the anchor, find a new anchor or clear it
-                  const newAnchor =
-                    stateAfter.multiSelectedBrickIds[
-                      stateAfter.multiSelectedBrickIds.length - 1
-                    ];
-                  setMovingBrickId(newAnchor || null);
-                }
-                e.nativeEvent?.target?.setPointerCapture?.(
-                  e.nativeEvent.pointerId,
-                );
-                useLegoStore.getState().setIsDraggingBrick(false);
-                useLegoStore.getState().setJustSelectedBrick(true);
-                useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
               }
+
+              const stateAfter = useLegoStore.getState();
+              const isNowSelected = stateAfter.multiSelectedBrickIds.includes(
+                brick.id,
+              );
+              if (isNowSelected) {
+                setMovingBrickId(brick.id);
+              } else if (stateBefore.movingBrickId === brick.id) {
+                // If it was the anchor, find a new anchor or clear it
+                const newAnchor =
+                  stateAfter.multiSelectedBrickIds[
+                    stateAfter.multiSelectedBrickIds.length - 1
+                  ];
+                setMovingBrickId(newAnchor || null);
+              }
+              e.nativeEvent?.target?.setPointerCapture?.(
+                e.nativeEvent.pointerId,
+              );
+              useLegoStore.getState().setIsDraggingBrick(false);
+              useLegoStore.getState().setJustSelectedBrick(true);
+              useLegoStore.getState().triggerSetGhostRotation(brick.rotation);
             } else {
               const wasAlreadySelected =
                 useLegoStore.getState().movingBrickId === brick.id;
@@ -213,14 +218,14 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
   const material = useMemo(() => {
     return new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.1,
-      metalness: 0.1,
+      roughness: 0.0,
+      metalness: 0.5,
       transparent: !!isGhost,
-      opacity: isGhost ? 0.3 : 1,
+      opacity: isGhost ? 0.35 : 1,
       depthWrite: !isGhost,
       depthTest: true,
       toneMapped: !isGhost,
+      color: isGhost ? "#4da6ff" : color,
     });
   }, [color, isGhost]);
 
