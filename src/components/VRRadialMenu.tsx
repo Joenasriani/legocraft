@@ -42,6 +42,12 @@ const VRMenuItem = ({
   }, [seg.label]);
 
   React.useEffect(() => {
+    return () => {
+      if (textureRef.current) textureRef.current.dispose();
+    };
+  }, []);
+
+  React.useEffect(() => {
     if (meshRef.current) {
       vrTargetManager.register(meshRef.current);
       meshRef.current.userData.isVRMenuItem = true;

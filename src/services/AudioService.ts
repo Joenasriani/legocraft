@@ -7,6 +7,9 @@ class AudioService {
         window.AudioContext || (window as any).webkitAudioContext
       )();
     }
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume();
+    }
   }
 
   private playTone(

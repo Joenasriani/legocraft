@@ -1,6 +1,6 @@
 {
   "name": "Brick XR Builder",
   "description": "Immersive Lego building game for Mixed Reality with hand tracking, physics, and grid snapping.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["xr-spatial-tracking"],
   "majorCapabilities": []
 }

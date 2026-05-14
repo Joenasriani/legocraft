@@ -242,31 +242,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // It's hoisted or we can just keep executeCommitRef and update it right after executeCommit is defined later down.
   });
 
-  const vrControllerActionTrigger = useLegoStore(
-    (s) => s.vrControllerActionTrigger,
-  );
-  const vrControllerActionDetail = useLegoStore(
-    (s) => s.vrControllerActionDetail,
-  );
-
-  useEffect(() => {
-    if (vrControllerActionTrigger === 0 || !vrControllerActionDetail) return;
-    const { type, point, normal, action } = vrControllerActionDetail;
-
-    if (type === "cancelMove") {
-      // cancel move logic if any
+  const handleVRCommit = (point: THREE.Vector3, normal: THREE.Vector3, targetKind: string) => {
+    pointerDownPos.current = null;
+    if (executeCommitRef.current) {
+      const position = computePlacementTarget(point, normal, targetKind);
+      executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind }, position });
     }
-
-    if (type === "trigger") {
-      pointerDownPos.current = null;
-      if (action === "commit" && executeCommitRef.current) {
-        const { targetKind } = vrControllerActionDetail;
-        const trg = targetKind || "none";
-        const position = computePlacementTarget(point, normal, trg);
-        executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind: trg }, position });
-      }
-    }
-  }, [vrControllerActionTrigger, vrControllerActionDetail]);
+  };
 
   const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
 
@@ -1518,6 +1500,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (activePreset) {
       if (checkCurrentPresetPlacement().valid) {
         commitPreset(currentGhostPos, ghostRotation);
+        const nextGhostPos = [
+          currentGhostPos[0],
+          currentGhostPos[1] + BRICK_HEIGHT,
+          currentGhostPos[2],
+        ] as [number, number, number];
+        setGhostPosition(nextGhostPos);
+        latestPlacementCandidateRef.current = {
+          hit: candidate.hit,
+          position: nextGhostPos,
+        };
       } else {
         useLegoStore
           .getState()
@@ -1538,6 +1530,17 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           position: currentGhostPos,
           rotation: ghostRotation,
         });
+
+        const nextGhostPos = [
+          currentGhostPos[0],
+          currentGhostPos[1] + BRICK_HEIGHT,
+          currentGhostPos[2],
+        ] as [number, number, number];
+        setGhostPosition(nextGhostPos);
+        latestPlacementCandidateRef.current = {
+          hit: candidate.hit,
+          position: nextGhostPos,
+        };
       } else if (status.reason === "floating") {
         useLegoStore.getState().setToastMessage("Cannot float in mid-air.");
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
@@ -1879,6 +1882,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             currentVRScale={currentVRScale}
             sceneGroupRef={sceneGroupRef}
             updateGhostPosition={updateGhostPosition}
+            handleVRCommit={handleVRCommit}
           />
         )}
         {xrSessionActive && (

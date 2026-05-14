@@ -117,6 +117,12 @@ export const VRStats = () => {
     return textureRef.current;
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (textureRef.current) textureRef.current.dispose();
+    };
+  }, []);
+
   return (
     <group position={[-0.8, 1.2, -1]} rotation={[0, 0.4, 0]}>
       <mesh>

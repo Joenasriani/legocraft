@@ -52,6 +52,13 @@ const PaletteButton = ({
     () => (label ? createTextTexture(label, "white", "transparent") : null),
     [label],
   );
+  
+  React.useEffect(() => {
+    return () => {
+      if (tex) tex.dispose();
+    };
+  }, [tex]);
+
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const isHovered = hoveredLabel === hoverLabel;
 

@@ -202,6 +202,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       depth - 0.002,
     );
     geom.translate(0, BRICK_HEIGHT / 2, 0);
+    geom.computeBoundsTree();
     return geom;
   }, [width, depth]);
 
@@ -213,6 +214,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       12,
     );
     geom.translate(0, BRICK_HEIGHT + STUD_HEIGHT / 2, 0);
+    geom.computeBoundsTree();
     return geom;
   }, []);
 
@@ -228,6 +230,14 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       color: isGhost ? "#4da6ff" : color,
     });
   }, [color, isGhost]);
+
+  useEffect(() => {
+    return () => {
+      bodyGeom.dispose();
+      studGeom.dispose();
+      material.dispose();
+    };
+  }, [bodyGeom, studGeom, material]);
 
   useEffect(() => {
     const bodyMesh = bodyMeshRef.current;

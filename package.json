@@ -25,6 +25,7 @@
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "three": "^0.160.0",
+    "three-mesh-bvh": "^0.9.10",
     "three-stdlib": "^2.30.0",
     "vite": "^6.2.3",
     "zustand": "^5.0.13"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
+import { Html } from "@react-three/drei";
 import { motion, AnimatePresence } from "motion/react";
 import {
   useLegoStore,
@@ -652,9 +653,15 @@ export default function App() {
     }
 
     if (navigator.xr && navigator.xr.isSessionSupported) {
-      navigator.xr.isSessionSupported("immersive-vr").then((supported) => {
-        setVrStatus(supported ? "ready" : "unsupported");
-      });
+      navigator.xr
+        .isSessionSupported("immersive-vr")
+        .then((supported) => {
+          setVrStatus(supported ? "ready" : "unsupported");
+        })
+        .catch((err) => {
+          console.warn("isSessionSupported rejected, likely iframe policy:", err);
+          setVrStatus("unsupported");
+        });
     } else {
       setVrStatus("unsupported");
     }
@@ -837,7 +844,15 @@ export default function App() {
           style={{ touchAction: "none" }}
           gl={{ antialias: true }}
         >
-          <Suspense fallback={null}>
+          <Suspense
+            fallback={
+              <Html center>
+                <div className="bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm font-mono text-sm border border-purple-500/30 whitespace-nowrap">
+                  Loading Experience...
+                </div>
+              </Html>
+            }
+          >
             <Scene xrStore={xrStore} />
           </Suspense>
         </Canvas>
