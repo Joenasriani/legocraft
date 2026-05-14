@@ -96,9 +96,7 @@ export const VRRadialMenu = ({
     if (visible && gl.xr.isPresenting) {
       const camera = gl.xr.getCamera();
       setTransform(getSafePanelTransform(camera));
-      useLegoStore.getState().setVrMenuVisible(true);
     } else {
-      useLegoStore.getState().setVrMenuVisible(false);
       setTransform(null);
     }
   }, [visible, gl.xr]);

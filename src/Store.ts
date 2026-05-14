@@ -364,8 +364,6 @@ interface LegoStore {
   // VR Tools Settings
   showXRPerf: boolean;
   setShowXRPerf: (show: boolean) => void;
-  showXROnboarding: boolean;
-  setShowXROnboarding: (show: boolean) => void;
   xrPanel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error";
   setXRPanel: (panel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error") => void;
   closeXRPanel: () => void;
@@ -433,8 +431,6 @@ interface LegoStore {
   loadPreset: (presetName: ActivePresetName | null) => void;
   commitPreset: (position: [number, number, number], rotation: number) => void;
   activePreset: ActivePresetName | null;
-  vrMenuVisible: boolean;
-  setVrMenuVisible: (visible: boolean) => void;
   toastTimeoutId: ReturnType<typeof setTimeout> | null;
 }
 
@@ -738,7 +734,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   selectedType: "2x2",
   selectedColor: COLORS[0],
   activePreset: null,
-  vrMenuVisible: false,
   undoStack: [],
   redoStack: [],
   toastMessage: null,
@@ -759,8 +754,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
   showXRPerf: false,
   setShowXRPerf: (showXRPerf) => set({ showXRPerf }),
-  showXROnboarding: true,
-  setShowXROnboarding: (showXROnboarding) => set({ showXROnboarding }),
   xrPanel: "none",
   setXRPanel: (panel) => set({ xrPanel: panel }),
   closeXRPanel: () => set({ xrPanel: "none" }),
@@ -1052,8 +1045,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     scheduleSave(nextState.bricks);
   },
-
-  setVrMenuVisible: (visible) => set({ vrMenuVisible: visible }),
 
   clearAll: () => {
     const { bricks, undoStack } = get();

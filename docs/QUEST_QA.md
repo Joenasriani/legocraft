@@ -12,7 +12,7 @@
 2. Verify "VR Ready" status.
 3. Enter VR.
 4. Build a structure of >50 bricks.
-5. Perform snap turns (Stationary Mode is default).
+5. Confirm right stick does not snap-turn in this stabilization build.
 6. Delete bricks using grip.
 7. Open VR menu and switch presets.
 8. Exit VR and check if progress persists in Desktop view.

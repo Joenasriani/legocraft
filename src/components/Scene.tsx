@@ -197,7 +197,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
   const selectionMode = useLegoStore((state) => state.selectionMode);
   const showXRPerf = useLegoStore((state) => state.showXRPerf);
-  const showXROnboarding = useLegoStore((state) => state.showXROnboarding);
   const xrPanel = useLegoStore((state) => state.xrPanel);
 
   const multiSelectedBrickIds = useLegoStore(
@@ -1915,6 +1914,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           <mesh
             ref={vrFloorRef}
             name="VRFloorCollider"
+            userData={{ isVRPlacementTarget: true }}
             rotation={[-Math.PI / 2, 0, 0]}
             position={[0, 0, 0]}
             visible={false}

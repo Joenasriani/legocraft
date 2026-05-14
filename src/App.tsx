@@ -555,6 +555,7 @@ const PRESET_OPTIONS: {
 ];
 
 const xrStore = createXRStore({
+  emulate: false,
   frameRate: "mid",
   frameBufferScaling: "low",
   layers: false,
