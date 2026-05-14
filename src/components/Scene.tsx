@@ -38,6 +38,7 @@ import { clientToCanvasNDC } from "../lib/pointer";
 import { HumanViewLayer } from "./VRViewLayers";
 import { VRStats } from "./VRStats";
 import { VROnboarding } from "./VROnboarding";
+import { VRWaitingPanel } from "./VRWaitingPanel";
 
 export type VRScaleMode = "human";
 
@@ -45,29 +46,11 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
 };
 
-const VRWaitingPanel = () => {
-  return (
-    <group position={[0, 1.5, -2]}>
-      <mesh position={[0, 0, -0.05]}>
-        <planeGeometry args={[2.5, 0.8]} />
-        <meshBasicMaterial color="#111111" opacity={0.8} transparent depthWrite={false} />
-      </mesh>
-      <Text
-        color="white"
-        fontSize={0.15}
-        maxWidth={2.2}
-        textAlign="center"
-        anchorX="center"
-        anchorY="middle"
-      >
-        {"Waiting for Quest controllers...\nPress any button on your controllers.\nIf this continues, exit VR and re-enter."}
-      </Text>
-    </group>
-  );
-};
+
 
 const VRDebugVisibilityLayer = () => {
-  if (!(import.meta as any).env.DEV) return null;
+  const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get("debugXR") === "1";
+  if (!isDebug) return null;
   return (
     <group position={[0, 0, 0]}>
       <mesh position={[0, 1, -2]}>
@@ -131,8 +114,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (!active) {
         setVrScale("human");
         setVrReady(true);
+        useLegoStore.getState().closeXRPanel();
       } else {
         setVrReady(false);
+        useLegoStore.getState().setXRPanel("waitingControllers");
       }
     });
   }, [xrStore, gl]);
@@ -176,6 +161,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           try {
             await teleportPlayer({ x: 0, y: 0, z: -1.0 });
             setVrReady(true);
+            const store = useLegoStore.getState();
+            if (store.xrPanel === "waitingControllers") {
+              store.setXRPanel("onboarding");
+            }
             if ((import.meta as any).env.DEV)
               console.log("[VR] Status: VR ready");
           } catch (e) {
@@ -209,6 +198,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const selectionMode = useLegoStore((state) => state.selectionMode);
   const showXRPerf = useLegoStore((state) => state.showXRPerf);
   const showXROnboarding = useLegoStore((state) => state.showXROnboarding);
+  const xrPanel = useLegoStore((state) => state.xrPanel);
 
   const multiSelectedBrickIds = useLegoStore(
     (state) => state.multiSelectedBrickIds,
@@ -260,16 +250,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useFrame((state) => {
     if (controlsRef.current) {
-      if (isCameraLocked || isVR) {
+      if (isCameraLocked || isVR || xrSessionActive || gl.xr.isPresenting) {
         controlsRef.current.enabled = false;
       } else {
         controlsRef.current.enabled =
-          !isBrickInteractionRef.current && !isDraggingBrick;
+          !isBrickInteractionRef.current && !isDraggingBrick && !marqueeStart;
       }
-      if (controlsRef.current.target.y < 0) {
+      if (controlsRef.current.target.y < 0 && !xrSessionActive && !gl.xr.isPresenting) {
         controlsRef.current.target.y = 0;
       }
-      if (state.camera.position.y < 0.1) {
+      if (state.camera.position.y < 0.1 && !xrSessionActive && !gl.xr.isPresenting) {
         state.camera.position.y = 0.1;
       }
     }
@@ -1795,7 +1785,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (cameraZoomTrigger === 0) return;
-    if (!controlsRef.current) return;
+    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting) return;
     if (cameraZoomDirection === "in") {
       controlsRef.current.dollyIn(1.15);
     } else {
@@ -1806,7 +1796,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (cameraRecenterTrigger === 0) return;
-    if (!controlsRef.current) return;
+    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting) return;
     controlsRef.current.reset();
     controlsRef.current.target.set(0, 0.2, 0);
     camera.position.set(2.8, 2.2, 3.2);
@@ -1870,13 +1860,23 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       <Suspense fallback={null}>
         {xrSessionActive && showXRPerf && <VRStats />}
-        {xrSessionActive && showXROnboarding && <VROnboarding />}
-        {xrSessionActive && !vrReady && (
-          <>
-            <VRWaitingPanel />
-            <VRDebugVisibilityLayer />
-          </>
-        )}
+        {xrSessionActive && (() => {
+          switch (xrPanel) {
+            case "waitingControllers":
+              return <VRWaitingPanel />;
+            case "onboarding":
+              return <VROnboarding />;
+            case "buildMenu":
+              return <VRRadialMenu vrScale={vrScale} />;
+            case "palette":
+              return <VRPalette />;
+            default:
+              return null;
+          }
+        })()}
+        
+        {xrSessionActive && <VRDebugVisibilityLayer />}
+        
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
             currentVRScale={currentVRScale}
@@ -1884,15 +1884,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             updateGhostPosition={updateGhostPosition}
             handleVRCommit={handleVRCommit}
           />
-        )}
-        {xrSessionActive && (
-          <>
-            <VRRadialMenu
-              vrScale={vrScale}
-              currentVRScale={currentVRScale}
-            />
-            <VRPalette />
-          </>
         )}
       </Suspense>
       <group

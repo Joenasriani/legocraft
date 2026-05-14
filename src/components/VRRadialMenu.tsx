@@ -5,6 +5,7 @@ import { useLegoStore } from "../Store";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
+import { getSafePanelTransform } from "../lib/vrHelpers";
 
 const VRMenuItem = ({
   seg,
@@ -81,137 +82,26 @@ const VRMenuItem = ({
 
 export const VRRadialMenu = ({
   vrScale,
-  currentVRScale,
 }: {
   vrScale: "human" | "micro";
-  currentVRScale: number;
 }) => {
   const { gl } = useThree();
-  const [visible, setVisible] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
-  
   const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
-
-  const wasXPressed = useRef(false);
-  const wasYPressed = useRef(false);
-  const wasAPressed = useRef(false);
-  const wasBPressed = useRef(false);
-
-  const fallbackAnchorRef = useRef<THREE.Vector3>(new THREE.Vector3());
-
-  useFrame((state) => {
-    const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
-    const frame = state.gl.xr.getFrame();
-    const refSpace = state.gl.xr.getReferenceSpace();
-
-    if (!session || !frame || !refSpace) {
-      if (visible) setVisible(false);
-      return;
-    }
-
-    let AnyButton4Pressed = false; // X on left, A on right
-    let AnyButton5Pressed = false; // Y on left, B on right
-
-    let isLeftTracked = false;
-    let leftWristPos: THREE.Vector3 | null = null;
-    let leftWristQuat: THREE.Quaternion | null = null;
-
-    for (const inputSource of session.inputSources) {
-      if (!inputSource) continue;
-      
-      if (inputSource.handedness === "left") {
-        isLeftTracked = true;
-        if (inputSource.gripSpace) {
-          const pose = frame.getPose(inputSource.gripSpace, refSpace);
-          if (pose) {
-            leftWristPos = new THREE.Vector3(
-              pose.transform.position.x,
-              pose.transform.position.y,
-              pose.transform.position.z
-            );
-            leftWristQuat = new THREE.Quaternion(
-              pose.transform.orientation.x,
-              pose.transform.orientation.y,
-              pose.transform.orientation.z,
-              pose.transform.orientation.w
-            );
-          }
-        }
-      }
-
-      if (inputSource.gamepad) {
-        if (inputSource.handedness === "left") {
-          const xPressed = !!inputSource.gamepad.buttons[4]?.pressed;
-          if (xPressed && !wasXPressed.current) {
-            setVisible(!visible);
-            if (!visible && (!leftWristPos)) {
-              // about to become visible without a left controller to anchor to
-              const camPos = new THREE.Vector3().setFromMatrixPosition(state.camera.matrixWorld);
-              const forward = new THREE.Vector3(0, 0, -1).transformDirection(state.camera.matrixWorld).normalize();
-              forward.y = 0;
-              forward.normalize();
-              const distance = vrScale === "human" ? 1.4 : 10;
-              fallbackAnchorRef.current.copy(camPos).addScaledVector(forward, distance);
-              fallbackAnchorRef.current.y = camPos.y - (vrScale === "human" ? 0.1 : 4);
-            }
-          }
-          wasXPressed.current = xPressed;
-        } else if (inputSource.handedness === "right") {
-          const bPressed = !!inputSource.gamepad.buttons[5]?.pressed;
-          if (bPressed && !wasBPressed.current && visible) {
-            setVisible(false);
-          }
-          wasBPressed.current = bPressed;
-        }
-      }
-    }
-
-    if (groupRef.current && visible) {
-      const camPos = new THREE.Vector3().setFromMatrixPosition(state.camera.matrixWorld);
-      
-      if (leftWristPos && leftWristQuat) {
-        // Track the left wrist exactly
-        groupRef.current.position.copy(leftWristPos);
-        
-        // Use controller's local up and forward vectors 
-        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(leftWristQuat).normalize();
-        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(leftWristQuat).normalize();
-        
-        const offsetUp = vrScale === "human" ? 0.2 : 1.5;
-        const offsetForward = vrScale === "human" ? 0.2 : 1.5;
-        
-        groupRef.current.position.addScaledVector(up, offsetUp);
-        groupRef.current.position.addScaledVector(forward, offsetForward);
-        
-        if ((import.meta as any).env.DEV) {
-          const now = Date.now();
-          if (!(window as any)._lastVRMenuAnchorLog || now - (window as any)._lastVRMenuAnchorLog > 5000) {
-            (window as any)._lastVRMenuAnchorLog = now;
-            console.log("[VR Menu] Anchored to Left Controller", leftWristPos);
-          }
-        }
-      } else {
-        // Fallback: Camera anchored statically where it was opened
-        groupRef.current.position.copy(fallbackAnchorRef.current);
-        
-        if ((import.meta as any).env.DEV) {
-          const now = Date.now();
-          if (!(window as any)._lastVRMenuAnchorLog || now - (window as any)._lastVRMenuAnchorLog > 5000) {
-            (window as any)._lastVRMenuAnchorLog = now;
-            console.log("[VR Menu] Anchored to Camera Fallback", groupRef.current.position);
-          }
-        }
-      }
-      
-      // Face the camera specifically
-      groupRef.current.lookAt(camPos.x, groupRef.current.position.y, camPos.z);
-    }
-  });
+  const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
+  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion } | null>(null);
 
   React.useEffect(() => {
-    useLegoStore.getState().setVrMenuVisible(visible);
-  }, [visible]);
+    if (visible && gl.xr.isPresenting) {
+      const camera = gl.xr.getCamera();
+      setTransform(getSafePanelTransform(camera));
+      useLegoStore.getState().setVrMenuVisible(true);
+    } else {
+      useLegoStore.getState().setVrMenuVisible(false);
+      setTransform(null);
+    }
+  }, [visible, gl.xr]);
 
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
@@ -242,7 +132,7 @@ export const VRRadialMenu = ({
       }
     }
     action();
-    setVisible(false);
+    useLegoStore.getState().closeXRPanel();
   };
 
   const SEGMENTS = [
@@ -291,19 +181,11 @@ export const VRRadialMenu = ({
     },
   ];
 
-  const billboardRef = useRef<THREE.Group>(null);
-  useFrame((state) => {
-    if (billboardRef.current && visible) {
-      billboardRef.current.quaternion.copy(state.camera.quaternion);
-    }
-  });
-
-  if (!visible) return null;
+  if (!visible || !transform) return null;
 
   return (
-    <group ref={groupRef}>
-      <group ref={billboardRef}>
-        {SEGMENTS.map((seg, i) => {
+    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
+      {SEGMENTS.map((seg, i) => {
           const x = Math.cos(seg.theta) * radius;
           const y = Math.sin(seg.theta) * radius;
           const isHovered = hoveredLabel === seg.label;
@@ -322,7 +204,6 @@ export const VRRadialMenu = ({
             </group>
           );
         })}
-      </group>
     </group>
   );
 };

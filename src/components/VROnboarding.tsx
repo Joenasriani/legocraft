@@ -1,19 +1,32 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Text } from "@react-three/drei";
+import { useThree } from "@react-three/fiber";
+import * as THREE from "three";
+import { getSafePanelTransform } from "../lib/vrHelpers";
+import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
+  const { camera } = useThree();
+  const [transform, setTransform] = useState({ 
+    position: new THREE.Vector3(0, 1.4, -2), 
+    quaternion: new THREE.Quaternion() 
+  });
+
+  useEffect(() => {
+    setTransform(getSafePanelTransform(camera));
+  }, [camera]);
+
   const instructions = [
-    { key: "X", action: "Build Menu" },
-    { key: "B", action: "Close/Cancel" },
-    { key: "Y", action: "Palette, only if menu is closed" },
     { key: "Right Trigger", action: "Place/Select" },
     { key: "Right Grip", action: "Pick/Move" },
     { key: "A", action: "Rotate" },
-    { key: "Right Stick", action: "Snap Turn" },
+    { key: "X", action: "Build Menu" },
+    { key: "Y", action: "Palette (if menu closed)" },
+    { key: "B", action: "Close Menu / Cancel" },
   ];
 
   return (
-    <group position={[0, 1.4, -2]}>
+    <group position={transform.position} quaternion={transform.quaternion}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.2, 1.5]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />

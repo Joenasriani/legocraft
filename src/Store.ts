@@ -366,6 +366,9 @@ interface LegoStore {
   setShowXRPerf: (show: boolean) => void;
   showXROnboarding: boolean;
   setShowXROnboarding: (show: boolean) => void;
+  xrPanel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error";
+  setXRPanel: (panel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error") => void;
+  closeXRPanel: () => void;
 
   // Event Triggers
   rotateGhostTrigger: number;
@@ -758,6 +761,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setShowXRPerf: (showXRPerf) => set({ showXRPerf }),
   showXROnboarding: true,
   setShowXROnboarding: (showXROnboarding) => set({ showXROnboarding }),
+  xrPanel: "none",
+  setXRPanel: (panel) => set({ xrPanel: panel }),
+  closeXRPanel: () => set({ xrPanel: "none" }),
 
   // Event Triggers
   rotateGhostTrigger: 0,

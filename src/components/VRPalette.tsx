@@ -107,91 +107,33 @@ const PaletteButton = ({
   );
 };
 
+import { getSafePanelTransform } from "../lib/vrHelpers";
+
 export const VRPalette = () => {
   const { gl } = useThree();
-  const [visible, setVisible] = useState(false);
   const groupRef = useRef<THREE.Group>(null);
-  const leftGripIndex = useRef<number | null>(null);
-  const wasYPressed = useRef(false);
+  
+  const visible = useLegoStore((s) => s.xrPanel === "palette");
+  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion } | null>(null);
 
   React.useEffect(() => {
-    const handleConn = (i: number) => (e: any) => {
-      if (e.data?.handedness === "left") leftGripIndex.current = i;
-    };
-    const c0 = gl.xr.getControllerGrip(0);
-    const cb0 = handleConn(0);
-    c0.addEventListener("connected", cb0);
-
-    const c1 = gl.xr.getControllerGrip(1);
-    const cb1 = handleConn(1);
-    c1.addEventListener("connected", cb1);
-
-    return () => {
-      c0.removeEventListener("connected", cb0);
-      c1.removeEventListener("connected", cb1);
-    };
-  }, [gl.xr]);
-
-  useFrame(() => {
-    const session = gl.xr.isPresenting ? gl.xr.getSession() : null;
-    if (!session) {
-      if (visible) setVisible(false);
-      return;
+    if (visible && gl.xr.isPresenting) {
+      const camera = gl.xr.getCamera();
+      setTransform(getSafePanelTransform(camera));
+    } else {
+      setTransform(null);
     }
-
-    for (const inputSource of session.inputSources) {
-      if (!inputSource) continue;
-      if (inputSource.handedness === "left" && inputSource.gamepad) {
-        const yPressed = !!inputSource.gamepad.buttons[5]?.pressed; // Left Y Button
-        if (yPressed && !wasYPressed.current) {
-          const menuVisible = useLegoStore.getState().vrMenuVisible;
-          if (!menuVisible) {
-            setVisible(!visible);
-          }
-        }
-        wasYPressed.current = yPressed;
-      } else if (inputSource.handedness === "right" && inputSource.gamepad) {
-        const bPressed = !!inputSource.gamepad.buttons[5]?.pressed; // Right B button
-        // B closes everything, including palette, if visible
-        if (bPressed && visible) {
-          setVisible(false);
-        }
-      }
-    }
-
-    if (leftGripIndex.current !== null && groupRef.current && visible) {
-      const leftGrip = gl.xr.getControllerGrip(leftGripIndex.current);
-      const wristPos = new THREE.Vector3().setFromMatrixPosition(
-        leftGrip.matrixWorld,
-      );
-      groupRef.current.position.copy(wristPos);
-
-      const up = new THREE.Vector3(0, 1, 0)
-        .transformDirection(leftGrip.matrixWorld)
-        .normalize();
-      const right = new THREE.Vector3(1, 0, 0)
-        .transformDirection(leftGrip.matrixWorld)
-        .normalize();
-
-      // Offset palette to the right and above of left wrist
-      groupRef.current.position
-        .addScaledVector(up, 0.1)
-        .addScaledVector(right, 0.15);
-
-      // Point it vaguely towards the face
-      groupRef.current.lookAt(gl.xr.getCamera().position);
-    }
-  });
+  }, [visible, gl.xr]);
 
   const activeColor = useLegoStore((s) => s.selectedColor);
   const setActiveColor = useLegoStore((s) => s.setSelectedColor);
   const activeBrickType = useLegoStore((s) => s.selectedType);
   const setActiveBrickType = useLegoStore((s) => s.setSelectedType);
 
-  if (!visible) return null;
+  if (!visible || !transform) return null;
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
       {/* Background Panel */}
       <mesh position={[0, -0.05, -0.01]}>
         <boxGeometry args={[0.35, 0.35, 0.005]} />

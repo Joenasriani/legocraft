@@ -138,6 +138,9 @@ export const HumanViewLayer = ({
   const wasTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
   const wasActionPressed = useRef(false);
+  const wasXPressed = useRef(false);
+  const wasYPressed = useRef(false);
+  const wasBPressed = useRef(false);
   const snapTurnCooldown = useRef(false);
 
   const isValidTarget = (obj: THREE.Object3D) => {
@@ -191,7 +194,7 @@ export const HumanViewLayer = ({
     tk: string;
   } | null>(null);
 
-  useFrame((state, delta) => {
+  useFrame((state, delta, xrFrame) => {
     const session = gl.xr.getSession();
     if (!session || !sceneGroupRef.current) return;
 
@@ -226,6 +229,54 @@ export const HumanViewLayer = ({
         console.log("[VR] right controller found in useFrame");
         (rightController as any)._hasLogged = true;
       }
+    }
+
+    const store = useLegoStore.getState();
+    const currentPanel = store.xrPanel;
+
+    // Process Left controller UI buttons
+    if (leftInput && leftInput.gamepad) {
+      const gp = leftInput.gamepad;
+      const xPressed = gp.buttons[4]?.pressed || false;
+      const yPressed = gp.buttons[5]?.pressed || false;
+
+      if (xPressed && !wasXPressed.current) {
+        if (currentPanel === "buildMenu") {
+          store.closeXRPanel();
+        } else {
+          store.setXRPanel("buildMenu");
+        }
+      }
+      if (yPressed && !wasYPressed.current) {
+        if (currentPanel === "palette") {
+          store.closeXRPanel();
+        } else if (currentPanel !== "buildMenu") {
+          store.setXRPanel("palette");
+        }
+      }
+
+      wasXPressed.current = xPressed;
+      wasYPressed.current = yPressed;
+    }
+
+    // Process Right controller UI buttons
+    if (rightInput && rightInput.gamepad) {
+      const gp = rightInput.gamepad;
+      // B button is 5 on right controller
+      const bPressed = gp.buttons[5]?.pressed || false;
+
+      if (bPressed && !wasBPressed.current) {
+        if (currentPanel !== "none") {
+          store.closeXRPanel();
+        } else if (store.mode === "Move" && store.movingBrickId) {
+          store.setMovingBrickId(null);
+          store.setIsDraggingBrick(false);
+          triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+          audioService.playSelect();
+        }
+      }
+
+      wasBPressed.current = bPressed;
     }
 
     // Handle Locomotion (Thumbsticks)
@@ -267,32 +318,18 @@ export const HumanViewLayer = ({
     }
 
     if (rightInput && rightInput.gamepad && !menuVisible) {
+      // Snap turn completely disabled for stabilization pass
+      /*
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
         if (!snapTurnCooldown.current) {
           snapTurnCooldown.current = true;
-          const turnAngleRad = (snapTurnAngle * Math.PI) / 180;
-          const turnAngle = xAxis > 0 ? -turnAngleRad : turnAngleRad;
-          const refSpace = gl.xr.getReferenceSpace();
-          if (refSpace) {
-            const rotTransform = new XRRigidTransform(
-              { x: 0, y: 0, z: 0 },
-              {
-                x: 0,
-                y: Math.sin(turnAngle / 2),
-                z: 0,
-                w: Math.cos(turnAngle / 2),
-              },
-            );
-            const newRefSpace = refSpace.getOffsetReferenceSpace(rotTransform);
-            gl.xr.setReferenceSpace(newRefSpace);
-            triggerHaptics(rightInput, HapticType.SNAP_TURN);
-            audioService.playSelect();
-          }
+          // snap turn logic
         }
       } else {
         snapTurnCooldown.current = false;
       }
+      */
     }
 
     if (rightController && rightInput && rightInput.gamepad) {
@@ -338,13 +375,13 @@ export const HumanViewLayer = ({
       const aPressed = gp.buttons[4]?.pressed || false;
       const actionPressed = aPressed;
 
+      let isMenuItem = false;
+      let onTriggerFn = null;
+      let hitMenuLabel = "";
+
       if (hit) {
         laserDistance = hit.distance;
         let currentHitObj: THREE.Object3D | null = hit.object;
-        let isMenuItem = false;
-        let onTriggerFn = null;
-
-        let hitMenuLabel = "";
 
         while (currentHitObj) {
           if (currentHitObj.userData?.isVRMenuItem) {
@@ -415,12 +452,7 @@ export const HumanViewLayer = ({
           }
 
           if (actionPressed && !wasActionPressed.current) {
-            if (mode === "Move" && movingBrickId) {
-              setMovingBrickId(null);
-              setIsDraggingBrick(false);
-              triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-              audioService.playSelect();
-            } else if (mode === "Build" || mode === "Move") {
+            if (mode === "Build" || mode === "Move") {
               useLegoStore.getState().triggerRotateGhost();
               triggerHaptics(rightInput, HapticType.ROTATE);
               audioService.playRotate();
@@ -574,7 +606,7 @@ export const HumanViewLayer = ({
             hit.object.name === "FloorPlacementCollider" ||
             hit.object.name.includes("BrickBody") ||
             hit.object.name.includes("BrickStuds") ||
-            hit.object.name.includes("VRMenuBtn"))
+            isMenuItem)
         ) {
           hoverMarkerRef.current.visible = true;
           hoverMarkerRef.current.position.copy(hit.point);
@@ -610,7 +642,7 @@ export const HumanViewLayer = ({
 
   return (
     <group>
-      <mesh ref={laserRef} geometry={laserGeo} visible={false}>
+      <mesh ref={laserRef} geometry={laserGeo} visible={false} raycast={() => null}>
         <meshBasicMaterial
           color="#aaaaaa"
           transparent
@@ -618,7 +650,7 @@ export const HumanViewLayer = ({
           depthWrite={false}
         />
       </mesh>
-      <mesh ref={hoverMarkerRef} visible={false}>
+      <mesh ref={hoverMarkerRef} visible={false} raycast={() => null}>
         <ringGeometry args={[0.02, 0.025, 16]} />
         <meshBasicMaterial
           color="#ffffff"
