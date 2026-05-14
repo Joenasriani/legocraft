@@ -6,15 +6,16 @@ import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const [transform, setTransform] = useState({ 
     position: new THREE.Vector3(0, 1.4, -2), 
     quaternion: new THREE.Quaternion() 
   });
 
   useEffect(() => {
-    setTransform(getSafePanelTransform(camera));
-  }, [camera]);
+    const cam = gl.xr.isPresenting ? gl.xr.getCamera() : camera;
+    setTransform(getSafePanelTransform(cam));
+  }, [camera, gl.xr.isPresenting]);
 
   const instructions = [
     { key: "Right Trigger", action: "Place/Select" },

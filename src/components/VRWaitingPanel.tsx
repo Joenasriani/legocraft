@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { getSafePanelTransform } from "../lib/vrHelpers";
 
 export const VRWaitingPanel = () => {
-  const { camera } = useThree();
+  const { camera, gl } = useThree();
   const [transform, setTransform] = useState({ 
     position: new THREE.Vector3(0, 1.5, -2), 
     quaternion: new THREE.Quaternion() 
@@ -13,8 +13,9 @@ export const VRWaitingPanel = () => {
 
   useEffect(() => {
     // Only calculate once when it appears
-    setTransform(getSafePanelTransform(camera));
-  }, [camera]);
+    const cam = gl.xr.isPresenting ? gl.xr.getCamera() : camera;
+    setTransform(getSafePanelTransform(cam));
+  }, [camera, gl.xr.isPresenting]);
 
   return (
     <group position={transform.position} quaternion={transform.quaternion}>

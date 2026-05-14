@@ -604,118 +604,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       Math.round(highestY / BRICK_HEIGHT) * BRICK_HEIGHT,
     );
 
-    const validatePos = (x: number, y: number, z: number) => {
-      if (activePreset) {
-        const presetBricksData = getActivePresetBricks(activePreset, clipboard);
-        if (!presetBricksData) return { valid: false };
-        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-        const info = getPresetInfo(activePreset, clipboard);
-        const testBricks = presetBricksData
-          .filter(isValidBrickData)
-          .map((b) => {
-            let ox = b.position[0] - info.cx;
-            let oz = b.position[2] - info.cz;
-            let nx = ox,
-              nz = oz;
-            if (rotMod === 90 || rotMod === -270) {
-              nx = -oz;
-              nz = ox;
-            } else if (Math.abs(rotMod) === 180) {
-              nx = -ox;
-              nz = -oz;
-            } else if (rotMod === 270 || rotMod === -90) {
-              nx = oz;
-              nz = -ox;
-            }
-            return {
-              ...b,
-              rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-              position: [nx + x, b.position[1] + y, nz + z] as [
-                number,
-                number,
-                number,
-              ],
-            };
-          });
-        return checkStructureValid(
-          bricks,
-          testBricks,
-          MODULE_SIZE,
-          BRICK_HEIGHT,
-        );
-      } else if (mode === "Move" && movingBrick) {
-        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-        const oxA = movingBrick.position[0] - movingGroupPivot[0];
-        const ozA = movingBrick.position[2] - movingGroupPivot[2];
-        let rXA = oxA,
-          rZA = ozA;
-        if (rotMod === 90 || rotMod === -270) {
-          rXA = -ozA;
-          rZA = oxA;
-        } else if (Math.abs(rotMod) === 180) {
-          rXA = -oxA;
-          rZA = -ozA;
-        } else if (rotMod === 270 || rotMod === -90) {
-          rXA = ozA;
-          rZA = -oxA;
-        }
-
-        const cPX = x - rXA;
-        const cPZ = z - rZA;
-        const cPY = y - (movingBrick.position[1] - movingGroupPivot[1]);
-
-        const testBricks = movingGroupOriginalBricks.map((b) => {
-          const ox = b.position[0] - movingGroupPivot[0];
-          const oz = b.position[2] - movingGroupPivot[2];
-          let nx = ox,
-            nz = oz;
-          if (rotMod === 90 || rotMod === -270) {
-            nx = -oz;
-            nz = ox;
-          } else if (Math.abs(rotMod) === 180) {
-            nx = -ox;
-            nz = -oz;
-          } else if (rotMod === 270 || rotMod === -90) {
-            nx = oz;
-            nz = -ox;
-          }
-          return {
-            ...b,
-            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-            position: [
-              cPX + nx,
-              cPY + (b.position[1] - movingGroupPivot[1]),
-              cPZ + nz,
-            ] as [number, number, number],
-          };
-        });
-        const others = bricks.filter(
-          (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
-        );
-        return checkStructureValid(
-          others,
-          testBricks,
-          MODULE_SIZE,
-          BRICK_HEIGHT,
-        );
-      } else {
-        return checkPlacementValid(
-          bricks,
-          {
-            id: "ghost",
-            type: activeType,
-            position: [x, y, z],
-            rotation: ghostRotation,
-          },
-          MODULE_SIZE,
-          BRICK_HEIGHT,
-        );
-      }
-    };
-
-    // Final result search logic
-    // We intentionally removed the neighbor-shifting logic as per requirements.
-    // The ghost stays exactly where requested, and validation will simply fail/succeed there.
     return [baseSnappedX, baseSnappedY, baseSnappedZ];
   };
 
@@ -1330,8 +1218,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const isBuilding = mode === "Build";
     const currentMovingBrickId = useLegoStore.getState().movingBrickId;
     const isMoving = mode === "Move" && currentMovingBrickId !== null;
+    const isDragging = useLegoStore.getState().isDraggingBrick;
     const isPlacingPreset = activePreset !== null;
-    if (isBuilding || isMoving || isPlacingPreset) {
+    
+    // In Move mode, don't snap to pointer on down unless we are already dragging
+    if (isBuilding || isPlacingPreset || (isMoving && isDragging)) {
       const hit = getCanonicalHit(e);
       if (hit) {
         if (!isCameraLocked && controlsRef.current) {
@@ -1652,6 +1543,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       ) {
         shouldCommit = false;
         useLegoStore.getState().setJustSelectedBrick(false);
+      }
+
+      if (mode === "Move" && !useLegoStore.getState().isDraggingBrick) {
+        shouldCommit = false;
       }
 
       if ((import.meta as any).env.DEV) {

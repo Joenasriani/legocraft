@@ -1,6 +1,6 @@
 {
   "name": "Brick XR Builder",
-  "description": "Lego-style building sandbox optimized for Meta Quest and WebXR with robust controller-based interactions.",
+  "description": "Browser-based WebXR Lego-style builder targeting Meta Quest Browser, with grid snapping, static brick placement, desktop/mobile controls, and experimental controller-based VR interaction.",
   "requestFramePermissions": ["xr-spatial-tracking"],
   "majorCapabilities": []
 }

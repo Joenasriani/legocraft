@@ -161,8 +161,9 @@ export const HumanViewLayer = ({
     }
 
     // VR target priority
-    const menuVisible = useLegoStore.getState().vrMenuVisible;
-    if (menuVisible) {
+    const xrPanel = useLegoStore.getState().xrPanel;
+    const isMenuPanel = xrPanel === "buildMenu" || xrPanel === "palette";
+    if (isMenuPanel) {
       return isMenu;
     } else {
       if (isMenu) return false;
@@ -281,9 +282,9 @@ export const HumanViewLayer = ({
 
     // Handle Locomotion (Thumbsticks)
     const dt = Math.min(delta, 0.05);
-    const menuVisible = useLegoStore.getState().vrMenuVisible;
+    const isAnyPanelOpen = store.xrPanel !== "none";
 
-    if (leftInput && leftInput.gamepad && !menuVisible) {
+    if (leftInput && leftInput.gamepad && !isAnyPanelOpen) {
       const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
       const zAxis = leftInput.gamepad.axes[3] || 0; // z forward/back
 
@@ -317,7 +318,7 @@ export const HumanViewLayer = ({
       }
     }
 
-    if (rightInput && rightInput.gamepad && !menuVisible) {
+    if (rightInput && rightInput.gamepad && !isAnyPanelOpen) {
       // Snap turn completely disabled for stabilization pass
       /*
       const xAxis = rightInput.gamepad.axes[2] || 0;
