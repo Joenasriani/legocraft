@@ -285,6 +285,8 @@ export const HumanViewLayer = ({
       }
     }
 
+    // Snap turn disabled in this build
+    /*
     if (rightInput && rightInput.gamepad) {
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
@@ -303,6 +305,7 @@ export const HumanViewLayer = ({
         snapTurnCooldown.current = false;
       }
     }
+    */
 
     if (rightController && rightInput && rightInput.gamepad) {
       const pos = new THREE.Vector3().setFromMatrixPosition(
@@ -534,7 +537,7 @@ export const HumanViewLayer = ({
                       const gIds = g.map((bz: any) => bz.id);
                       const isBlocked = g.some((bz: any) => hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds));
                       
-                      setIsDraggingBrick(true);
+                      setIsDraggingBrick(false);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -560,7 +563,7 @@ export const HumanViewLayer = ({
                           const br = stateAfter.bricks.find(bk => bk.id === id);
                           return br && hasBrickAbove(br, stateAfter.bricks, MODULE_SIZE, BRICK_HEIGHT, stateAfter.multiSelectedBrickIds);
                         });
-                        setIsDraggingBrick(true);
+                        setIsDraggingBrick(false);
                         squeezeStartPosRef.current = pos.clone();
                         
                         if (isBlocked) {
@@ -573,7 +576,7 @@ export const HumanViewLayer = ({
                         const newAnchorId = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
                         setMovingBrickId(newAnchorId || null);
                         if (newAnchorId) {
-                           setIsDraggingBrick(true);
+                           setIsDraggingBrick(false);
                         } else {
                           setIsDraggingBrick(false);
                         }
@@ -586,7 +589,7 @@ export const HumanViewLayer = ({
                       setMovingBrickId(b.id);
                       const blocks = useLegoStore.getState().bricks;
                       const isBlocked = hasBrickAbove(b, blocks, MODULE_SIZE, BRICK_HEIGHT);
-                      setIsDraggingBrick(true);
+                      setIsDraggingBrick(false);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {

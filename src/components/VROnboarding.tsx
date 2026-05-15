@@ -33,7 +33,6 @@ export const VROnboarding = () => {
 
   const instructions = [
     { key: "Left Stick", action: "Smooth Move" },
-    { key: "Right Stick", action: "Snap Turn" },
     { key: "Right Trigger", action: "Place/Confirm" },
     { key: "Right Grip", action: "Select/Move" },
     { key: "A", action: "Rotate" },
