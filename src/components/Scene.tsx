@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html, Text } from "@react-three/drei";
+import { OrbitControls, Html, Text, Sky } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -1795,8 +1795,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   return (
     <>
-      <color attach="background" args={["#4da6ff"]} />
-      <fog attach="fog" args={["#4da6ff", 50, 300]} />
+      <color attach="background" args={["#87CEEB"]} />
+      <Sky distance={450000} sunPosition={[0, 1, 0]} inclination={0} azimuth={0.25} />
+      <fog attach="fog" args={["#87CEEB", 50, 300]} />
       <ambientLight intensity={0.4} />
       <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
       <directionalLight

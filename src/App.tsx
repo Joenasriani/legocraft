@@ -1154,7 +1154,7 @@ export default function App() {
           shadows
           camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
           style={{ touchAction: "none" }}
-          gl={{ antialias: true }}
+          gl={{ antialias: true, alpha: false }}
         >
           <Suspense
             fallback={

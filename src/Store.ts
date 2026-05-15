@@ -755,7 +755,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setSnapTurnAngle: (snapTurnAngle) => set({ snapTurnAngle }),
   movementSpeed: 1.5,
   setMovementSpeed: (movementSpeed) => set({ movementSpeed }),
-  locomotionMode: "Stationary",
+  locomotionMode: "Smooth",
   setLocomotionMode: (locomotionMode) => set({ locomotionMode }),
 
   showXRPerf: false,

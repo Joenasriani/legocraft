@@ -11,8 +11,8 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
   const distance = 1.35; // 1.35m in front of headset
   const position = camPos.clone().add(camFwd.multiplyScalar(distance));
   
-  // Clamp Y between 1.1m and 1.7m (chest to eye level constraint)
-  position.y = Math.max(1.1, Math.min(1.7, camPos.y - 0.2)); 
+  // Allow it to be relative to the headset height, so seated players can reach it.
+  position.y = camPos.y - 0.15;
 
   // Instead of lookAt which can flip depending on height and axis,
   // we just use the camera's Y-rotation so the panel reliably faces the user.

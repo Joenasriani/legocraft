@@ -96,8 +96,7 @@ export const HumanViewLayer = ({
         curr.userData?.isGhost ||
         curr.name?.includes("ghost") ||
         curr.name?.startsWith("presetPreview") ||
-        curr.name === "GridHelper" ||
-        curr.name === "Grid"
+        curr.name === "GridHelper"
       ) {
         return false;
       }
@@ -108,7 +107,7 @@ export const HumanViewLayer = ({
     // VR target priority
     const xrPanel = useLegoStore.getState().xrPanel;
     if (xrPanel !== "none") {
-      return isMenu;
+      return isMenu || obj.name === "Grid" || obj.name === "FloorPlacementCollider" || obj.name === "VRFloorCollider";
     } else {
       if (isMenu) return false;
       return true;
@@ -159,11 +158,17 @@ export const HumanViewLayer = ({
 
     for (let i = 0; i < 2; i++) {
       const c = gl.xr.getController(i);
-      if (c && c.userData && c.userData.handedness === "left") {
-        leftController = c;
-      }
-      if (c && c.userData && c.userData.handedness === "right") {
-        rightController = c;
+      // Try to find the corresponding input source
+      // In Three.js, controller index order often matches inputSources order but not always reliably.
+      // Usually, session.inputSources index could be matched to controller index.
+      const source = inputSourcesArray[i];
+      if (source) {
+         if (source.handedness === "left") leftController = c;
+         if (source.handedness === "right") rightController = c;
+      } else if (c && c.userData) {
+         // Fallback
+         if (c.userData.handedness === "left") leftController = c;
+         if (c.userData.handedness === "right") rightController = c;
       }
     }
 
@@ -228,9 +233,8 @@ export const HumanViewLayer = ({
 
     // Handle Locomotion (Thumbsticks)
     const dt = Math.min(delta, 0.05);
-    const isAnyPanelOpen = store.xrPanel !== "none";
 
-    if (leftInput && leftInput.gamepad && !isAnyPanelOpen) {
+    if (leftInput && leftInput.gamepad) {
       const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
       const zAxis = leftInput.gamepad.axes[3] || 0; // z forward/back
 
@@ -264,19 +268,23 @@ export const HumanViewLayer = ({
       }
     }
 
-    if (rightInput && rightInput.gamepad && !isAnyPanelOpen) {
-      // Snap turn completely disabled for stabilization pass
-      /*
+    if (rightInput && rightInput.gamepad) {
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
         if (!snapTurnCooldown.current) {
           snapTurnCooldown.current = true;
-          // snap turn logic
+          const turnAngle = xAxis > 0 ? -Math.PI / 4 : Math.PI / 4;
+          const refSpace = gl.xr.getReferenceSpace();
+          if (refSpace) {
+            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turnAngle);
+            const transform = new XRRigidTransform(new DOMPoint(0,0,0), new DOMPoint(q.x, q.y, q.z, q.w));
+            gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
+          }
+          setTimeout(() => snapTurnCooldown.current = false, 500);
         }
-      } else {
+      } else if (Math.abs(xAxis) < 0.2) {
         snapTurnCooldown.current = false;
       }
-      */
     }
 
     if (rightController && rightInput && rightInput.gamepad) {
@@ -366,7 +374,7 @@ export const HumanViewLayer = ({
           }
 
           let targetKind = "none";
-          if (hit.object.name === "FloorPlacementCollider")
+          if (hit.object.name === "FloorPlacementCollider" || hit.object.name === "VRFloorCollider")
             targetKind = "floor";
           else if (Math.abs(normal.y) > 0.7) targetKind = "brick-top";
           else targetKind = "brick-side";

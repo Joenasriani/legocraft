@@ -1,23 +1,35 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Text } from "@react-three/drei";
-import { useThree } from "@react-three/fiber";
+import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
   const { camera, gl } = useThree();
+  const groupRef = useRef<THREE.Group>(null);
+  
+  // Set initial position out of view
   const [transform, setTransform] = useState({ 
-    position: new THREE.Vector3(0, 1.4, -2), 
+    position: new THREE.Vector3(0, 100, 0), 
     quaternion: new THREE.Quaternion() 
   });
 
-  useEffect(() => {
-    // Only calculate once when it appears
-    const cam = gl.xr.isPresenting ? gl.xr.getCamera() : camera;
-    setTransform(getSafePanelTransform(cam));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl.xr.isPresenting]);
+  useFrame((state, delta) => {
+    if (!gl.xr.isPresenting || !groupRef.current) return;
+    const cam = gl.xr.getCamera();
+    const target = getSafePanelTransform(cam);
+    
+    // Jump if extremely far away (e.g. first frame)
+    if (groupRef.current.position.distanceTo(target.position) > 10) {
+      groupRef.current.position.copy(target.position);
+      groupRef.current.quaternion.copy(target.quaternion);
+    } else {
+      // Smoothly follow
+      groupRef.current.position.lerp(target.position, delta * 3.0);
+      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
+    }
+  });
 
   const instructions = [
     { key: "Right Trigger", action: "Place/Select" },
@@ -38,7 +50,7 @@ export const VROnboarding = () => {
   }, [closeXRPanel]);
 
   return (
-    <group position={transform.position} quaternion={transform.quaternion}>
+    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.2, 1.8]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />
