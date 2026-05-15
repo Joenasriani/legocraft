@@ -417,13 +417,20 @@ export const HumanViewLayer = ({
                  }
                }
             } else if (latestValidPlacement.current) {
-               handleVRCommit(
-                  latestValidPlacement.current.p,
-                  latestValidPlacement.current.n,
-                  latestValidPlacement.current.tk
-               );
-               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-               audioService.playPlace();
+               if (mode === "Move" && (!movingBrickId || !useLegoStore.getState().isDraggingBrick)) {
+                 useLegoStore.getState().setToastMessage("Select and drag a brick to move it.");
+                 setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                 triggerHaptics(rightInput, HapticType.ERROR);
+                 audioService.playInvalid();
+               } else {
+                 handleVRCommit(
+                    latestValidPlacement.current.p,
+                    latestValidPlacement.current.n,
+                    latestValidPlacement.current.tk
+                 );
+                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                 audioService.playPlace();
+               }
             } else if (mode === "Build" || mode === "Move") {
                useLegoStore.getState().setToastMessage("Invalid placement surface.");
                triggerHaptics(rightInput, HapticType.ERROR);
@@ -502,7 +509,7 @@ export const HumanViewLayer = ({
                       const gIds = g.map((bz: any) => bz.id);
                       const isBlocked = g.some((bz: any) => hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds));
                       
-                      setIsDraggingBrick(!isBlocked);
+                      setIsDraggingBrick(false);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -528,7 +535,7 @@ export const HumanViewLayer = ({
                           const br = stateAfter.bricks.find(bk => bk.id === id);
                           return br && hasBrickAbove(br, stateAfter.bricks, MODULE_SIZE, BRICK_HEIGHT, stateAfter.multiSelectedBrickIds);
                         });
-                        setIsDraggingBrick(!isBlocked);
+                        setIsDraggingBrick(false);
                         squeezeStartPosRef.current = pos.clone();
                         
                         if (isBlocked) {
@@ -554,7 +561,7 @@ export const HumanViewLayer = ({
                       setMovingBrickId(b.id);
                       const blocks = useLegoStore.getState().bricks;
                       const isBlocked = hasBrickAbove(b, blocks, MODULE_SIZE, BRICK_HEIGHT);
-                      setIsDraggingBrick(!isBlocked);
+                      setIsDraggingBrick(false);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {

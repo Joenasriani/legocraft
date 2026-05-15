@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "tsx --test \"src/**/*.test.ts\""
+    "test": "vitest run"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",

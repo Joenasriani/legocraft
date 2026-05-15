@@ -21,5 +21,16 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
   euler.z = 0; // Remove roll
   const quaternion = new THREE.Quaternion().setFromEuler(euler);
 
+  // Safety check: ensure panel Z-axis (front) faces towards the headset
+  const panelForward = new THREE.Vector3(0, 0, 1).applyQuaternion(quaternion);
+  const toCamera = new THREE.Vector3().subVectors(camPos, position);
+  toCamera.y = 0;
+  if (toCamera.lengthSq() > 0.001) {
+    toCamera.normalize();
+    if (panelForward.dot(toCamera) < 0) {
+      quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+    }
+  }
+
   return { position, quaternion };
 }

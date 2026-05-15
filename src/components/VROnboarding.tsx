@@ -24,18 +24,27 @@ export const VROnboarding = () => {
     { key: "Right Grip", action: "Pick/Move" },
     { key: "A", action: "Rotate" },
     { key: "X", action: "Build Menu" },
-    { key: "Y", action: "Palette (if menu closed)" },
+    { key: "Y", action: "Palette" },
     { key: "B", action: "Close Menu / Cancel" },
   ];
+
+  const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      closeXRPanel();
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [closeXRPanel]);
 
   return (
     <group position={transform.position} quaternion={transform.quaternion}>
       <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[2.2, 1.5]} />
+        <planeGeometry args={[2.2, 1.8]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />
       </mesh>
       <Text
-        position={[0, 0.55, 0]}
+        position={[0, 0.7, 0]}
         color="#a855f7"
         fontSize={0.16}
         fontWeight="bold"
@@ -45,7 +54,20 @@ export const VROnboarding = () => {
         HOW TO BUILD
       </Text>
       
-      <group position={[-0.8, 0.25, 0]}>
+      <Text
+        position={[0, -0.7, 0]}
+        color="#fbbf24"
+        fontSize={0.07}
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={2.0}
+        textAlign="center"
+      >
+        Stationary VR: move physically in your play space. Controller locomotion is disabled.
+        {'\n'}Press B to close or wait.
+      </Text>
+      
+      <group position={[-0.8, 0.35, 0]}>
         {instructions.map((item, i) => {
           const y = -i * 0.12;
           return (
