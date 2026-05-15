@@ -31,38 +31,79 @@ export const HumanViewLayer = ({
   ) => boolean;
 }) => {
   const { gl, scene } = useThree();
-  const raycaster = new THREE.Raycaster();
+  const raycaster = useRef(new THREE.Raycaster()).current;
+
+  const controllersRef = useRef<{
+    left: { inputSource: XRInputSource | null; targetRay: THREE.Group | null; grip: THREE.Group | null };
+    right: { inputSource: XRInputSource | null; targetRay: THREE.Group | null; grip: THREE.Group | null };
+  }>({
+    left: { inputSource: null, targetRay: null, grip: null },
+    right: { inputSource: null, targetRay: null, grip: null },
+  });
 
   useEffect(() => {
-    const attachHandedness = (event: any) => {
-      event.target.userData.handedness = event.data.handedness;
-      event.target.userData.inputSource = event.data;
-      if ((import.meta as any).env.DEV) {
-        console.log(`[VR] Controller Connected!`, {
-          handedness: event.data.handedness,
-          targetRayMode: event.data.targetRayMode,
-          gamepad: !!event.data.gamepad,
-          profiles: event.data.profiles,
-        });
+    const session = gl.xr.getSession();
+    if (!session) return;
+
+    const resolveControllers = () => {
+      const state = {
+        left: { inputSource: null as XRInputSource | null, targetRay: null as THREE.Group | null, grip: null as THREE.Group | null },
+        right: { inputSource: null as XRInputSource | null, targetRay: null as THREE.Group | null, grip: null as THREE.Group | null },
+      };
+
+      const sources = Array.from(session.inputSources);
+      
+      for (let i = 0; i < 2; i++) {
+        const targetRay = gl.xr.getController(i);
+        const grip = gl.xr.getControllerGrip(i);
+        
+        let handedness = targetRay?.userData?.handedness || targetRay?.userData?.inputSource?.handedness;
+        let source = sources.find(s => s === targetRay?.userData?.inputSource);
+        
+        // Fallback matching
+        if (!handedness && targetRay) {
+           if (sources[i]) {
+              handedness = sources[i].handedness;
+              source = sources[i];
+           }
+        }
+
+        if (handedness === "left") {
+           state.left = { inputSource: source || null, targetRay, grip };
+        } else if (handedness === "right") {
+           state.right = { inputSource: source || null, targetRay, grip };
+        }
+      }
+      
+      controllersRef.current = state;
+      
+      const hasBoth = state.left.inputSource && state.right.inputSource;
+      if (!hasBoth && useLegoStore.getState().xrPanel === "none") {
+         // Optionally warn about missing controller
       }
     };
+
+    const attachHandedness = (event: any) => {
+      if (event.target && event.data) {
+        event.target.userData.handedness = event.data.handedness;
+        event.target.userData.inputSource = event.data;
+      }
+      resolveControllers();
+    };
+
+    session.addEventListener("inputsourceschange", resolveControllers);
+    
     const c0 = gl.xr.getController(0);
     const c1 = gl.xr.getController(1);
     c0.addEventListener("connected", attachHandedness);
     c1.addEventListener("connected", attachHandedness);
-
-    const onSelect = (e: any) => {
-      // Logic moved to useFrame for instant responsiveness
-    };
-
-    c0.addEventListener("select", onSelect);
-    c1.addEventListener("select", onSelect);
+    
+    resolveControllers();
 
     return () => {
+      session.removeEventListener("inputsourceschange", resolveControllers);
       c0.removeEventListener("connected", attachHandedness);
       c1.removeEventListener("connected", attachHandedness);
-      c0.removeEventListener("select", onSelect);
-      c1.removeEventListener("select", onSelect);
     };
   }, [gl.xr]);
 
@@ -153,45 +194,14 @@ export const HumanViewLayer = ({
     const session = gl.xr.getSession();
     if (!session || !sceneGroupRef.current) return;
 
-    let leftController: THREE.Group | null = null;
-    let rightController: THREE.Group | null = null;
-    let leftGrip: THREE.Group | null = null;
-    let rightGrip: THREE.Group | null = null;
-    let leftInput: XRInputSource | null = null;
-    let rightInput: XRInputSource | null = null;
-
-    const inputSourcesArray = Array.from(session.inputSources);
-    for (const source of inputSourcesArray) {
-      if (!source) continue;
-      if (source.handedness === "left") leftInput = source;
-      if (source.handedness === "right") rightInput = source;
-    }
-
-    for (let i = 0; i < 2; i++) {
-      const c = gl.xr.getController(i);
-      const cg = gl.xr.getControllerGrip(i);
-      if (!c) continue;
-
-      let handedness = c.userData?.handedness;
-      if (c.userData?.inputSource) {
-        handedness = c.userData.inputSource.handedness;
-      }
-      
-      // Fallback: If userData is missing but we only have 1 of 2 sources matching, we can infer.
-      // In ThreeJS, controllers[0] is often the first inputSource, controllers[1] the second.
-      if (!handedness && inputSourcesArray[i]) {
-         handedness = inputSourcesArray[i].handedness;
-      }
-
-      if (handedness === "left") {
-         leftController = c;
-         leftGrip = cg;
-      }
-      if (handedness === "right") {
-         rightController = c;
-         rightGrip = cg;
-      }
-    }
+    const { left, right } = controllersRef.current;
+    
+    const leftController = left.targetRay;
+    const rightController = right.targetRay;
+    const leftGrip = left.grip;
+    const rightGrip = right.grip;
+    const leftInput = left.inputSource;
+    const rightInput = right.inputSource;
 
     if ((import.meta as any).env.DEV) {
       if (leftController && !(leftController as any)._hasLogged) {
@@ -261,7 +271,6 @@ export const HumanViewLayer = ({
     }
 
     // Handle Locomotion (Thumbsticks)
-    /*
     const dt = Math.min(delta, 0.05);
 
     if (leftInput && leftInput.gamepad) {
@@ -297,10 +306,8 @@ export const HumanViewLayer = ({
         }
       }
     }
-    */
 
-    // Snap turn disabled in this build
-    /*
+    // Snap turn
     if (rightInput && rightInput.gamepad) {
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
@@ -319,7 +326,6 @@ export const HumanViewLayer = ({
         snapTurnCooldown.current = false;
       }
     }
-    */
 
     if (rightController && rightInput && rightInput.gamepad) {
       const pos = new THREE.Vector3().setFromMatrixPosition(

@@ -123,6 +123,37 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [xrStore, gl]);
 
   useEffect(() => {
+    if (!xrSessionActive) return;
+    const session = gl.xr.getSession();
+    if (!session) return;
+    
+    const handleVisibility = (e: any) => {
+       if (e.session && e.session.visibilityState === 'visible') {
+          import("../services/AudioService").then(m => m.audioService.resume());
+          gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+          if (useLegoStore.getState().xrPanel === "waitingControllers") {
+            useLegoStore.getState().setToastMessage("XR Resumed");
+            setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+          }
+       }
+    };
+    
+    const docVis = () => {
+       if (document.visibilityState === 'visible') {
+          import("../services/AudioService").then(m => m.audioService.resume());
+       }
+    }
+    
+    session.addEventListener('visibilitychange', handleVisibility);
+    document.addEventListener('visibilitychange', docVis);
+    
+    return () => {
+       session.removeEventListener('visibilitychange', handleVisibility);
+       document.removeEventListener('visibilitychange', docVis);
+    };
+  }, [gl, xrSessionActive]);
+
+  useEffect(() => {
     if (xrSessionActive) {
       let rafId: number;
       let startTime = Date.now();
@@ -1836,8 +1867,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   return (
     <>
       <color attach="background" args={["#1c2834"]} />
-      <Environment preset="sunset" background blur={0.4} />
-      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      {!xrSessionActive && <Environment preset="sunset" background blur={0.4} />}
+      {!xrSessionActive && <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />}
       <fog attach="fog" args={["#1c2834", 10, 200]} />
       <ambientLight intensity={0.4} />
       <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#001804" />
@@ -1845,8 +1876,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         position={[10, 15, 10]}
         intensity={1.0}
         castShadow={!xrSessionActive}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={!xrSessionActive ? 2048 : 512}
+        shadow-mapSize-height={!xrSessionActive ? 2048 : 512}
         shadow-camera-near={0.5}
         shadow-camera-far={100}
         shadow-camera-left={-20}
@@ -1854,7 +1885,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         shadow-camera-top={20}
         shadow-camera-bottom={-20}
       />
-      <ContactShadows resolution={1024} scale={40} blur={2} opacity={0.3} far={10} color="#000000" position={[0, -0.01, 0]} />
+      {!xrSessionActive && <ContactShadows resolution={1024} scale={40} blur={2} opacity={0.3} far={10} color="#000000" position={[0, -0.01, 0]} />}
 
       <Suspense fallback={null}>
         {xrSessionActive && showXRPerf && <VRStats />}
@@ -1913,14 +1944,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
         {!isScreenshotting && mode === "Build" && !activePreset && placementStatus.valid && (
           <group>
-            <LegoBrick
-              id="ghost"
+            <BrickInstances
               type={selectedType}
               color={selectedColor}
-              position={ghostPosition}
-              rotation={ghostRotation}
-              isPlacementGhost
-              opacity={xrSessionActive ? 0.2 : 0.4}
+              bricks={[{ id: "ghost", position: ghostPosition, rotation: ghostRotation }]}
+              isGhost
             />
             {!xrSessionActive && (
               <mesh
@@ -2036,10 +2064,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#002D04" />
           </mesh>
-          <gridHelper
-            args={[40, 500, "#004010", "#003A0A"]}
-            position={[0, 0.001, 0]}
-          />
+          {!xrSessionActive && (
+            <gridHelper
+              args={[40, 500, "#004010", "#003A0A"]}
+              position={[0, 0.001, 0]}
+            />
+          )}
+          {xrSessionActive && (
+            <gridHelper
+              args={[40, 40, "#004010", "#003A0A"]}
+              position={[0, 0.001, 0]}
+            />
+          )}
         </group>
       </group>
       <OrbitControls

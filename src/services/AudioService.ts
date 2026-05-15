@@ -40,6 +40,10 @@ class AudioService {
     osc.stop(this.ctx.currentTime + duration);
   }
 
+  resume() {
+    this.init();
+  }
+
   playPlace() {
     this.playTone(880, "sine", 0.1, 0.2);
   }

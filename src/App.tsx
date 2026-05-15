@@ -589,7 +589,7 @@ const PRESET_OPTIONS: {
 ];
 
 const xrStore = createXRStore({
-  emulate: false,
+  ...((import.meta as any).env.DEV ? { emulate: false } : {}),
   frameRate: "mid",
   frameBufferScaling: "low",
   layers: false,
@@ -1028,6 +1028,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
+                    import("./services/AudioService").then((m) => m.audioService.resume());
                     if ((import.meta as any).env.DEV)
                       console.log("[VR] enterVR requested");
                     setShowVRPrompt(false);

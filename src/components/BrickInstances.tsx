@@ -184,16 +184,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     };
   }, [type]);
 
-  const getCapacityTier = (count: number) => {
-    if (count <= 64) return 64;
-    if (count <= 128) return 128;
-    if (count <= 256) return 256;
-    if (count <= 512) return 512;
-    return Math.ceil(count / 256) * 256;
-  };
-
-  const bodyCapacity = getCapacityTier(bricks.length);
-  const studCapacity = Math.max(1, bodyCapacity * w * d);
+  // High-water mark to prevent remounting InstancedMesh
+  const MAX_CAPACITY = 8192;
+  const bodyCapacity = MAX_CAPACITY;
+  const studCapacity = MAX_CAPACITY * w * d;
 
   const bodyGeom = useMemo(() => {
     const geom = new THREE.BoxGeometry(
@@ -313,7 +307,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   return (
     <group>
       <instancedMesh
-        key={`body-${bodyCapacity}`}
         ref={bodyMeshRef}
         name="BrickBodyInstanced"
         args={[bodyGeom, material, bodyCapacity]}
@@ -324,7 +317,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         raycast={isGhost ? () => null : undefined}
       />
       <instancedMesh
-        key={`stud-${studCapacity}`}
         ref={studMeshRef}
         name="BrickStudsInstanced"
         args={[studGeom, material, studCapacity]}
