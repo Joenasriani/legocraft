@@ -54,8 +54,9 @@ export const HumanViewLayer = ({
       if (!rightInput) return;
       
       const { hitMenuItem, hitLoc } = latestHit.current || {};
-      if (hitMenuItem) {
+      if (hitMenuItem || menuClickActiveRef.current) {
          // Menu logic is handled in useFrame
+         menuClickActiveRef.current = false;
          return;
       }
 
@@ -141,6 +142,7 @@ export const HumanViewLayer = ({
   const wasYPressed = useRef(false);
   const wasBPressed = useRef(false);
   const snapTurnCooldown = useRef(false);
+  const menuClickActiveRef = useRef(false);
 
   const isValidTarget = (obj: THREE.Object3D) => {
     let curr: THREE.Object3D | null = obj;
@@ -397,12 +399,22 @@ export const HumanViewLayer = ({
 
         latestHit.current = { hitMenuItem: isMenuItem, onTriggerFn, hitLoc: hit };
 
+        if (triggerPressed && !wasTriggerPressed.current) {
+          if (isMenuItem) {
+            menuClickActiveRef.current = true;
+          } else {
+            menuClickActiveRef.current = false;
+          }
+        }
+
         if (isMenuItem && onTriggerFn) {
           if (triggerPressed && !wasTriggerPressed.current) {
             onTriggerFn();
             triggerHaptics(rightInput, HapticType.UI_CLICK);
             audioService.playMenu();
           }
+          latestValidPlacement.current = null;
+          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
         } else {
           // Normal brick interaction
           const unscaledP3 = hit.point.clone().divideScalar(currentVRScale);

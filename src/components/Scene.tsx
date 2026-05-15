@@ -1805,7 +1805,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           );
         })}
 
-        {!isScreenshotting && mode === "Build" && !activePreset && (
+        {!isScreenshotting && mode === "Build" && !activePreset && placementStatus.valid && (
           <group>
             <LegoBrick
               id="ghost"
@@ -1839,7 +1839,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <>
               {/* The ghost preview that follows the mouse */}
               {mode === "Move" &&
-                isDraggingBrick &&
+                isDraggingBrick && placementStatus.valid &&
                 Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
                   const [type, color] = key.split("_");
                   return (
@@ -1870,7 +1870,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-        {!isScreenshotting && activePreset && (
+        {!isScreenshotting && activePreset && presetPlacementStatus.valid && (
           <>
             {Object.entries(groupedPresetBricks).map(([key, group]) => {
               const [type, color] = key.split("_");

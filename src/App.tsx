@@ -370,6 +370,40 @@ const RedoIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const SaveIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+    <polyline points="17 21 17 13 7 13 7 21" />
+    <polyline points="7 3 7 8 15 8" />
+  </svg>
+);
+
+const LoadIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+);
+
 const ClearIcon = ({ size = 24 }: { size?: number }) => (
   <svg
     width={size}
@@ -711,6 +745,96 @@ export default function App() {
 
   const handleScreenshot = () => {
     useLegoStore.getState().triggerScreenshot();
+  };
+
+  const handleSave = async () => {
+    const bricks = useLegoStore.getState().bricks;
+    const data = JSON.stringify(bricks, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    try {
+      if ("showSaveFilePicker" in window) {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: "brick-build.json",
+          types: [
+            {
+              description: "JSON Files",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+        const writable = await (handle as any).createWritable();
+        await writable.write(blob);
+        await writable.close();
+        useLegoStore.getState().setToastMessage("Saved successfully.");
+      } else {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "brick-build.json";
+        a.click();
+        URL.revokeObjectURL(url);
+        useLegoStore.getState().setToastMessage("Saved to file.");
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        useLegoStore
+          .getState()
+          .setToastMessage("Failed to save: " + err.message);
+      }
+    }
+  };
+
+  const handleLoad = async () => {
+    try {
+      if ("showOpenFilePicker" in window) {
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [
+            {
+              description: "JSON Files",
+              accept: { "application/json": [".json"] },
+            },
+          ],
+        });
+        const file = await handle.getFile();
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed) && parsed.every(isValidBrickData)) {
+          useLegoStore.getState().setBricks(parsed);
+          useLegoStore.getState().setToastMessage("Loaded successfully.");
+        } else {
+          throw new Error("Invalid format");
+        }
+      } else {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".json";
+        input.onchange = async (e: any) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const text = await file.text();
+          try {
+            const parsed = JSON.parse(text);
+            if (Array.isArray(parsed) && parsed.every(isValidBrickData)) {
+              useLegoStore.getState().setBricks(parsed);
+              useLegoStore.getState().setToastMessage("Loaded successfully.");
+            } else {
+              throw new Error("Invalid format");
+            }
+          } catch (err: any) {
+            useLegoStore
+              .getState()
+              .setToastMessage("Failed to load: " + err.message);
+          }
+        };
+        input.click();
+      }
+    } catch (err: any) {
+      if (err.name !== "AbortError") {
+        useLegoStore
+          .getState()
+          .setToastMessage("Failed to load: " + err.message);
+      }
+    }
   };
 
   return (
@@ -1274,6 +1398,28 @@ export default function App() {
                       </span>
                     </button>
                   </div>
+
+                  <button
+                    onClick={handleSave}
+                    title="Save Build"
+                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                  >
+                    <SaveIcon size={18} />
+                    <span className="hidden sm:inline text-[13px] font-semibold">
+                      Save
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={handleLoad}
+                    title="Load Build"
+                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                  >
+                    <LoadIcon size={18} />
+                    <span className="hidden sm:inline text-[13px] font-semibold">
+                      Load
+                    </span>
+                  </button>
 
                   <button
                     onClick={handleScreenshot}
