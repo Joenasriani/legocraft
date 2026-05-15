@@ -86,6 +86,7 @@ export const HumanViewLayer = ({
   const wasXPressed = useRef(false);
   const wasYPressed = useRef(false);
   const wasBPressed = useRef(false);
+  const squeezeMoveBlockedRef = useRef(false);
   const snapTurnCooldown = useRef(false);
   const menuClickActiveRef = useRef(false);
 
@@ -239,9 +240,11 @@ export const HumanViewLayer = ({
       if (bPressed && !wasBPressed.current) {
         if (currentPanel !== "none") {
           store.closeXRPanel();
+          squeezeMoveBlockedRef.current = false;
         } else if (store.mode === "Move" && store.movingBrickId) {
           store.setMovingBrickId(null);
           store.setIsDraggingBrick(false);
+          squeezeMoveBlockedRef.current = false;
           store.setMode("Build");
           updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
           triggerHaptics(rightInput, HapticType.BRICK_SELECT);
@@ -451,7 +454,7 @@ export const HumanViewLayer = ({
                  }
                }
             } else if (latestValidPlacement.current) {
-               if (mode === "Move" && (!movingBrickId || !useLegoStore.getState().isDraggingBrick)) {
+               if (mode === "Move" && !movingBrickId) {
                  useLegoStore.getState().setToastMessage("Select and drag a brick to move it.");
                  setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
                  triggerHaptics(rightInput, HapticType.ERROR);
@@ -473,7 +476,7 @@ export const HumanViewLayer = ({
           }
 
           if (squeezePressed && wasSqueezePressed.current) {
-            if (useLegoStore.getState().mode === "Move" && movingBrickId && squeezeStartPosRef.current && !useLegoStore.getState().isDraggingBrick) {
+            if (useLegoStore.getState().mode === "Move" && movingBrickId && squeezeStartPosRef.current && !useLegoStore.getState().isDraggingBrick && !squeezeMoveBlockedRef.current) {
               const dist = pos.distanceTo(squeezeStartPosRef.current);
               if (dist > 0.05) {
                  useLegoStore.getState().setIsDraggingBrick(true);
@@ -544,6 +547,7 @@ export const HumanViewLayer = ({
                       const isBlocked = g.some((bz: any) => hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds));
                       
                       setIsDraggingBrick(false);
+                      squeezeMoveBlockedRef.current = isBlocked;
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -570,6 +574,7 @@ export const HumanViewLayer = ({
                           return br && hasBrickAbove(br, stateAfter.bricks, MODULE_SIZE, BRICK_HEIGHT, stateAfter.multiSelectedBrickIds);
                         });
                         setIsDraggingBrick(false);
+                        squeezeMoveBlockedRef.current = isBlocked;
                         squeezeStartPosRef.current = pos.clone();
                         
                         if (isBlocked) {
@@ -581,6 +586,7 @@ export const HumanViewLayer = ({
                       } else if (stateBefore.movingBrickId === b.id) {
                         const newAnchorId = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
                         setMovingBrickId(newAnchorId || null);
+                        squeezeMoveBlockedRef.current = false;
                         if (newAnchorId) {
                            setIsDraggingBrick(false);
                         } else {
@@ -596,6 +602,7 @@ export const HumanViewLayer = ({
                       const blocks = useLegoStore.getState().bricks;
                       const isBlocked = hasBrickAbove(b, blocks, MODULE_SIZE, BRICK_HEIGHT);
                       setIsDraggingBrick(false);
+                      squeezeMoveBlockedRef.current = isBlocked;
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -622,6 +629,7 @@ export const HumanViewLayer = ({
         updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
         latestValidPlacement.current = null;
         latestHit.current = null;
+        squeezeMoveBlockedRef.current = false;
       }
 
       // Render laser
@@ -671,24 +679,10 @@ export const HumanViewLayer = ({
 
       // Handle Squeeze (Grip) release for dropping/placing
       if (!squeezePressed && wasSqueezePressed.current) {
-        if (useLegoStore.getState().mode === "Move" && useLegoStore.getState().isDraggingBrick) {
-          if (latestValidPlacement.current) {
-            handleVRCommit(
-              latestValidPlacement.current.p,
-              latestValidPlacement.current.n,
-              latestValidPlacement.current.tk
-            );
-            triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-            audioService.playPlace();
-          } else {
-            useLegoStore.getState().setToastMessage("Invalid placement - Dropped");
-            triggerHaptics(rightInput, HapticType.ERROR);
-            audioService.playInvalid();
-          }
-          useLegoStore.getState().setIsDraggingBrick(false);
-          useLegoStore.getState().setMovingBrickId(null);
-          useLegoStore.getState().setMode("Build");
-          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+        if (useLegoStore.getState().mode === "Move") {
+            // Grip release stops dragging but does NOT commit and does NOT clear selection
+            useLegoStore.getState().setIsDraggingBrick(false);
+            squeezeMoveBlockedRef.current = false;
         }
       }
 

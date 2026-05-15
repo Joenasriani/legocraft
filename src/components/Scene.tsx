@@ -283,8 +283,19 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const handleVRCommit = (point: THREE.Vector3, normal: THREE.Vector3, targetKind: string) => {
     pointerDownPos.current = null;
+    const state = useLegoStore.getState();
     if (executeCommitRef.current) {
-      const position = computePlacementTarget(point, normal, targetKind);
+      let position = computePlacementTarget(point, normal, targetKind);
+      
+      // If we are in Move mode but not dragging, we force the position to the current brick's position
+      // so that Trigger commits the rotation change exactly where it is.
+      if (state.mode === "Move" && state.movingBrickId && !state.isDraggingBrick) {
+        const mb = state.bricks.find(b => b.id === state.movingBrickId);
+        if (mb) {
+          position = mb.position;
+        }
+      }
+
       executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind }, position });
     }
   };
