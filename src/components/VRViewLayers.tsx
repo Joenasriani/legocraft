@@ -147,6 +147,8 @@ export const HumanViewLayer = ({
 
     let leftController: THREE.Group | null = null;
     let rightController: THREE.Group | null = null;
+    let leftGrip: THREE.Group | null = null;
+    let rightGrip: THREE.Group | null = null;
     let leftInput: XRInputSource | null = null;
     let rightInput: XRInputSource | null = null;
 
@@ -159,6 +161,7 @@ export const HumanViewLayer = ({
 
     for (let i = 0; i < 2; i++) {
       const c = gl.xr.getController(i);
+      const cg = gl.xr.getControllerGrip(i);
       if (!c) continue;
 
       let handedness = c.userData?.handedness;
@@ -166,8 +169,20 @@ export const HumanViewLayer = ({
         handedness = c.userData.inputSource.handedness;
       }
       
-      if (handedness === "left") leftController = c;
-      if (handedness === "right") rightController = c;
+      // Fallback: If userData is missing but we only have 1 of 2 sources matching, we can infer.
+      // In ThreeJS, controllers[0] is often the first inputSource, controllers[1] the second.
+      if (!handedness && inputSourcesArray[i]) {
+         handedness = inputSourcesArray[i].handedness;
+      }
+
+      if (handedness === "left") {
+         leftController = c;
+         leftGrip = cg;
+      }
+      if (handedness === "right") {
+         rightController = c;
+         rightGrip = cg;
+      }
     }
 
     if ((import.meta as any).env.DEV) {
@@ -221,8 +236,12 @@ export const HumanViewLayer = ({
         } else if (store.mode === "Move" && store.movingBrickId) {
           store.setMovingBrickId(null);
           store.setIsDraggingBrick(false);
+          store.setMode("Build");
+          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
           triggerHaptics(rightInput, HapticType.BRICK_SELECT);
           audioService.playSelect();
+        } else if (store.mode !== "Build") {
+          store.setMode("Build");
         }
       }
 
@@ -271,7 +290,7 @@ export const HumanViewLayer = ({
       if (Math.abs(xAxis) > 0.5) {
         if (!snapTurnCooldown.current) {
           snapTurnCooldown.current = true;
-          const turnAngle = xAxis > 0 ? -Math.PI / 4 : Math.PI / 4;
+          const turnAngle = xAxis > 0 ? -snapTurnAngle : snapTurnAngle;
           const refSpace = gl.xr.getReferenceSpace();
           if (refSpace) {
             const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turnAngle);
@@ -515,7 +534,7 @@ export const HumanViewLayer = ({
                       const gIds = g.map((bz: any) => bz.id);
                       const isBlocked = g.some((bz: any) => hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds));
                       
-                      setIsDraggingBrick(false);
+                      setIsDraggingBrick(true);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -541,7 +560,7 @@ export const HumanViewLayer = ({
                           const br = stateAfter.bricks.find(bk => bk.id === id);
                           return br && hasBrickAbove(br, stateAfter.bricks, MODULE_SIZE, BRICK_HEIGHT, stateAfter.multiSelectedBrickIds);
                         });
-                        setIsDraggingBrick(false);
+                        setIsDraggingBrick(true);
                         squeezeStartPosRef.current = pos.clone();
                         
                         if (isBlocked) {
@@ -554,7 +573,7 @@ export const HumanViewLayer = ({
                         const newAnchorId = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
                         setMovingBrickId(newAnchorId || null);
                         if (newAnchorId) {
-                           setIsDraggingBrick(false);
+                           setIsDraggingBrick(true);
                         } else {
                           setIsDraggingBrick(false);
                         }
@@ -567,7 +586,7 @@ export const HumanViewLayer = ({
                       setMovingBrickId(b.id);
                       const blocks = useLegoStore.getState().bricks;
                       const isBlocked = hasBrickAbove(b, blocks, MODULE_SIZE, BRICK_HEIGHT);
-                      setIsDraggingBrick(false);
+                      setIsDraggingBrick(true);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -641,6 +660,29 @@ export const HumanViewLayer = ({
         }
       }
 
+      // Handle Squeeze (Grip) release for dropping/placing
+      if (!squeezePressed && wasSqueezePressed.current) {
+        if (useLegoStore.getState().mode === "Move" && useLegoStore.getState().isDraggingBrick) {
+          if (latestValidPlacement.current) {
+            handleVRCommit(
+              latestValidPlacement.current.p,
+              latestValidPlacement.current.n,
+              latestValidPlacement.current.tk
+            );
+            triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+            audioService.playPlace();
+          } else {
+            useLegoStore.getState().setToastMessage("Invalid placement - Dropped");
+            triggerHaptics(rightInput, HapticType.ERROR);
+            audioService.playInvalid();
+          }
+          useLegoStore.getState().setIsDraggingBrick(false);
+          useLegoStore.getState().setMovingBrickId(null);
+          useLegoStore.getState().setMode("Build");
+          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+        }
+      }
+
       // Always track state
       wasActionPressed.current = actionPressed;
       wasTriggerPressed.current = triggerPressed;
@@ -648,13 +690,12 @@ export const HumanViewLayer = ({
 
       if (isDebugXR && debugTextRef.current) {
          debugTextRef.current.text = [
-            `LHand: ${leftInput?.handedness || 'none'} | RHand: ${rightInput?.handedness || 'none'}`,
-            `LProf: ${leftInput?.profiles?.[0] || 'none'} | RProf: ${rightInput?.profiles?.[0] || 'none'}`,
-            `LBtn: ${leftInput?.gamepad?.buttons.length || 0} | RBtn: ${rightInput?.gamepad?.buttons.length || 0}`,
-            `LAxes: ${leftInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'} | RAxes: ${rightInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
+            `RTrig: ${triggerPressed} | RGrip: ${squeezePressed} | A: ${actionPressed} | B: ${wasBPressed.current}`,
+            `LAxes: ${leftInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
+            `RAxes: ${rightInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
             `Hit: ${hit ? hit.object.name : 'none'}`,
-            `RLaser: ${laserRef.current?.visible}`,
-            `Locomotion: ${locomotionMode}`,
+            `Sel: ${useLegoStore.getState().multiSelectedBrickIds.join(',')} | Mv: ${useLegoStore.getState().movingBrickId}`,
+            `Drag: ${useLegoStore.getState().isDraggingBrick}`
          ].join('\n');
       }
 

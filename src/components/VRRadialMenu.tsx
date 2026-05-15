@@ -90,16 +90,34 @@ export const VRRadialMenu = ({
   const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
-  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion } | null>(null);
+  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion }>({ 
+    position: new THREE.Vector3(0, 100, 0), 
+    quaternion: new THREE.Quaternion() 
+  });
+
+  const [hasInitializedTransform, setHasInitializedTransform] = useState(false);
 
   React.useEffect(() => {
-    if (visible && gl.xr.isPresenting) {
-      const camera = gl.xr.getCamera();
-      setTransform(getSafePanelTransform(camera));
-    } else {
-      setTransform(null);
+    if (!visible) {
+      setHasInitializedTransform(false);
     }
-  }, [visible, gl.xr]);
+  }, [visible]);
+
+  useFrame((state, delta) => {
+    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
+    const cam = gl.xr.getCamera();
+    const target = getSafePanelTransform(cam);
+    
+    if (!hasInitializedTransform || groupRef.current.position.distanceTo(target.position) > 10) {
+      groupRef.current.position.copy(target.position);
+      groupRef.current.quaternion.copy(target.quaternion);
+      setTransform({ position: target.position.clone(), quaternion: target.quaternion.clone() });
+      setHasInitializedTransform(true);
+    } else {
+      groupRef.current.position.lerp(target.position, delta * 3.0);
+      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
+    }
+  });
 
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
@@ -179,7 +197,7 @@ export const VRRadialMenu = ({
     },
   ];
 
-  if (!visible || !transform) return null;
+  if (!visible) return null;
 
   return (
     <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
