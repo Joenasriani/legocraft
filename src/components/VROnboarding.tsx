@@ -37,27 +37,29 @@ export const VROnboarding = () => {
     { key: "Right Grip", action: "Select/Move" },
     { key: "A", action: "Rotate" },
     { key: "B", action: "Cancel/Close" },
+    { key: "X", action: "Build Menu" },
+    { key: "Y", action: "Palette" },
   ];
 
-  const subtext = "Controller locomotion is disabled.";
+  const subtext = "Stationary VR: move physically in your play space. Controller locomotion is disabled.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
   useEffect(() => {
     const t = setTimeout(() => {
       closeXRPanel();
-    }, 8000);
+    }, 10000);
     return () => clearTimeout(t);
   }, [closeXRPanel]);
 
   return (
     <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
       <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[2.2, 1.8]} />
+        <planeGeometry args={[2.4, 2.2]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />
       </mesh>
       <Text
-        position={[0, 0.7, 0]}
+        position={[0, 0.9, 0]}
         color="#a855f7"
         fontSize={0.16}
         fontWeight="bold"
@@ -68,7 +70,7 @@ export const VROnboarding = () => {
       </Text>
       
       <Text
-        position={[0, -0.6, 0]}
+        position={[0, -0.7, 0]}
         color="#fbbf24"
         fontSize={0.06}
         anchorX="center"
@@ -80,7 +82,7 @@ export const VROnboarding = () => {
       </Text>
       
       <Text
-        position={[0, -0.8, 0]}
+        position={[0, -0.9, 0]}
         color="#aaaaaa"
         fontSize={0.05}
         anchorX="center"
@@ -91,9 +93,9 @@ export const VROnboarding = () => {
         Press B to close or wait.
       </Text>
       
-      <group position={[-0.8, 0.35, 0]}>
+      <group position={[-0.8, 0.55, 0]}>
         {instructions.map((item, i) => {
-          const y = -i * 0.12;
+          const y = -i * 0.15;
           return (
             <group key={item.key} position={[0, y, 0]}>
               <Text

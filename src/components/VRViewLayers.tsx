@@ -308,6 +308,7 @@ export const HumanViewLayer = ({
     }
 
     // Snap turn
+    /*
     if (rightInput && rightInput.gamepad) {
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
@@ -326,6 +327,7 @@ export const HumanViewLayer = ({
         snapTurnCooldown.current = false;
       }
     }
+    */
 
     if (rightController && rightInput && rightInput.gamepad) {
       const pos = new THREE.Vector3().setFromMatrixPosition(
