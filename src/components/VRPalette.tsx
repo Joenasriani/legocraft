@@ -119,29 +119,13 @@ export const VRPalette = () => {
     quaternion: new THREE.Quaternion() 
   });
 
-  const [hasInitializedTransform, setHasInitializedTransform] = useState(false);
-
   React.useEffect(() => {
-    if (!visible) {
-      setHasInitializedTransform(false);
-    }
-  }, [visible]);
-
-  useFrame((state, delta) => {
-    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-    const cam = gl.xr.getCamera();
-    const target = getSafePanelTransform(cam);
-    
-    if (!hasInitializedTransform || groupRef.current.position.distanceTo(target.position) > 10) {
-      groupRef.current.position.copy(target.position);
-      groupRef.current.quaternion.copy(target.quaternion);
+    if (visible && gl.xr.isPresenting) {
+      const cam = gl.xr.getCamera();
+      const target = getSafePanelTransform(cam);
       setTransform({ position: target.position.clone(), quaternion: target.quaternion.clone() });
-      setHasInitializedTransform(true);
-    } else {
-      groupRef.current.position.lerp(target.position, delta * 3.0);
-      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
     }
-  });
+  }, [visible, gl.xr]);
 
   const activeColor = useLegoStore((s) => s.selectedColor);
   const setActiveColor = useLegoStore((s) => s.setSelectedColor);

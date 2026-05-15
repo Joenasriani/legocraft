@@ -32,12 +32,14 @@ export const VROnboarding = () => {
   });
 
   const instructions = [
-    { key: "Left Stick", action: "Smooth Move" },
+    { key: "Stationary VR", action: "Move physically in your space" },
     { key: "Right Trigger", action: "Place/Confirm" },
     { key: "Right Grip", action: "Select/Move" },
     { key: "A", action: "Rotate" },
     { key: "B", action: "Cancel/Close" },
   ];
+
+  const subtext = "Controller locomotion is disabled.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
@@ -66,9 +68,21 @@ export const VROnboarding = () => {
       </Text>
       
       <Text
-        position={[0, -0.7, 0]}
+        position={[0, -0.6, 0]}
         color="#fbbf24"
-        fontSize={0.07}
+        fontSize={0.06}
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={2.0}
+        textAlign="center"
+      >
+        {subtext}
+      </Text>
+      
+      <Text
+        position={[0, -0.8, 0]}
+        color="#aaaaaa"
+        fontSize={0.05}
         anchorX="center"
         anchorY="middle"
         maxWidth={2.0}

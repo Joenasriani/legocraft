@@ -107,11 +107,17 @@ export const HumanViewLayer = ({
 
     // VR target priority
     const xrPanel = useLegoStore.getState().xrPanel;
-    if (xrPanel !== "none") {
-      return isMenu || obj.name === "Grid" || obj.name === "FloorPlacementCollider" || obj.name === "VRFloorCollider";
+
+    if (xrPanel === "buildMenu" || xrPanel === "palette") {
+      // Priority to menu items when interactive panels are open.
+      // This prevents accidental clicks through the panel to the world.
+      return isMenu;
+    } else if (xrPanel === "none") {
+      // Normal building mode, ignore menu items (radial menu is closed)
+      return !isMenu;
     } else {
-      if (isMenu) return false;
-      return true;
+      // onboarding, error, waitingControllers - no interaction with world or menu
+      return false;
     }
   };
 

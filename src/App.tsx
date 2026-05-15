@@ -605,78 +605,6 @@ const xrStore = createXRStore({
   customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: ["bounded-floor"] },
 });
 
-const PaymentModal = ({
-  show,
-  onClose,
-  onConfirm,
-}: {
-  show: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) => {
-  return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm pointer-events-auto"
-        >
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0, y: 10 }}
-            animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0, y: 10 }}
-            className="bg-zinc-900 border border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full mx-auto shadow-2xl relative"
-          >
-            <div className="absolute top-0 right-0 p-4">
-              <button
-                onClick={onClose}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 text-white/50 hover:text-white transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-2xl bg-[#0070BA]/20 flex items-center justify-center border border-[#0070BA]/40">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0070BA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M7 6h6a4 4 0 0 1 0 8H9l-1 5" />
-                  <path d="M10 6v13" />
-                  <path d="M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z" />
-                </svg>
-              </div>
-            </div>
-
-            <h2 className="text-2xl font-bold text-white text-center mb-2">Premium Export</h2>
-            <p className="text-white/60 text-center text-sm mb-8 leading-relaxed">
-              Exporting your 3D creation to GLB requires a one-time payment of $1.00 USD. This supports the developer!
-            </p>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={() => {
-                  window.open("https://www.paypal.com/cgi-bin/webscr?cmd=_xclick&business=joenasr@gmail.com&item_name=3D+GLB+Export&amount=1.00&currency_code=USD", "_blank");
-                  onConfirm();
-                }}
-                className="w-full py-3 sm:py-4 px-6 bg-[#0070BA] hover:bg-[#003087] text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                Pay $1.00 & Export
-              </button>
-              <button
-                onClick={onClose}
-                className="w-full py-3 px-6 bg-transparent hover:bg-white/5 text-white/60 hover:text-white rounded-xl font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
 const SaveExportMenuOverlay = ({
   show,
   onClose,
@@ -810,7 +738,6 @@ export default function App() {
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = React.useRef<HTMLDivElement>(null);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showVRPrompt, setShowVRPrompt] = useState(false);
   const [isFadingToVR, setIsFadingToVR] = useState(false);
@@ -1657,14 +1584,7 @@ export default function App() {
               saveMenuRef={saveMenuRef}
               onSaveProject={handleSave}
               onLoadProject={handleLoad}
-              onExportGLB={() => setShowPaymentModal(true)}
-            />
-
-            <PaymentModal
-              show={showPaymentModal}
-              onClose={() => setShowPaymentModal(false)}
-              onConfirm={() => {
-                setShowPaymentModal(false);
+              onExportGLB={() => {
                 useLegoStore.getState().exportGLB?.();
               }}
             />
