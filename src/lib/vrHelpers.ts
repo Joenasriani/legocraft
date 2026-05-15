@@ -19,7 +19,6 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
   const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
   euler.x = 0; // Remove pitch (so it stands vertically straight)
   euler.z = 0; // Remove roll
-  euler.y += Math.PI; // Flip 180 deg to face the user
   const quaternion = new THREE.Quaternion().setFromEuler(euler);
 
   return { position, quaternion };

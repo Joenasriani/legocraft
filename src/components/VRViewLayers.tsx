@@ -440,7 +440,7 @@ export const HumanViewLayer = ({
           }
 
           if (squeezePressed && wasSqueezePressed.current) {
-            if (mode === "Move" && movingBrickId && squeezeStartPosRef.current && !useLegoStore.getState().isDraggingBrick) {
+            if (useLegoStore.getState().mode === "Move" && movingBrickId && squeezeStartPosRef.current && !useLegoStore.getState().isDraggingBrick) {
               const dist = pos.distanceTo(squeezeStartPosRef.current);
               if (dist > 0.05) {
                  useLegoStore.getState().setIsDraggingBrick(true);
@@ -457,7 +457,11 @@ export const HumanViewLayer = ({
           }
 
           if (squeezePressed && !wasSqueezePressed.current) {
-            if (mode === "Delete" || mode === "Move") {
+            if (mode === "Build") {
+              useLegoStore.getState().setMode("Move");
+            }
+            const currentMode = useLegoStore.getState().mode;
+            if (currentMode === "Delete" || currentMode === "Move") {
               const instId = hit.instanceId;
               const ud = hit.object.userData;
               if (instId !== undefined && ud && ud.bricks) {
@@ -467,7 +471,7 @@ export const HumanViewLayer = ({
                 }
                 const b = ud.bricks[brickIndex];
                 if (b) {
-                  if (mode === "Delete") {
+                  if (currentMode === "Delete") {
                     if (selectionMode === "Group") {
                       const allb = useLegoStore.getState().bricks;
                       const g = getGroupBricks(b, allb);
@@ -498,7 +502,7 @@ export const HumanViewLayer = ({
                         audioService.playDelete();
                       }
                     }
-                  } else if (mode === "Move" && !movingBrickId) {
+                  } else if (currentMode === "Move" && !movingBrickId) {
                     if (selectionMode === "Group") {
                       setMovingBrickId(b.id);
                       const allb = useLegoStore.getState().bricks;
@@ -506,7 +510,7 @@ export const HumanViewLayer = ({
                       const gIds = g.map((bz: any) => bz.id);
                       const isBlocked = g.some((bz: any) => hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds));
                       
-                      setIsDraggingBrick(false);
+                      setIsDraggingBrick(!isBlocked);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {
@@ -532,7 +536,7 @@ export const HumanViewLayer = ({
                           const br = stateAfter.bricks.find(bk => bk.id === id);
                           return br && hasBrickAbove(br, stateAfter.bricks, MODULE_SIZE, BRICK_HEIGHT, stateAfter.multiSelectedBrickIds);
                         });
-                        setIsDraggingBrick(false);
+                        setIsDraggingBrick(!isBlocked);
                         squeezeStartPosRef.current = pos.clone();
                         
                         if (isBlocked) {
@@ -558,7 +562,7 @@ export const HumanViewLayer = ({
                       setMovingBrickId(b.id);
                       const blocks = useLegoStore.getState().bricks;
                       const isBlocked = hasBrickAbove(b, blocks, MODULE_SIZE, BRICK_HEIGHT);
-                      setIsDraggingBrick(false);
+                      setIsDraggingBrick(!isBlocked);
                       squeezeStartPosRef.current = pos.clone();
                       
                       if (isBlocked) {

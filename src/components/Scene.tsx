@@ -216,7 +216,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             exportGroupRef.current!,
             (gltf: any) => {
               const blob = new Blob([gltf], { type: "application/octet-stream" });
+              let canUsePicker = false;
               if ("showSaveFilePicker" in window) {
+                try { canUsePicker = window.self === window.top; }
+                catch (e) { canUsePicker = false; }
+              }
+              if (canUsePicker) {
                 (window as any).showSaveFilePicker({
                   suggestedName: "brick-structure.glb",
                   types: [{ description: "GLB Files", accept: { "model/gltf-binary": [".glb"] } }],
