@@ -366,6 +366,8 @@ interface LegoStore {
   setLocomotionMode: (mode: "Stationary" | "Smooth") => void;
 
   // VR Tools Settings
+  vrDebugText: string;
+  setVrDebugText: (text: string) => void;
   showXRPerf: boolean;
   setShowXRPerf: (show: boolean) => void;
   xrPanel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error";
@@ -757,6 +759,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setMovementSpeed: (movementSpeed) => set({ movementSpeed }),
   locomotionMode: "Smooth",
   setLocomotionMode: (locomotionMode) => set({ locomotionMode }),
+
+  vrDebugText: "",
+  setVrDebugText: (text) => set({ vrDebugText: text }),
 
   showXRPerf: false,
   setShowXRPerf: (showXRPerf) => set({ showXRPerf }),

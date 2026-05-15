@@ -602,7 +602,7 @@ const xrStore = createXRStore({
   screenInput: false,
   transientPointer: false,
   controller: { rayPointer: false, teleportPointer: false, grabPointer: false }, // Disables library pointers but enables standard controller models because we use our custom VRViewLayers
-  customSessionInit: { optionalFeatures: ["local-floor", "bounded-floor"] },
+  customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: ["bounded-floor"] },
 });
 
 const PaymentModal = ({

@@ -1980,14 +1980,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             userData={{ isVRPlacementTarget: true }}
             rotation={[-Math.PI / 2, 0, 0]}
             position={[0, 0, 0]}
-            visible={false}
           >
             <planeGeometry args={[40, 40]} />
-            <meshBasicMaterial />
+            <meshBasicMaterial visible={false} />
           </mesh>
           <mesh
             ref={gridRef}
             name="Grid"
+            raycast={() => null}
             receiveShadow={!xrSessionActive}
             rotation={[-Math.PI / 2, 0, 0]}
           >

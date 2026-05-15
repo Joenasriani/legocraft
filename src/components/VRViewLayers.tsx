@@ -36,6 +36,7 @@ export const HumanViewLayer = ({
   useEffect(() => {
     const attachHandedness = (event: any) => {
       event.target.userData.handedness = event.data.handedness;
+      event.target.userData.inputSource = event.data;
       if ((import.meta as any).env.DEV) {
         console.log(`[VR] Controller Connected!`, {
           handedness: event.data.handedness,
@@ -158,18 +159,15 @@ export const HumanViewLayer = ({
 
     for (let i = 0; i < 2; i++) {
       const c = gl.xr.getController(i);
-      // Try to find the corresponding input source
-      // In Three.js, controller index order often matches inputSources order but not always reliably.
-      // Usually, session.inputSources index could be matched to controller index.
-      const source = inputSourcesArray[i];
-      if (source) {
-         if (source.handedness === "left") leftController = c;
-         if (source.handedness === "right") rightController = c;
-      } else if (c && c.userData) {
-         // Fallback
-         if (c.userData.handedness === "left") leftController = c;
-         if (c.userData.handedness === "right") rightController = c;
+      if (!c) continue;
+
+      let handedness = c.userData?.handedness;
+      if (c.userData?.inputSource) {
+        handedness = c.userData.inputSource.handedness;
       }
+      
+      if (handedness === "left") leftController = c;
+      if (handedness === "right") rightController = c;
     }
 
     if ((import.meta as any).env.DEV) {
@@ -650,12 +648,13 @@ export const HumanViewLayer = ({
 
       if (isDebugXR && debugTextRef.current) {
          debugTextRef.current.text = [
-            `Panel: ${store.xrPanel}`,
-            `Mode: ${store.mode} | Dragging: ${store.isDraggingBrick}`,
-            `Selected: ${store.multiSelectedBrickIds.length} | Moving: ${store.movingBrickId || 'none'}`,
-            `Hit: ${latestHit.current ? (latestHit.current.hitMenuItem ? 'MENU' : 'WORLD') : 'NONE'}`,
-            `L(X:${wasXPressed.current} Y:${wasYPressed.current}) R(A:${wasActionPressed.current} B:${wasBPressed.current} TRG:${wasTriggerPressed.current} GRP:${wasSqueezePressed.current})`,
-            `HitObj: ${hit ? hit.object.name : 'none'}`,
+            `LHand: ${leftInput?.handedness || 'none'} | RHand: ${rightInput?.handedness || 'none'}`,
+            `LProf: ${leftInput?.profiles?.[0] || 'none'} | RProf: ${rightInput?.profiles?.[0] || 'none'}`,
+            `LBtn: ${leftInput?.gamepad?.buttons.length || 0} | RBtn: ${rightInput?.gamepad?.buttons.length || 0}`,
+            `LAxes: ${leftInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'} | RAxes: ${rightInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
+            `Hit: ${hit ? hit.object.name : 'none'}`,
+            `RLaser: ${laserRef.current?.visible}`,
+            `Locomotion: ${locomotionMode}`,
          ].join('\n');
       }
 

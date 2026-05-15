@@ -32,12 +32,12 @@ export const VROnboarding = () => {
   });
 
   const instructions = [
-    { key: "Right Trigger", action: "Place/Select" },
-    { key: "Right Grip", action: "Pick/Move" },
+    { key: "Left Stick", action: "Smooth Move" },
+    { key: "Right Stick", action: "Snap Turn" },
+    { key: "Right Trigger", action: "Place/Confirm" },
+    { key: "Right Grip", action: "Select/Move" },
     { key: "A", action: "Rotate" },
-    { key: "X", action: "Build Menu" },
-    { key: "Y", action: "Palette" },
-    { key: "B", action: "Close Menu / Cancel" },
+    { key: "B", action: "Cancel/Close" },
   ];
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
@@ -75,8 +75,7 @@ export const VROnboarding = () => {
         maxWidth={2.0}
         textAlign="center"
       >
-        Stationary VR: move physically in your play space. Controller locomotion is disabled.
-        {'\n'}Press B to close or wait.
+        Press B to close or wait.
       </Text>
       
       <group position={[-0.8, 0.35, 0]}>
