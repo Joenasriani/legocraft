@@ -296,8 +296,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }
       }
 
-      executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind }, position });
+      return executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind }, position });
     }
+    return false;
   };
 
   const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
@@ -1313,11 +1314,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     setIsDraggingBrick(false);
 
     const now = Date.now();
-    if (now - lastPlacementRef.current < 50) return;
+    if (now - lastPlacementRef.current < 50) return false;
     lastPlacementRef.current = now;
 
     const currentGhostPos = candidate.position;
     setGhostPosition(currentGhostPos);
+
+    let commitSuccess = false;
 
     const checkCurrentPlacement = () => {
       if (mode === "Move") {
@@ -1462,6 +1465,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           hit: candidate.hit,
           position: nextGhostPos,
         };
+        commitSuccess = true;
       } else {
         useLegoStore
           .getState()
@@ -1470,7 +1474,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           );
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
       }
-      return;
+      interactionStartCandidateRef.current = null;
+      latestPlacementCandidateRef.current = null;
+      return commitSuccess;
     }
 
     if (mode === "Build" && !activePreset) {
@@ -1493,6 +1499,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           hit: candidate.hit,
           position: nextGhostPos,
         };
+        commitSuccess = true;
       } else if (status.reason === "floating") {
         useLegoStore.getState().setToastMessage("Cannot float in mid-air.");
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
@@ -1521,6 +1528,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           });
         }
         setMovingBrickId(null);
+        commitSuccess = true;
       } else {
         useLegoStore
           .getState()
@@ -1534,6 +1542,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     interactionStartCandidateRef.current = null;
     latestPlacementCandidateRef.current = null;
+    return commitSuccess;
   };
 
   executeCommitRef.current = executeCommit;
