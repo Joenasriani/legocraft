@@ -3,6 +3,7 @@ import { Text } from "@react-three/drei";
 import { useThree, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { getSafePanelTransform } from "../lib/vrHelpers";
+import { useLegoStore } from "../Store";
 
 export const VRWaitingPanel = () => {
   const { camera, gl } = useThree();
@@ -11,6 +12,18 @@ export const VRWaitingPanel = () => {
     position: new THREE.Vector3(0, 100, 0), 
     quaternion: new THREE.Quaternion() 
   });
+
+  const closeXRPanel = useLegoStore((state: any) => state.closeXRPanel);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // If we are still waiting after 15 seconds, just close it so it's not a persistent annoyance
+      if (useLegoStore.getState().xrPanel === "waitingControllers") {
+         closeXRPanel();
+      }
+    }, 15000);
+    return () => clearTimeout(t);
+  }, [closeXRPanel]);
 
   useFrame((state, delta) => {
     if (!gl.xr.isPresenting || !groupRef.current) return;

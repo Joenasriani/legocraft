@@ -28,7 +28,7 @@ export const HumanViewLayer = ({
     p: THREE.Vector3,
     n: THREE.Vector3,
     tk: string,
-  ) => void;
+  ) => boolean;
 }) => {
   const { gl, scene } = useThree();
   const raycaster = new THREE.Raycaster();
@@ -261,6 +261,7 @@ export const HumanViewLayer = ({
     }
 
     // Handle Locomotion (Thumbsticks)
+    /*
     const dt = Math.min(delta, 0.05);
 
     if (leftInput && leftInput.gamepad) {
@@ -296,6 +297,7 @@ export const HumanViewLayer = ({
         }
       }
     }
+    */
 
     // Snap turn disabled in this build
     /*
@@ -387,6 +389,9 @@ export const HumanViewLayer = ({
         if (isMenuItem && onTriggerFn) {
           latestValidPlacement.current = null;
           updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+        } else if (useLegoStore.getState().xrPanel !== "none") {
+          latestValidPlacement.current = null;
+          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
         } else {
           // Normal brick interaction
           const unscaledP3 = hit.point.clone().divideScalar(currentVRScale);
@@ -411,7 +416,11 @@ export const HumanViewLayer = ({
           else if (Math.abs(normal.y) > 0.7) targetKind = "brick-top";
           else targetKind = "brick-side";
 
-          if (isValidPlacement) {
+          const isFrozenPreview = mode === "Move" && useLegoStore.getState().isDraggingBrick && movePreviewActiveRef.current && !squeezePressed;
+
+          if (isFrozenPreview) {
+            // Keep frozen
+          } else if (isValidPlacement) {
             latestValidPlacement.current = { p: unscaledP3, n: normal, tk: targetKind };
             updateGhostPosition(unscaledP3, normal, targetKind);
           } else {
@@ -425,6 +434,8 @@ export const HumanViewLayer = ({
              onTriggerFn();
              triggerHaptics(rightInput, HapticType.UI_CLICK);
              audioService.playMenu();
+          } else if (useLegoStore.getState().xrPanel !== "none") {
+             // Do nothing to the world if a panel is open!
           } else if (mode === "Delete" && hit) {
              const instId = hit.instanceId;
              const ud = hit.object.userData;
@@ -464,23 +475,33 @@ export const HumanViewLayer = ({
              const canCommitBuild = mode === "Build" && latestValidPlacement.current;
 
              if (canCommitMove || canCommitBuild) {
-               handleVRCommit(
+               const success = handleVRCommit(
                   latestValidPlacement.current!.p,
                   latestValidPlacement.current!.n,
                   latestValidPlacement.current!.tk
                );
-               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-               audioService.playPlace();
-               movePreviewActiveRef.current = false;
+               if (success) {
+                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                 audioService.playPlace();
+                 movePreviewActiveRef.current = false;
+               } else {
+                 triggerHaptics(rightInput, HapticType.ERROR);
+                 audioService.playInvalid();
+               }
              } else if (canCommitRotationOnly) {
-               handleVRCommit(
+               const success = handleVRCommit(
                   new THREE.Vector3(),
                   new THREE.Vector3(0, 1, 0),
                   "none"
                );
-               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-               audioService.playPlace();
-               movePreviewActiveRef.current = false;
+               if (success) {
+                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                 audioService.playPlace();
+                 movePreviewActiveRef.current = false;
+               } else {
+                 triggerHaptics(rightInput, HapticType.ERROR);
+                 audioService.playInvalid();
+               }
              } else if (mode === "Move" && !state.movingBrickId) {
                useLegoStore.getState().setToastMessage("Select and drag a brick to move it.");
                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
@@ -641,22 +662,50 @@ export const HumanViewLayer = ({
         // Not aimed at valid target, clear action states without logic
         // if users click trigger, nothing happens.
         useLegoStore.getState().setVRMenuHoverContent("");
-        updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
-        latestValidPlacement.current = null;
+        const isFrozenPreview = mode === "Move" && useLegoStore.getState().isDraggingBrick && movePreviewActiveRef.current && !squeezePressed;
+        if (!isFrozenPreview) {
+          updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+          latestValidPlacement.current = null;
+        }
         latestHit.current = null;
 
-        // Handle trigger for rotation-only commit when not aiming at anything
         if (triggerPressed && !wasTriggerPressed.current) {
-           const state = useLegoStore.getState();
-           if (mode === "Move" && state.movingBrickId && !state.isDraggingBrick) {
-               handleVRCommit(
-                  new THREE.Vector3(),
-                  new THREE.Vector3(0, 1, 0),
-                  "none"
-               );
-               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-               audioService.playPlace();
-               movePreviewActiveRef.current = false;
+           if (useLegoStore.getState().xrPanel !== "none") {
+              // Ignore trigger completely
+           } else {
+             const state = useLegoStore.getState();
+             const canCommitFrozenMove = mode === "Move" && state.movingBrickId && state.isDraggingBrick && movePreviewActiveRef.current && latestValidPlacement.current;
+             const canCommitRotationOnly = mode === "Move" && state.movingBrickId && !state.isDraggingBrick;
+
+             if (canCommitFrozenMove) {
+                 const success = handleVRCommit(
+                    latestValidPlacement.current!.p,
+                    latestValidPlacement.current!.n,
+                    latestValidPlacement.current!.tk
+                 );
+                 if (success) {
+                   triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                   audioService.playPlace();
+                   movePreviewActiveRef.current = false;
+                 } else {
+                   triggerHaptics(rightInput, HapticType.ERROR);
+                   audioService.playInvalid();
+                 }
+             } else if (canCommitRotationOnly) {
+                 const success = handleVRCommit(
+                    new THREE.Vector3(),
+                    new THREE.Vector3(0, 1, 0),
+                    "none"
+                 );
+                 if (success) {
+                   triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                   audioService.playPlace();
+                   movePreviewActiveRef.current = false;
+                 } else {
+                   triggerHaptics(rightInput, HapticType.ERROR);
+                   audioService.playInvalid();
+                 }
+             }
            }
         }
       }

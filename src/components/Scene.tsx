@@ -1,6 +1,6 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html, Text, Sky } from "@react-three/drei";
+import { OrbitControls, Html, Text, Sky, Environment, Stars, Sparkles, ContactShadows } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
@@ -287,16 +287,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (executeCommitRef.current) {
       let position = computePlacementTarget(point, normal, targetKind);
       
-      // If we are in Move mode but not dragging, we force the position to the current brick's position
-      // so that Trigger commits the rotation change exactly where it is.
+      let finalTargetKind = targetKind;
       if (state.mode === "Move" && state.movingBrickId && !state.isDraggingBrick) {
-        const mb = state.bricks.find(b => b.id === state.movingBrickId);
-        if (mb) {
-          position = mb.position;
-        }
+        finalTargetKind = "rotation-only";
       }
 
-      return executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind }, position });
+      return executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind: finalTargetKind }, position });
     }
     return false;
   };
@@ -1317,7 +1313,31 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (now - lastPlacementRef.current < 50) return false;
     lastPlacementRef.current = now;
 
-    const currentGhostPos = candidate.position;
+    let currentGhostPos = candidate.position;
+
+    if (candidate.hit.targetKind === "rotation-only" && mode === "Move" && movingBrick) {
+        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+        const oxA = movingBrick!.position[0] - movingGroupPivot[0];
+        const ozA = movingBrick!.position[2] - movingGroupPivot[2];
+        let rotatedOxA = oxA,
+          rotatedOzA = ozA;
+        if (rotMod === 90 || rotMod === -270) {
+          rotatedOxA = -ozA;
+          rotatedOzA = oxA;
+        } else if (Math.abs(rotMod) === 180) {
+          rotatedOxA = -oxA;
+          rotatedOzA = -ozA;
+        } else if (rotMod === 270 || rotMod === -90) {
+          rotatedOxA = ozA;
+          rotatedOzA = -oxA;
+        }
+        currentGhostPos = [
+          movingGroupPivot[0] + rotatedOxA,
+          movingBrick!.position[1],
+          movingGroupPivot[2] + rotatedOzA
+        ];
+    }
+
     setGhostPosition(currentGhostPos);
 
     let commitSuccess = false;
@@ -1815,17 +1835,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   return (
     <>
-      <color attach="background" args={["#87CEEB"]} />
-      <Sky distance={450000} sunPosition={[0, 1, 0]} inclination={0} azimuth={0.25} />
-      <fog attach="fog" args={["#87CEEB", 50, 300]} />
+      <color attach="background" args={["#1c2834"]} />
+      <Environment preset="sunset" background blur={0.4} />
+      <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+      <fog attach="fog" args={["#1c2834", 10, 200]} />
       <ambientLight intensity={0.4} />
-      <hemisphereLight intensity={0.6} color="#ffffff" groundColor="#002D04" />
+      <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#001804" />
       <directionalLight
-        position={[10, 20, 10]}
-        intensity={1.5}
+        position={[10, 15, 10]}
+        intensity={1.0}
         castShadow={!xrSessionActive}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-near={0.5}
         shadow-camera-far={100}
         shadow-camera-left={-20}
@@ -1833,6 +1854,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         shadow-camera-top={20}
         shadow-camera-bottom={-20}
       />
+      <ContactShadows resolution={1024} scale={40} blur={2} opacity={0.3} far={10} color="#000000" position={[0, -0.01, 0]} />
 
       <Suspense fallback={null}>
         {xrSessionActive && showXRPerf && <VRStats />}
