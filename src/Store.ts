@@ -7,8 +7,11 @@ import {
   HALF_MODULE,
 } from "./constants";
 
-export type BrickType = "1x1" | "1x2" | "2x2" | "2x3" | "2x4";
-export const BRICK_TYPES: BrickType[] = ["1x1", "1x2", "2x2", "2x3", "2x4"];
+export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5";
+export const BRICK_TYPES: BrickType[] = [
+  "1x2", "1x3", "2x2", "2x3", "2x4",
+  "3x3", "3x4", "4x4", "4x5", "5x5",
+];
 export const PLACEMENT_EPSILON = 0.002;
 
 export interface BrickData {
@@ -100,18 +103,19 @@ export const isValidBrickData = (item: any): boolean => {
 
 export const getBrickDimensions = (type: BrickType) => {
   switch (type) {
-    case "1x1":
-      return { w: 1, d: 1 };
-    case "1x2":
-      return { w: 1, d: 2 };
-    case "2x2":
-      return { w: 2, d: 2 };
-    case "2x3":
-      return { w: 2, d: 3 };
-    case "2x4":
-      return { w: 2, d: 4 };
+    case "1x1": return { w: 1, d: 1 };
+    case "1x2": return { w: 1, d: 2 };
+    case "1x3": return { w: 1, d: 3 };
+    case "2x2": return { w: 2, d: 2 };
+    case "2x3": return { w: 2, d: 3 };
+    case "2x4": return { w: 2, d: 4 };
+    case "3x3": return { w: 3, d: 3 };
+    case "3x4": return { w: 3, d: 4 };
+    case "4x4": return { w: 4, d: 4 };
+    case "4x5": return { w: 4, d: 5 };
+    case "5x5": return { w: 5, d: 5 };
     default:
-      return { w: 1, d: 1 };
+      return { w: 2, d: 2 };
   }
 };
 
@@ -432,6 +436,8 @@ interface LegoStore {
   commitPreset: (position: [number, number, number], rotation: number) => void;
   activePreset: ActivePresetName | null;
   toastTimeoutId: ReturnType<typeof setTimeout> | null;
+  exportGLB: (() => void) | null;
+  setExportGLB: (fn: (() => void) | null) => void;
 }
 
 const COLORS = [
@@ -809,6 +815,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       ghostRotTrigger: state.ghostRotTrigger + 1,
       ghostRotData: rot,
     })),
+
+  exportGLB: null,
+  setExportGLB: (fn) => set({ exportGLB: fn }),
 
   setToastMessage: (msg) => {
     const { toastTimeoutId } = get();

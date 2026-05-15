@@ -14,13 +14,13 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
   // Clamp Y between 1.1m and 1.7m (chest to eye level constraint)
   position.y = Math.max(1.1, Math.min(1.7, camPos.y - 0.2)); 
 
-  const dummy = new THREE.Group();
-  dummy.position.copy(position);
-  dummy.lookAt(camPos);
-  
-  // lookAt makes the object's -Z axis point at the target.
-  // Standard PlaneGeometry faces +Z. To make +Z face the camera, we rotate 180 degrees around Y.
-  dummy.rotateY(Math.PI);
+  // Instead of lookAt which can flip depending on height and axis,
+  // we just use the camera's Y-rotation so the panel reliably faces the user.
+  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  euler.x = 0; // Remove pitch (so it stands vertically straight)
+  euler.z = 0; // Remove roll
+  euler.y += Math.PI; // Flip 180 deg to face the user
+  const quaternion = new THREE.Quaternion().setFromEuler(euler);
 
-  return { position, quaternion: dummy.quaternion };
+  return { position, quaternion };
 }

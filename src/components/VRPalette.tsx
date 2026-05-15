@@ -163,13 +163,13 @@ export const VRPalette = () => {
       {/* Bricks Grid */}
       <group position={[-0.12, -0.15, 0]}>
         {BRICK_TYPES.map((bt, i) => {
-          const col = i % 2;
-          const row = Math.floor(i / 2);
+          const col = i % 5;
+          const row = Math.floor(i / 5);
           return (
             <PaletteButton
               key={bt}
-              position={[col * 0.12 + 0.06, -row * 0.05, 0]}
-              width={0.11}
+              position={[col * 0.06, -row * 0.05, 0]}
+              width={0.055}
               height={0.04}
               color="#444"
               label={`${bt}`}

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
+import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { useLegoStore, getGroupBricks, hasBrickAbove } from "../Store";
 import { MODULE_SIZE, BRICK_HEIGHT } from "../constants";
@@ -7,6 +8,8 @@ import { audioService } from "../services/AudioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
+
+const isDebugXR = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugXR") === "1";
 
 export const HumanViewLayer = ({
   currentVRScale,
@@ -53,10 +56,11 @@ export const HumanViewLayer = ({
       const rightInput = Array.from(gl.xr.getSession()?.inputSources || []).find((s: any) => s.handedness === "right") as XRInputSource | undefined;
       if (!rightInput) return;
       
-      const { hitMenuItem, hitLoc } = latestHit.current || {};
-      if (hitMenuItem || menuClickActiveRef.current) {
-         // Menu logic is handled in useFrame
-         menuClickActiveRef.current = false;
+      const { hitMenuItem, onTriggerFn, hitLoc } = latestHit.current || {};
+      if (hitMenuItem && onTriggerFn) {
+         onTriggerFn();
+         triggerHaptics(rightInput, HapticType.UI_CLICK);
+         audioService.playMenu();
          return;
       }
 
@@ -163,8 +167,7 @@ export const HumanViewLayer = ({
 
     // VR target priority
     const xrPanel = useLegoStore.getState().xrPanel;
-    const isMenuPanel = xrPanel === "buildMenu" || xrPanel === "palette";
-    if (isMenuPanel) {
+    if (xrPanel !== "none") {
       return isMenu;
     } else {
       if (isMenu) return false;
@@ -195,6 +198,8 @@ export const HumanViewLayer = ({
     n: THREE.Vector3;
     tk: string;
   } | null>(null);
+
+  const debugTextRef = useRef<any>(null);
 
   useFrame((state, delta, xrFrame) => {
     const session = gl.xr.getSession();
@@ -399,20 +404,7 @@ export const HumanViewLayer = ({
 
         latestHit.current = { hitMenuItem: isMenuItem, onTriggerFn, hitLoc: hit };
 
-        if (triggerPressed && !wasTriggerPressed.current) {
-          if (isMenuItem) {
-            menuClickActiveRef.current = true;
-          } else {
-            menuClickActiveRef.current = false;
-          }
-        }
-
         if (isMenuItem && onTriggerFn) {
-          if (triggerPressed && !wasTriggerPressed.current) {
-            onTriggerFn();
-            triggerHaptics(rightInput, HapticType.UI_CLICK);
-            audioService.playMenu();
-          }
           latestValidPlacement.current = null;
           updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
         } else {
@@ -452,22 +444,6 @@ export const HumanViewLayer = ({
               const dist = pos.distanceTo(squeezeStartPosRef.current);
               if (dist > 0.05) {
                  useLegoStore.getState().setIsDraggingBrick(true);
-              }
-            }
-          }
-
-          // Handle squeeze release for "Release to Drop" in Move mode
-          if (!squeezePressed && wasSqueezePressed.current) {
-            if (mode === "Move" && movingBrickId) {
-              // We only commit if we were actually dragging (to avoid tiny accidental clicks committing)
-              if (latestValidPlacement.current) {
-                handleVRCommit(
-                  latestValidPlacement.current.p,
-                  latestValidPlacement.current.n,
-                  latestValidPlacement.current.tk
-                );
-                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.playPlace();
               }
             }
           }
@@ -660,6 +636,18 @@ export const HumanViewLayer = ({
       wasActionPressed.current = actionPressed;
       wasTriggerPressed.current = triggerPressed;
       wasSqueezePressed.current = squeezePressed;
+
+      if (isDebugXR && debugTextRef.current) {
+         debugTextRef.current.text = [
+            `Panel: ${store.xrPanel}`,
+            `Mode: ${store.mode} | Dragging: ${store.isDraggingBrick}`,
+            `Selected: ${store.multiSelectedBrickIds.length} | Moving: ${store.movingBrickId || 'none'}`,
+            `Hit: ${latestHit.current ? (latestHit.current.hitMenuItem ? 'MENU' : 'WORLD') : 'NONE'}`,
+            `L(X:${wasXPressed.current} Y:${wasYPressed.current}) R(A:${wasActionPressed.current} B:${wasBPressed.current} TRG:${wasTriggerPressed.current} GRP:${wasSqueezePressed.current})`,
+            `HitObj: ${hit ? hit.object.name : 'none'}`,
+         ].join('\n');
+      }
+
     } else {
       if (laserRef.current) laserRef.current.visible = false;
       if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
@@ -685,6 +673,11 @@ export const HumanViewLayer = ({
           depthTest={false}
         />
       </mesh>
+      {isDebugXR && (
+        <group position={[0, 1.5, -1.5]}>
+           <Text ref={debugTextRef} color="chartreuse" fontSize={0.05} anchorX="center" anchorY="middle"> </Text>
+        </group>
+      )}
     </group>
   );
 };

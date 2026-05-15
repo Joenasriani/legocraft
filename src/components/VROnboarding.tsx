@@ -13,9 +13,11 @@ export const VROnboarding = () => {
   });
 
   useEffect(() => {
+    // Only calculate once when it appears
     const cam = gl.xr.isPresenting ? gl.xr.getCamera() : camera;
     setTransform(getSafePanelTransform(cam));
-  }, [camera, gl.xr.isPresenting]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl.xr.isPresenting]);
 
   const instructions = [
     { key: "Right Trigger", action: "Place/Select" },

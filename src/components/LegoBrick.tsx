@@ -78,7 +78,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
         {hideMesh ? (
           <mesh raycast={ghostRaycast}>
             <boxGeometry args={[width, BRICK_HEIGHT, depth]} />
-            <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            <meshBasicMaterial visible={false} depthWrite={false} />
           </mesh>
         ) : (
           <>

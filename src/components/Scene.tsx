@@ -205,6 +205,51 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const isCameraLocked = useLegoStore((state) => state.isCameraLocked);
 
   const controlsRef = useRef<any>(null);
+  const exportGroupRef = useRef<THREE.Group>(null);
+  
+  useEffect(() => {
+    useLegoStore.getState().setExportGLB(() => {
+      if (exportGroupRef.current) {
+        import("three/examples/jsm/exporters/GLTFExporter.js").then(({ GLTFExporter }) => {
+          const exporter = new GLTFExporter();
+          exporter.parse(
+            exportGroupRef.current!,
+            (gltf: any) => {
+              const blob = new Blob([gltf], { type: "application/octet-stream" });
+              if ("showSaveFilePicker" in window) {
+                (window as any).showSaveFilePicker({
+                  suggestedName: "brick-structure.glb",
+                  types: [{ description: "GLB Files", accept: { "model/gltf-binary": [".glb"] } }],
+                }).then((handle: any) => handle.createWritable())
+                  .then((writable: any) => writable.write(blob).then(() => {
+                     writable.close();
+                     useLegoStore.getState().setToastMessage("Exported GLB successfully.");
+                  }))
+                  .catch((e: any) => {
+                    if (e.name !== "AbortError") console.error(e);
+                  });
+              } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "brick-structure.glb";
+                a.click();
+                URL.revokeObjectURL(url);
+                useLegoStore.getState().setToastMessage("Exported GLB successfully.");
+              }
+            },
+            (error) => {
+              console.error("An error happened during GLB export", error);
+              useLegoStore.getState().setToastMessage("Error exporting GLB.");
+            },
+            { binary: true }
+          );
+        });
+      }
+    });
+    return () => useLegoStore.getState().setExportGLB(null);
+  }, []);
+
   const isBrickInteractionRef = useRef(false);
   type PlacementCandidate = {
     hit: {
@@ -611,7 +656,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     normal: THREE.Vector3,
     targetKind: string = "none",
   ) => {
-    setGhostPosition(computePlacementTarget(point, normal, targetKind));
+    const position = computePlacementTarget(point, normal, targetKind);
+    const state = useLegoStore.getState();
+    const isDragging = state.isDraggingBrick;
+    const isBuilding = state.mode === "Build";
+    const isPlacingPreset = state.activePreset !== null;
+
+    if (isDragging || isBuilding || isPlacingPreset) {
+      setGhostPosition(position);
+    } else if (state.mode === "Move" && movingBrickId) {
+      const mb = state.bricks.find(b => b.id === movingBrickId);
+      if (mb) setGhostPosition(mb.position);
+    }
   };
 
   const getPointerCoords = (e: any) => {
@@ -1792,25 +1848,27 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }}
         onContextMenu={handleContextMenu}
       >
-        {/* Visualized Bricks using InstancedMesh */}
-        {Object.entries(groupedBricks).map(([key, group]) => {
-          const [type, color] = key.split("_");
-          return (
-            <BrickInstances
-              key={key}
-              type={type as any}
-              color={color}
-              bricks={group}
-            />
-          );
-        })}
+        <group ref={exportGroupRef}>
+          {/* Visualized Bricks using InstancedMesh */}
+          {Object.entries(groupedBricks).map(([key, group]) => {
+            const [type, color] = key.split("_");
+            return (
+              <BrickInstances
+                key={key}
+                type={type as any}
+                color={color}
+                bricks={group}
+              />
+            );
+          })}
+        </group>
 
         {!isScreenshotting && mode === "Build" && !activePreset && placementStatus.valid && (
           <group>
             <LegoBrick
               id="ghost"
               type={selectedType}
-              color="#4da6ff"
+              color={selectedColor}
               position={ghostPosition}
               rotation={ghostRotation}
               isPlacementGhost
@@ -1905,8 +1963,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           >
             <planeGeometry args={[100, 100]} />
             <meshBasicMaterial
-              transparent
-              opacity={0}
+              visible={false}
               depthWrite={false}
               colorWrite={false}
             />

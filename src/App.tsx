@@ -605,6 +605,101 @@ const xrStore = createXRStore({
   customSessionInit: { optionalFeatures: ["local-floor", "bounded-floor"] },
 });
 
+const SaveExportMenuOverlay = ({
+  show,
+  onClose,
+  saveMenuRef,
+  onSaveProject,
+  onLoadProject,
+  onExportGLB,
+}: {
+  show: boolean;
+  onClose: () => void;
+  saveMenuRef: React.RefObject<HTMLDivElement>;
+  onSaveProject: () => void;
+  onLoadProject: () => void;
+  onExportGLB: () => void;
+}) => {
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          ref={saveMenuRef}
+          initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+          animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
+          exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex gap-2 sm:gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
+        >
+          <button
+            onClick={() => {
+              onSaveProject();
+              onClose();
+            }}
+            className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+          >
+            <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
+              <SaveIcon size={32} />
+            </span>
+            <div className="text-center w-full">
+              <div className="text-[12px] font-bold text-white leading-tight truncate">
+                Save Project
+              </div>
+              <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
+                .json
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              onLoadProject();
+              onClose();
+            }}
+            className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+          >
+            <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
+              <LoadIcon size={32} />
+            </span>
+            <div className="text-center w-full">
+              <div className="text-[12px] font-bold text-white leading-tight truncate">
+                Load Project
+              </div>
+              <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
+                .json
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              onExportGLB();
+              onClose();
+            }}
+            className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+            title="Exports the current structure to a GLTF file for use in other 3D applications."
+          >
+            <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
+               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+               </svg>
+            </span>
+            <div className="text-center w-full">
+              <div className="text-[12px] font-bold text-white leading-tight truncate">
+                Export 3D
+              </div>
+              <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
+                .glb
+              </div>
+            </div>
+          </button>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
 export default function App() {
   useEffect(() => {
     console.log(
@@ -641,6 +736,8 @@ export default function App() {
   });
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
+  const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const saveMenuRef = React.useRef<HTMLDivElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showVRPrompt, setShowVRPrompt] = useState(false);
   const [isFadingToVR, setIsFadingToVR] = useState(false);
@@ -711,12 +808,19 @@ export default function App() {
       ) {
         setShowPresetMenu(false);
       }
+      if (
+        showSaveMenu &&
+        saveMenuRef.current &&
+        !saveMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowSaveMenu(false);
+      }
     };
-    if (showPresetMenu) {
+    if (showPresetMenu || showSaveMenu) {
       window.addEventListener("pointerdown", handleGlobalClick);
       return () => window.removeEventListener("pointerdown", handleGlobalClick);
     }
-  }, [showPresetMenu]);
+  }, [showPresetMenu, showSaveMenu]);
 
   // Load save on startup
   useEffect(() => {
@@ -1005,6 +1109,19 @@ export default function App() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
+                  <div className="flex gap-1.5 relative">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSaveMenu(!showSaveMenu);
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
+                      title="Save / Export Menu"
+                    >
+                      <SaveIcon size={16} />
+                    </button>
+                  </div>
                   <div
                     className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate bg-black/40 border-white/20 text-white/80`}
                   >
@@ -1287,7 +1404,7 @@ export default function App() {
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
-                    className="glass-panel p-1.5 sm:p-2 rounded-2xl pointer-events-auto flex gap-1 shadow-2xl flex-wrap justify-center"
+                    className="glass-panel p-1.5 sm:p-2 rounded-2xl pointer-events-auto grid grid-cols-5 gap-1 shadow-2xl"
                   >
                     {BRICK_TYPES.map((type) => (
                       <button
@@ -1399,27 +1516,22 @@ export default function App() {
                     </button>
                   </div>
 
-                  <button
-                    onClick={handleSave}
-                    title="Save Build"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
-                  >
-                    <SaveIcon size={18} />
-                    <span className="hidden sm:inline text-[13px] font-semibold">
-                      Save
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={handleLoad}
-                    title="Load Build"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
-                  >
-                    <LoadIcon size={18} />
-                    <span className="hidden sm:inline text-[13px] font-semibold">
-                      Load
-                    </span>
-                  </button>
+                  <div className="relative flex items-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSaveMenu(!showSaveMenu);
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      title="Save / Export Menu"
+                      className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
+                    >
+                      <SaveIcon size={18} />
+                      <span className="hidden sm:inline text-[13px] font-semibold">
+                        Save / Export
+                      </span>
+                    </button>
+                  </div>
 
                   <button
                     onClick={handleScreenshot}
@@ -1454,6 +1566,15 @@ export default function App() {
               onClose={() => setShowPresetMenu(false)}
               presetMenuRef={presetMenuRef}
               presets={PRESET_OPTIONS}
+            />
+
+            <SaveExportMenuOverlay
+              show={showSaveMenu}
+              onClose={() => setShowSaveMenu(false)}
+              saveMenuRef={saveMenuRef}
+              onSaveProject={handleSave}
+              onLoadProject={handleLoad}
+              onExportGLB={() => useLegoStore.getState().exportGLB?.()}
             />
 
             <HelpModal
