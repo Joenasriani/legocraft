@@ -51,67 +51,7 @@ export const HumanViewLayer = ({
     c1.addEventListener("connected", attachHandedness);
 
     const onSelect = (e: any) => {
-      const src = e.target;
-      if (src.userData.handedness !== "right") return;
-      const rightInput = Array.from(gl.xr.getSession()?.inputSources || []).find((s: any) => s.handedness === "right") as XRInputSource | undefined;
-      if (!rightInput) return;
-      
-      const { hitMenuItem, onTriggerFn, hitLoc } = latestHit.current || {};
-      if (hitMenuItem && onTriggerFn) {
-         onTriggerFn();
-         triggerHaptics(rightInput, HapticType.UI_CLICK);
-         audioService.playMenu();
-         return;
-      }
-
-      const m = useLegoStore.getState().mode;
-      const sm = useLegoStore.getState().selectionMode;
-
-      if (m === "Delete" && hitLoc) {
-          const instId = hitLoc.instanceId;
-          const ud = hitLoc.object.userData;
-          if (instId !== undefined && ud && ud.bricks) {
-            const brickIndex = ud.isStud
-              ? Math.floor(instId / (ud.w * ud.d))
-              : instId;
-            const b = ud.bricks[brickIndex];
-            if (b) {
-              if (sm === "Group") {
-                const allb = useLegoStore.getState().bricks;
-                const g = getGroupBricks(b, allb);
-                useLegoStore.getState().removeBricks(g.map((bz: any) => bz.id));
-              } else if (sm === "Multi") {
-                const allb = useLegoStore.getState().bricks;
-                if (hasBrickAbove(b, allb, MODULE_SIZE, BRICK_HEIGHT)) {
-                  useLegoStore.getState().setToastMessage("Cannot select: brick has another brick above it.");
-                  setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-                  triggerHaptics(rightInput, HapticType.ERROR);
-                  audioService.playInvalid();
-                } else {
-                  useLegoStore.getState().toggleMultiSelectBrickId(b.id);
-                  triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                  audioService.playDelete();
-                }
-              } else {
-                useLegoStore.getState().removeBrick(b.id);
-                triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                audioService.playDelete();
-              }
-            }
-          }
-      } else if (latestValidPlacement.current) {
-         handleVRCommit(
-            latestValidPlacement.current.p,
-            latestValidPlacement.current.n,
-            latestValidPlacement.current.tk
-         );
-         triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-         audioService.playPlace();
-      } else {
-         useLegoStore.getState().setToastMessage("Invalid placement surface.");
-         triggerHaptics(rightInput, HapticType.ERROR);
-         audioService.playInvalid();
-      }
+      // Logic moved to useFrame for instant responsiveness
     };
 
     c0.addEventListener("select", onSelect);
@@ -437,6 +377,58 @@ export const HumanViewLayer = ({
           } else {
             latestValidPlacement.current = null;
             updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
+          }
+
+          if (triggerPressed && !wasTriggerPressed.current) {
+            if (isMenuItem && onTriggerFn) {
+               onTriggerFn();
+               triggerHaptics(rightInput, HapticType.UI_CLICK);
+               audioService.playMenu();
+            } else if (mode === "Delete" && hit) {
+               const instId = hit.instanceId;
+               const ud = hit.object.userData;
+               if (instId !== undefined && ud && ud.bricks) {
+                 const brickIndex = ud.isStud
+                   ? Math.floor(instId / (ud.w * ud.d))
+                   : instId;
+                 const b = ud.bricks[brickIndex];
+                 if (b) {
+                   if (selectionMode === "Group") {
+                     const allb = useLegoStore.getState().bricks;
+                     const g = getGroupBricks(b, allb);
+                     removeBricks(g.map((bz: any) => bz.id));
+                   } else if (selectionMode === "Multi") {
+                     const allb = useLegoStore.getState().bricks;
+                     if (hasBrickAbove(b, allb, MODULE_SIZE, BRICK_HEIGHT)) {
+                       useLegoStore.getState().setToastMessage("Cannot select: brick has another brick above it.");
+                       setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                       triggerHaptics(rightInput, HapticType.ERROR);
+                       audioService.playInvalid();
+                     } else {
+                       useLegoStore.getState().toggleMultiSelectBrickId(b.id);
+                       triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                       audioService.playDelete();
+                     }
+                   } else {
+                     removeBrick(b.id);
+                     triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                     audioService.playDelete();
+                   }
+                 }
+               }
+            } else if (latestValidPlacement.current) {
+               handleVRCommit(
+                  latestValidPlacement.current.p,
+                  latestValidPlacement.current.n,
+                  latestValidPlacement.current.tk
+               );
+               triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+               audioService.playPlace();
+            } else if (mode === "Build" || mode === "Move") {
+               useLegoStore.getState().setToastMessage("Invalid placement surface.");
+               triggerHaptics(rightInput, HapticType.ERROR);
+               audioService.playInvalid();
+            }
           }
 
           if (squeezePressed && wasSqueezePressed.current) {
