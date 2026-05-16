@@ -297,16 +297,16 @@ export const HumanViewLayer = ({
     }
 
     // Snap turn
-    /*
     if (rightInput && rightInput.gamepad) {
       const xAxis = rightInput.gamepad.axes[2] || 0;
       if (Math.abs(xAxis) > 0.5) {
         if (!snapTurnCooldown.current) {
           snapTurnCooldown.current = true;
           const turnAngle = xAxis > 0 ? -snapTurnAngle : snapTurnAngle;
+          const turnAngleRad = THREE.MathUtils.degToRad(turnAngle);
           const refSpace = gl.xr.getReferenceSpace();
           if (refSpace) {
-            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turnAngle);
+            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turnAngleRad);
             const transform = new XRRigidTransform(new DOMPoint(0,0,0), new DOMPoint(q.x, q.y, q.z, q.w));
             gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
           }
@@ -316,7 +316,6 @@ export const HumanViewLayer = ({
         snapTurnCooldown.current = false;
       }
     }
-    */
 
     if (rightController && rightInput && rightInput.gamepad) {
       const pos = new THREE.Vector3().setFromMatrixPosition(
