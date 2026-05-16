@@ -176,6 +176,22 @@ export const HumanViewLayer = ({
       }
     }
 
+    // Defaulting logic for controllers if handedness is unknown
+    if (!leftInput && !rightInput && inputSourcesArray.length >= 2) {
+       leftInput = inputSourcesArray[0];
+       rightInput = inputSourcesArray[1];
+    } else if (!rightInput && inputSourcesArray.length === 1) {
+       // Only one controller? Assume it's the right (primary)
+       rightInput = inputSourcesArray[0];
+    }
+
+    if (!leftController && leftInput) {
+       leftController = gl.xr.getController(inputSourcesArray.indexOf(leftInput));
+    }
+    if (!rightController && rightInput) {
+       rightController = gl.xr.getController(inputSourcesArray.indexOf(rightInput));
+    }
+
     if ((import.meta as any).env.DEV) {
       if (leftController && !(leftController as any)._hasLogged) {
         console.log("[VR] left controller found in useFrame");
@@ -193,8 +209,8 @@ export const HumanViewLayer = ({
     // Process Left controller UI buttons
     if (leftInput && leftInput.gamepad) {
       const gp = leftInput.gamepad;
-      const xPressed = gp.buttons[4]?.pressed || false;
-      const yPressed = gp.buttons[5]?.pressed || false;
+      const xPressed = gp.buttons[4]?.pressed || gp.buttons[3]?.pressed || false;
+      const yPressed = gp.buttons[5]?.pressed || gp.buttons[4]?.pressed || false;
 
       if (xPressed && !wasXPressed.current) {
         if (currentPanel === "buildMenu") {
@@ -218,8 +234,8 @@ export const HumanViewLayer = ({
     // Process Right controller UI buttons
     if (rightInput && rightInput.gamepad) {
       const gp = rightInput.gamepad;
-      // B button is 5 on right controller
-      const bPressed = gp.buttons[5]?.pressed || false;
+      // B button is 5 on right controller, or 4 for some old Oculus mapping
+      const bPressed = gp.buttons[5]?.pressed || gp.buttons[4]?.pressed || false;
 
       if (bPressed && !wasBPressed.current) {
         if (currentPanel !== "none") {
@@ -341,8 +357,8 @@ export const HumanViewLayer = ({
       const gp = rightInput.gamepad;
       const triggerPressed = gp.buttons[0]?.pressed || false;
       const squeezePressed = gp.buttons[1]?.pressed || false;
-      // right A = 4
-      const aPressed = gp.buttons[4]?.pressed || false;
+      // right A = 4 (or 3 fallback for some profiles)
+      const aPressed = gp.buttons[4]?.pressed || gp.buttons[3]?.pressed || false;
       const actionPressed = aPressed;
 
       let isMenuItem = false;
@@ -763,7 +779,7 @@ export const HumanViewLayer = ({
 
       if (isDebugXR && debugTextRef.current) {
          debugTextRef.current.text = [
-            `RTrig: ${triggerPressed} | RGrip: ${squeezePressed} | A: ${actionPressed} | B: ${wasBPressed.current}`,
+            `L(X/Y): ${wasXPressed.current}/${wasYPressed.current} | RTrig: ${triggerPressed} | A/B: ${actionPressed}/${wasBPressed.current}`,
             `LAxes: ${leftInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
             `RAxes: ${rightInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
             `Hit: ${hit ? hit.object.name : 'none'}`,
