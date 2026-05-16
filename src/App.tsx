@@ -1113,11 +1113,38 @@ export default function App() {
             <div className="flex flex-col gap-3 w-full pointer-events-none shrink-0">
               {/* Top Bar */}
               <div className="flex justify-between items-start sm:items-center pointer-events-auto flex-wrap gap-2">
-                <div className="text-base sm:text-xl font-extrabold tracking-[2px] flex items-center gap-1 sm:gap-2 shrink-0">
-                  BRICK{" "}
-                  <span className="font-light opacity-60 hidden sm:inline">
-                    XR
-                  </span>
+                <div className="flex flex-col">
+                  <div className="text-base sm:text-xl font-extrabold tracking-[2px] flex items-center gap-1 sm:gap-2 shrink-0">
+                    BRICK{" "}
+                    <span className="font-light opacity-60 hidden sm:inline">
+                      XR
+                    </span>
+                  </div>
+                  <motion.div
+                    className="font-handwriting text-red-500 text-sm sm:text-base -mt-1"
+                    initial="hidden"
+                    animate="visible"
+                    variants={{
+                      hidden: { opacity: 0 },
+                      visible: {
+                        opacity: 1,
+                        transition: { staggerChildren: 0.1, delayChildren: 0.5 },
+                      },
+                    }}
+                  >
+                    {"LegoCraft".split("").map((char, index) => (
+                      <motion.span
+                        key={index}
+                        variants={{
+                          hidden: { opacity: 0, y: 5, rotate: -10 },
+                          visible: { opacity: 1, y: 0, rotate: 0 },
+                        }}
+                        style={{ display: "inline-block" }}
+                      >
+                        {char}
+                      </motion.span>
+                    ))}
+                  </motion.div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
                   <div className="flex gap-1.5 relative">
