@@ -8,12 +8,6 @@ import { useLegoStore } from "../Store";
 export const VROnboarding = () => {
   const { camera, gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
-  
-  // Set initial position out of view
-  const [transform, setTransform] = useState({ 
-    position: new THREE.Vector3(0, 100, 0), 
-    quaternion: new THREE.Quaternion() 
-  });
 
   useFrame((state, delta) => {
     if (!gl.xr.isPresenting || !groupRef.current) return;
@@ -32,13 +26,13 @@ export const VROnboarding = () => {
   });
 
   const instructions = [
-    { key: "Left Thumbstick", action: "Move (Smooth)" },
-    { key: "Right Thumbstick", action: "Turn (Snap)" },
-    { key: "Right Trigger", action: "Place/Confirm" },
-    { key: "Right Grip", action: "Select/Move" },
-    { key: "A / Right Trigger", action: "Rotate" },
-    { key: "B", action: "Cancel/Close" },
-    { key: "X / Menu", action: "Build Menu" },
+    { key: "Left stick", action: "Move" },
+    { key: "Right stick", action: "Snap turn" },
+    { key: "Right trigger", action: "Place / confirm" },
+    { key: "Right grip", action: "Select / move" },
+    { key: "A", action: "Rotate" },
+    { key: "B", action: "Cancel / close" },
+    { key: "X", action: "Build menu" },
     { key: "Y", action: "Palette" },
   ];
 
@@ -54,7 +48,7 @@ export const VROnboarding = () => {
   }, [closeXRPanel]);
 
   return (
-    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
+    <group ref={groupRef} position={[0, 100, 0]}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.4, 2.2]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />

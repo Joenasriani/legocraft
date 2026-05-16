@@ -90,18 +90,20 @@ export const VRRadialMenu = ({
   const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
-  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion }>({ 
-    position: new THREE.Vector3(0, 100, 0), 
-    quaternion: new THREE.Quaternion() 
-  });
 
-  React.useEffect(() => {
-    if (visible && gl.xr.isPresenting) {
-      const cam = gl.xr.getCamera();
-      const target = getSafePanelTransform(cam);
-      setTransform({ position: target.position.clone(), quaternion: target.quaternion.clone() });
+  useFrame((state, delta) => {
+    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
+    const cam = gl.xr.getCamera();
+    const target = getSafePanelTransform(cam);
+    
+    if (groupRef.current.position.distanceTo(target.position) > 10) {
+      groupRef.current.position.copy(target.position);
+      groupRef.current.quaternion.copy(target.quaternion);
+    } else {
+      groupRef.current.position.lerp(target.position, delta * 3.0);
+      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
     }
-  }, [visible, gl.xr]);
+  });
 
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
@@ -184,7 +186,7 @@ export const VRRadialMenu = ({
   if (!visible) return null;
 
   return (
-    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
+    <group ref={groupRef} position={[0, 100, 0]}>
       {SEGMENTS.map((seg, i) => {
           const x = Math.cos(seg.theta) * radius;
           const y = Math.sin(seg.theta) * radius;

@@ -114,18 +114,22 @@ export const VRPalette = () => {
   const groupRef = useRef<THREE.Group>(null);
   
   const visible = useLegoStore((s) => s.xrPanel === "palette");
-  const [transform, setTransform] = useState<{ position: THREE.Vector3, quaternion: THREE.Quaternion }>({ 
-    position: new THREE.Vector3(0, 100, 0), 
-    quaternion: new THREE.Quaternion() 
-  });
 
-  React.useEffect(() => {
-    if (visible && gl.xr.isPresenting) {
-      const cam = gl.xr.getCamera();
-      const target = getSafePanelTransform(cam);
-      setTransform({ position: target.position.clone(), quaternion: target.quaternion.clone() });
+  useFrame((state, delta) => {
+    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
+    const cam = gl.xr.getCamera();
+    const target = getSafePanelTransform(cam);
+    
+    // Jump if extremely far away (e.g. first frame)
+    if (groupRef.current.position.distanceTo(target.position) > 10) {
+      groupRef.current.position.copy(target.position);
+      groupRef.current.quaternion.copy(target.quaternion);
+    } else {
+      // Smoothly follow
+      groupRef.current.position.lerp(target.position, delta * 3.0);
+      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
     }
-  }, [visible, gl.xr]);
+  });
 
   const activeColor = useLegoStore((s) => s.selectedColor);
   const setActiveColor = useLegoStore((s) => s.setSelectedColor);
@@ -135,7 +139,7 @@ export const VRPalette = () => {
   if (!visible) return null;
 
   return (
-    <group ref={groupRef} position={transform.position} quaternion={transform.quaternion}>
+    <group ref={groupRef} position={[0, 100, 0]}>
       {/* Background Panel */}
       <mesh position={[0, -0.05, -0.01]}>
         <boxGeometry args={[0.35, 0.35, 0.005]} />

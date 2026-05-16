@@ -762,11 +762,33 @@ export const HumanViewLayer = ({
 
       // Handle Squeeze (Grip) release for dropping/placing
       if (!squeezePressed && wasSqueezePressed.current) {
-        if (useLegoStore.getState().mode === "Move") {
-            // Grip release stops dragging but does NOT commit and does NOT clear selection
-            if (!movePreviewActiveRef.current) {
-               useLegoStore.getState().setIsDraggingBrick(false);
+        const state = useLegoStore.getState();
+        if (state.mode === "Move") {
+            if (state.isDraggingBrick && movePreviewActiveRef.current) {
+               if (latestValidPlacement.current) {
+                  const success = handleVRCommit(
+                     latestValidPlacement.current.p,
+                     latestValidPlacement.current.n,
+                     latestValidPlacement.current.tk
+                  );
+                  if (success) {
+                    triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+                    audioService.playPlace();
+                  } else {
+                    triggerHaptics(rightInput, HapticType.ERROR);
+                    audioService.playInvalid();
+                    state.setMovingBrickId(null);
+                  }
+               } else {
+                  state.setToastMessage("Invalid placement surface.");
+                  setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                  triggerHaptics(rightInput, HapticType.ERROR);
+                  audioService.playInvalid();
+                  state.setMovingBrickId(null);
+               }
+               movePreviewActiveRef.current = false;
             }
+            state.setIsDraggingBrick(false);
             squeezeMoveBlockedRef.current = false;
         }
       }
