@@ -589,7 +589,7 @@ const PRESET_OPTIONS: {
 ];
 
 const xrStore = createXRStore({
-  ...((import.meta as any).env.DEV ? { emulate: false } : {}),
+  emulate: false,
   frameRate: "mid",
   frameBufferScaling: "low",
   layers: false,

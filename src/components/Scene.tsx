@@ -1,10 +1,16 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html, Text, Sky, Environment, Stars, Sparkles, ContactShadows } from "@react-three/drei";
+import { OrbitControls, Html, Text, Sky, Sparkles, ContactShadows } from "@react-three/drei";
 import { XR } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
 import { BrickInstances } from "./BrickInstances";
+
+const LazyEnvironment = React.lazy(() => import("@react-three/drei").then((m) => ({ default: m.Environment })));
+const LazyStars = React.lazy(() => import("@react-three/drei").then((m) => ({ default: m.Stars })));
+
+const isQuest = typeof navigator !== 'undefined' && /Quest|OculusBrowser/i.test(navigator.userAgent);
+
 import {
   useLegoStore,
   checkPlacementValid,
@@ -1867,8 +1873,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   return (
     <>
       <color attach="background" args={["#1c2834"]} />
-      {!xrSessionActive && <Environment preset="sunset" background blur={0.4} />}
-      {!xrSessionActive && <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />}
+      {(!xrSessionActive && !isQuest) && (
+         <Suspense fallback={null}>
+            <LazyEnvironment preset="sunset" background blur={0.4} />
+            <LazyStars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+         </Suspense>
+      )}
       <fog attach="fog" args={["#1c2834", 10, 200]} />
       <ambientLight intensity={0.4} />
       <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#001804" />
