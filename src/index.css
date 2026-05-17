@@ -55,6 +55,39 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+@media (max-height: 600px) {
+  .scale-ui-left {
+    transform: scale(0.85);
+    transform-origin: left center;
+  }
+  .scale-ui-right {
+    transform: scale(0.85);
+    transform-origin: right center;
+  }
+}
+
+@media (max-height: 520px) {
+  .scale-ui-left {
+    transform: scale(0.7);
+    transform-origin: left center;
+  }
+  .scale-ui-right {
+    transform: scale(0.7);
+    transform-origin: right center;
+  }
+}
+
+@media (max-height: 400px) {
+  .scale-ui-left {
+    transform: scale(0.55);
+    transform-origin: left center;
+  }
+  .scale-ui-right {
+    transform: scale(0.55);
+    transform-origin: right center;
+  }
+}
+
 @media (max-height: 520px) and (orientation: landscape) {
   .mobile-landscape-compact {
     gap: 0.25rem;

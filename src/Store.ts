@@ -9,7 +9,7 @@ import {
 
 export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5";
 export const BRICK_TYPES: BrickType[] = [
-  "1x2", "1x3", "2x2", "2x3", "2x4",
+  "1x1", "1x2", "1x3", "2x2", "2x3", "2x4",
   "3x3", "3x4", "4x4", "4x5", "5x5",
 ];
 export const PLACEMENT_EPSILON = 0.002;
@@ -1118,7 +1118,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         ...b,
         id: crypto.randomUUID(),
         groupId,
-        rotation: ((b.rotation || 0) + rotMod) % 360,
+        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
         position: [
           nx + position[0],
           b.position[1] + position[1],

@@ -1213,6 +1213,13 @@ export default function App() {
                   </motion.div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
+                  <button
+                    onClick={() => setShowHelp(true)}
+                    title="Show Help"
+                    className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    <HelpIcon size={16} />
+                  </button>
                   <div className="flex gap-1.5 relative">
                     <button
                       onClick={(e) => {
@@ -1251,7 +1258,7 @@ export default function App() {
                   {vrStatus === "ready" ? (
                     <button
                       onClick={() => setShowVRPrompt(true)}
-                      className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
+                      className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors leading-tight"
                       title="Enter VR Session"
                     >
                       Enter VR
@@ -1259,7 +1266,7 @@ export default function App() {
                   ) : (
                     <button
                       disabled
-                      className="bg-gray-600/50 backdrop-blur-md border border-gray-500/30 text-gray-400/50 px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider cursor-not-allowed"
+                      className="bg-gray-600/50 backdrop-blur-md border border-gray-500/30 text-gray-400/50 px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center cursor-not-allowed leading-tight"
                       title={
                         vrStatus === "https-required" ? "VR requires HTTPS or localhost." :
                         vrStatus === "no-xr" ? "WebXR is not available in this browser. Open on Meta Quest Browser to use VR." :
@@ -1389,7 +1396,7 @@ export default function App() {
             {/* Absolute Floating Docks (Anchored to middle) */}
             {/* Left Tools */}
             <div className="absolute safe-area-left top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
-              <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
+              <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 scale-ui-left">
                 <ToolIconButton
                   icon={uiVisible ? <EyeIcon size={24} /> : <EyeOffIcon size={24} />}
                   active={false}
@@ -1520,7 +1527,7 @@ export default function App() {
                   exit={{ opacity: 0, x: 20 }}
                   className="absolute safe-area-right top-[55%] -translate-y-1/2 pointer-events-none z-20"
                 >
-                  <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
+                  <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl scale-ui-right">
                     <div className="grid grid-cols-2 gap-1 sm:gap-2">
                       {LEGO_COLORS.map((color) => (
                         <button
@@ -1643,25 +1650,6 @@ export default function App() {
                 <div className="w-px h-6 bg-glass-border shrink-0" />
 
                 <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
-                  <button
-                    onClick={() => {
-                      if (bricks.length === 0) {
-                        useLegoStore
-                          .getState()
-                          .setToastMessage("Nothing to clear.");
-                      } else {
-                        setShowClearConfirm(true);
-                      }
-                    }}
-                    title="Clear all bricks"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-red-400 hover:text-red-300"
-                  >
-                    <ClearIcon size={18} />
-                    <span className="hidden sm:inline text-[13px] font-semibold">
-                      Clear
-                    </span>
-                  </button>
-
                   <div className="relative flex items-center">
                     <button
                       onClick={(e) => {
@@ -1706,13 +1694,21 @@ export default function App() {
                   </div>
 
                   <button
-                    onClick={() => setShowHelp(true)}
-                    title="Show Help"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+                    onClick={() => {
+                      if (bricks.length === 0) {
+                        useLegoStore
+                          .getState()
+                          .setToastMessage("Nothing to clear.");
+                      } else {
+                        setShowClearConfirm(true);
+                      }
+                    }}
+                    title="Clear all bricks"
+                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-red-400 hover:text-red-300"
                   >
-                    <HelpIcon size={18} />
+                    <ClearIcon size={18} />
                     <span className="hidden sm:inline text-[13px] font-semibold">
-                      Help
+                      Clear
                     </span>
                   </button>
                 </div>
