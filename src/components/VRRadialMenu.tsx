@@ -91,28 +91,29 @@ export const VRRadialMenu = ({
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
 
-  useFrame((state, delta) => {
-    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-    const cam = gl.xr.getCamera();
-    const target = getSafePanelTransform(cam);
-    
-    if (groupRef.current.position.distanceTo(target.position) > 10) {
-      groupRef.current.position.copy(target.position);
-      groupRef.current.quaternion.copy(target.quaternion);
-    } else {
-      groupRef.current.position.lerp(target.position, delta * 3.0);
-      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
-    }
-  });
-
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
+
+  const hasPlacedRef = useRef(false);
 
   React.useEffect(() => {
     if (!visible) {
       setClearArmed(false);
+      hasPlacedRef.current = false;
     }
   }, [visible]);
+
+  useFrame((state, delta) => {
+    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
+    if (hasPlacedRef.current) return;
+
+    const cam = gl.xr.getCamera();
+    const target = getSafePanelTransform(cam);
+    
+    groupRef.current.position.copy(target.position);
+    groupRef.current.quaternion.copy(target.quaternion);
+    hasPlacedRef.current = true;
+  });
 
   const radius = vrScale === "human" ? 0.22 : 2.2;
   const boxDepth = vrScale === "human" ? 0.015 : 0.1;

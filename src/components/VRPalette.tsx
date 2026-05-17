@@ -115,20 +115,24 @@ export const VRPalette = () => {
   
   const visible = useLegoStore((s) => s.xrPanel === "palette");
 
+  const hasPlacedRef = useRef(false);
+
+  React.useEffect(() => {
+    if (!visible) {
+      hasPlacedRef.current = false;
+    }
+  }, [visible]);
+
   useFrame((state, delta) => {
     if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
+    if (hasPlacedRef.current) return;
+
     const cam = gl.xr.getCamera();
     const target = getSafePanelTransform(cam);
     
-    // Jump if extremely far away (e.g. first frame)
-    if (groupRef.current.position.distanceTo(target.position) > 10) {
-      groupRef.current.position.copy(target.position);
-      groupRef.current.quaternion.copy(target.quaternion);
-    } else {
-      // Smoothly follow
-      groupRef.current.position.lerp(target.position, delta * 3.0);
-      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
-    }
+    groupRef.current.position.copy(target.position);
+    groupRef.current.quaternion.copy(target.quaternion);
+    hasPlacedRef.current = true;
   });
 
   const activeColor = useLegoStore((s) => s.selectedColor);

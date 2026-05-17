@@ -34,3 +34,11 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
 
   return { position, quaternion };
 }
+
+export function isQuestControllerReady(inputSource?: XRInputSource | null): boolean {
+  if (!inputSource) return false;
+  if (inputSource.targetRayMode !== "tracked-pointer") return false;
+  if (!inputSource.gamepad) return false;
+  if (inputSource.gamepad.buttons.length === 0) return false;
+  return true;
+}

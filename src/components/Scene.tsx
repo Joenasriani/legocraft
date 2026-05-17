@@ -39,6 +39,7 @@ import {
 import { VRRadialMenu } from "./VRRadialMenu";
 import { VRPalette } from "./VRPalette";
 import { vrTargetManager } from "../lib/vrTargets";
+import { isQuestControllerReady } from "../lib/vrHelpers";
 import { clientToCanvasNDC } from "../lib/pointer";
 
 import { HumanViewLayer } from "./VRViewLayers";
@@ -180,16 +181,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           const sess = gl.xr.getSession();
           if (sess) {
             hasTrackedController = Array.from(sess.inputSources).some(
-              (source) => source.targetRayMode === "tracked-pointer",
+              (source) => isQuestControllerReady(source)
             );
-            if ((import.meta as any).env.DEV) {
-              const info = Array.from(sess.inputSources).map(
-                (s) => `${s.handedness}/${s.targetRayMode}`,
-              );
-              if (info.length > 0) {
-                // Log silently or avoid spam since this is RAF, log status change
-              }
-            }
           }
         } catch (e) {}
 
@@ -200,7 +193,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             setVrReady(true);
             const store = useLegoStore.getState();
             if (store.xrPanel === "waitingControllers") {
-              store.setXRPanel("none");
+              store.setXRPanel("onboarding");
             }
             if ((import.meta as any).env.DEV)
               console.log("[VR] Status: VR ready");

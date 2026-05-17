@@ -8,6 +8,7 @@ import { audioService } from "../services/AudioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
+import { isQuestControllerReady } from "../lib/vrHelpers";
 
 const isDebugXR = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debugXR") === "1";
 
@@ -206,16 +207,9 @@ export const HumanViewLayer = ({
     const store = useLegoStore.getState();
     const currentPanel = store.xrPanel;
 
-    const isQuestController = (input: XRInputSource | null) => 
-       !!(input && input.targetRayMode === "tracked-pointer" && input.gamepad && input.gamepad.buttons.length > 0);
-       
-    if (currentPanel === "waitingControllers" || currentPanel === "onboarding") {
-      if (isQuestController(rightInput) || isQuestController(leftInput)) {
-         // Auto dismiss waiting state if Quest controllers are active.
-         // If they were stuck on waitingControllers or onboarding and controllers are ready, clear it out.
-         if (currentPanel === "waitingControllers") {
-            store.setXRPanel("none");
-         }
+    if (currentPanel === "waitingControllers") {
+      if (isQuestControllerReady(rightInput) || isQuestControllerReady(leftInput)) {
+         store.setXRPanel("onboarding");
       }
     }
 
