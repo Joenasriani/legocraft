@@ -638,10 +638,16 @@ const PRESET_OPTIONS: {
   },
 ];
 
+const isQuest =
+  typeof navigator !== "undefined" &&
+  /Quest|OculusBrowser/i.test(navigator.userAgent);
+const isQuest3 =
+  typeof navigator !== "undefined" && navigator.userAgent.includes("Quest 3");
+
 const xrStore = createXRStore({
   emulate: false,
-  frameRate: "mid",
-  frameBufferScaling: "low",
+  frameRate: isQuest3 ? "high" : isQuest ? "mid" : "high",
+  frameBufferScaling: isQuest3 ? "high" : isQuest ? "low" : "high",
   layers: false,
   anchors: false,
   meshDetection: false,
@@ -798,31 +804,6 @@ export default function App() {
   const [isXRActive, setIsXRActive] = useState(false);
   const [xrError, setXrError] = useState<string | null>(null);
   const [uiVisible, setUiVisible] = useState(true);
-
-  useEffect(() => {
-    // Quality Profile Detection
-    const ua = navigator.userAgent;
-    if (ua.includes("Oculus") || ua.includes("Quest")) {
-      if (ua.includes("Quest 3")) {
-        // In v6, we might need a different way to update these if setState doesn't work
-        // but typically xrStore is a zustand store.
-        (xrStore as any).setState({
-          frameRate: "high",
-          frameBufferScaling: "high",
-        });
-      } else {
-        (xrStore as any).setState({
-          frameRate: "mid",
-          frameBufferScaling: "low",
-        });
-      }
-    } else {
-      (xrStore as any).setState({
-        frameRate: "high",
-        frameBufferScaling: "high",
-      });
-    }
-  }, []);
 
   useEffect(() => {
     return xrStore.subscribe((state: any) => {

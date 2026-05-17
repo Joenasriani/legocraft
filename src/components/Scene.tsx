@@ -8,6 +8,51 @@ import {
   Stars,
 } from "@react-three/drei";
 import { XR, XROrigin } from "@react-three/xr";
+import * as THREE from "three";
+import { LegoBrick } from "./LegoBrick";
+import { BrickInstances } from "./BrickInstances";
+import {
+  useLegoStore,
+  checkPlacementValid,
+  checkStructureValid,
+  getBrickDimensions,
+  getPresetInfo,
+  PRESETS,
+  isValidBrickData,
+  getActivePresetBricks,
+  BrickData,
+  getGroupBricks,
+  LEGO_COLORS,
+  getBrickAABB,
+  doAABBsOverlap,
+  hasBrickAbove,
+} from "../Store";
+
+import {
+  MODULE_SIZE,
+  BRICK_HEIGHT,
+} from "../constants";
+
+import { VRRadialMenu } from "./VRRadialMenu";
+import { VRPalette } from "./VRPalette";
+import { vrTargetManager } from "../lib/vrTargets";
+import { isQuestControllerReady } from "../lib/vrHelpers";
+import { clientToCanvasNDC } from "../lib/pointer";
+
+import { HumanViewLayer } from "./VRViewLayers";
+import { VRStats } from "./VRStats";
+import { VROnboarding } from "./VROnboarding";
+import { VRWaitingPanel } from "./VRWaitingPanel";
+
+const isQuest =
+  typeof navigator !== "undefined" &&
+  /Quest|OculusBrowser/i.test(navigator.userAgent);
+
+export type VRScaleMode = "human";
+
+const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
+  human: 1.0,
+};
 
 function Locomotion() {
   const originRef = useRef<THREE.Group>(null);
@@ -53,52 +98,6 @@ function Locomotion() {
 
   return <XROrigin ref={originRef} position={[0, 0, 1.0]} />;
 }
-import * as THREE from "three";
-import { LegoBrick } from "./LegoBrick";
-import { BrickInstances } from "./BrickInstances";
-
-const isQuest =
-  typeof navigator !== "undefined" &&
-  /Quest|OculusBrowser/i.test(navigator.userAgent);
-
-import {
-  useLegoStore,
-  checkPlacementValid,
-  checkStructureValid,
-  getBrickDimensions,
-  getPresetInfo,
-  PRESETS,
-  isValidBrickData,
-  getActivePresetBricks,
-  BrickData,
-  getGroupBricks,
-  LEGO_COLORS,
-  getBrickAABB,
-  doAABBsOverlap,
-  hasBrickAbove,
-} from "../Store";
-
-import {
-  MODULE_SIZE,
-  BRICK_HEIGHT,
-} from "../constants";
-
-import { VRRadialMenu } from "./VRRadialMenu";
-import { VRPalette } from "./VRPalette";
-import { vrTargetManager } from "../lib/vrTargets";
-import { isQuestControllerReady } from "../lib/vrHelpers";
-import { clientToCanvasNDC } from "../lib/pointer";
-
-import { HumanViewLayer } from "./VRViewLayers";
-import { VRStats } from "./VRStats";
-import { VROnboarding } from "./VROnboarding";
-import { VRWaitingPanel } from "./VRWaitingPanel";
-
-export type VRScaleMode = "human";
-
-const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
-  human: 1.0,
-};
 
 const VRDebugVisibilityLayer = () => {
   const isDebug =
@@ -220,7 +219,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }
 
         const targets = vrTargetManager.getValidTargets();
-        const hasGrid = targets.some((t) => t.name === "Grid");
+        const hasFloor = targets.some((t) => t.name === "VRFloorCollider");
 
         let hasTrackedController = false;
         try {
@@ -233,7 +232,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         } catch (e) {}
 
         // Removed the fake 3000ms readiness timeout. Wait until conditions are actually met.
-        if (hasGrid && hasTrackedController) {
+        if (hasFloor && hasTrackedController) {
           try {
             await teleportPlayer({ x: 0, y: 0, z: -1.0 });
             setVrReady(true);
