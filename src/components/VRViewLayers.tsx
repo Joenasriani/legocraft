@@ -116,7 +116,7 @@ export const HumanViewLayer = ({
   const hoverMarkerRef = useRef<THREE.Mesh>(null);
 
   const laserGeo = React.useMemo(() => {
-    const geo = new THREE.BoxGeometry(0.002, 0.002, 1);
+    const geo = new THREE.BoxGeometry(0.005, 0.005, 1);
     geo.translate(0, 0, -0.5); // Pivot at the start of the laser
     return geo;
   }, []);
@@ -374,7 +374,7 @@ export const HumanViewLayer = ({
         }
       }
 
-      let laserDistance = 0.5; // Short length when not hitting anything
+      let laserDistance = 2.0; // Short length when not hitting anything
       const gp = rightInput.gamepad;
       const triggerPressed = gp.buttons[0]?.pressed || false;
       const squeezePressed = gp.buttons[1]?.pressed || false;
@@ -841,9 +841,9 @@ export const HumanViewLayer = ({
     <group>
       <mesh ref={laserRef} geometry={laserGeo} visible={false} raycast={() => null}>
         <meshBasicMaterial
-          color="#aaaaaa"
+          color="#ffffff"
           transparent
-          opacity={0.6}
+          opacity={0.8}
           depthWrite={false}
         />
       </mesh>
