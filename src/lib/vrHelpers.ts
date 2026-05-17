@@ -53,5 +53,10 @@ export function isQuestControllerReady(
     inputSource.hand ||
     (inputSource.profiles && inputSource.profiles.includes("generic-hand"));
   if (isHand) return false;
-  return true;
+
+  return !!(
+    inputSource.gamepad &&
+    inputSource.gamepad.buttons &&
+    inputSource.gamepad.buttons.length > 0
+  );
 }

@@ -526,7 +526,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     y: number;
     z: number;
   }) {
-    if (xrStore) return; // Prevent conflict with PMNDRS XR Locomotion
     if (!gl.xr.isPresenting) return;
     const session = gl.xr.getSession();
     if (!session) return;
