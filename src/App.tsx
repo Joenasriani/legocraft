@@ -1149,6 +1149,13 @@ export default function App() {
                 <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
                   <div className="flex gap-1.5 relative">
                     <button
+                      onClick={handleScreenshot}
+                      className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
+                      title="Capture Screenshot"
+                    >
+                      <ScreenshotIcon size={16} />
+                    </button>
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowSaveMenu(!showSaveMenu);
@@ -1553,34 +1560,6 @@ export default function App() {
                       </span>
                     </button>
                   </div>
-
-                  <div className="relative flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowSaveMenu(!showSaveMenu);
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title="Save / Export Menu"
-                      className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-blue-500/10 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition-colors text-blue-400 hover:text-blue-300"
-                    >
-                      <SaveIcon size={18} />
-                      <span className="hidden sm:inline text-[13px] font-semibold">
-                        Save / Export
-                      </span>
-                    </button>
-                  </div>
-
-                  <button
-                    onClick={handleScreenshot}
-                    title="Capture Screenshot"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
-                  >
-                    <ScreenshotIcon size={18} />
-                    <span className="hidden sm:inline text-[13px] font-semibold">
-                      Capture
-                    </span>
-                  </button>
 
                   <button
                     onClick={() => setShowHelp(true)}
