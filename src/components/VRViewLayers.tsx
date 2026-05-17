@@ -10,6 +10,8 @@ import { triggerHaptics, HapticType } from "../lib/haptics";
 import { vrTargetManager } from "../lib/vrTargets";
 import { isQuestControllerReady } from "../lib/vrHelpers";
 
+import { useXRStore } from "@react-three/xr";
+
 const isDebugXR =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("debugXR") === "1";
@@ -29,30 +31,11 @@ export const HumanViewLayer = ({
   ) => void;
   handleVRCommit: (p: THREE.Vector3, n: THREE.Vector3, tk: string) => boolean;
 }) => {
+  const xrStore = useXRStore();
   const { gl, scene } = useThree();
   const raycaster = useRef(new THREE.Raycaster()).current;
 
-  useEffect(() => {
-    const session = gl.xr.getSession();
-    if (!session) return;
-
-    const attachHandedness = (event: any) => {
-      if (event.target && event.data) {
-        event.target.userData.handedness = event.data.handedness;
-        event.target.userData.inputSource = event.data;
-      }
-    };
-
-    const c0 = gl.xr.getController(0);
-    const c1 = gl.xr.getController(1);
-    c0.addEventListener("connected", attachHandedness);
-    c1.addEventListener("connected", attachHandedness);
-
-    return () => {
-      c0.removeEventListener("connected", attachHandedness);
-      c1.removeEventListener("connected", attachHandedness);
-    };
-  }, [gl.xr]);
+  // We rely on useXRStore for controller detection instead of gl.xr
 
   const mode = useLegoStore((s) => s.mode);
   const bricks = useLegoStore((s) => s.bricks);
@@ -138,62 +121,37 @@ export const HumanViewLayer = ({
   const debugTextRef = useRef<any>(null);
 
   useFrame((state, delta, xrFrame) => {
-    const session = gl.xr.getSession();
+    const xrState = xrStore.getState();
+    const session = xrState.session;
     if (!session || !sceneGroupRef.current) return;
 
-    let leftController: THREE.Group | null = null;
-    let rightController: THREE.Group | null = null;
-    let leftGrip: THREE.Group | null = null;
-    let rightGrip: THREE.Group | null = null;
+    let leftController: THREE.Object3D | null = null;
+    let rightController: THREE.Object3D | null = null;
     let leftInput: XRInputSource | null = null;
     let rightInput: XRInputSource | null = null;
 
-    const inputSourcesArray = Array.from(session.inputSources);
-    for (const source of inputSourcesArray) {
-      if (!source) continue;
-      if (source.handedness === "left") leftInput = source;
-      if (source.handedness === "right") rightInput = source;
+    const inputSourcesArray = Array.from(xrState.inputSourceStates);
+    let rightState = inputSourcesArray.find(
+      (s) => s.type === "controller" && s.inputSource.handedness === "right",
+    ) as any;
+    let leftState = inputSourcesArray.find(
+      (s) => s.type === "controller" && s.inputSource.handedness === "left",
+    ) as any;
+
+    if (!rightState && !leftState && inputSourcesArray.length >= 2) {
+      leftState = inputSourcesArray[0];
+      rightState = inputSourcesArray[1];
+    } else if (!rightState && inputSourcesArray.length === 1) {
+      rightState = inputSourcesArray[0];
     }
 
-    for (let i = 0; i < 2; i++) {
-      const c = gl.xr.getController(i);
-      const cg = gl.xr.getControllerGrip(i);
-      if (!c) continue;
-
-      let handedness =
-        c.userData?.handedness || c.userData?.inputSource?.handedness;
-
-      if (!handedness && inputSourcesArray[i]) {
-        handedness = inputSourcesArray[i].handedness;
-      }
-
-      if (handedness === "left") {
-        leftController = c;
-        leftGrip = cg;
-      } else if (handedness === "right") {
-        rightController = c;
-        rightGrip = cg;
-      }
+    if (rightState) {
+      rightInput = rightState.inputSource;
+      rightController = rightState.object;
     }
-
-    // Defaulting logic for controllers if handedness is unknown
-    if (!leftInput && !rightInput && inputSourcesArray.length >= 2) {
-      leftInput = inputSourcesArray[0];
-      rightInput = inputSourcesArray[1];
-    } else if (!rightInput && inputSourcesArray.length === 1) {
-      // Only one controller? Assume it's the right (primary)
-      rightInput = inputSourcesArray[0];
-    }
-
-    if (!leftController && leftInput) {
-      leftController = gl.xr.getController(
-        inputSourcesArray.indexOf(leftInput),
-      );
-    }
-    if (!rightController && rightInput) {
-      rightController = gl.xr.getController(
-        inputSourcesArray.indexOf(rightInput),
-      );
+    if (leftState) {
+      leftInput = leftState.inputSource;
+      leftController = leftState.object;
     }
 
     if ((import.meta as any).env.DEV) {
@@ -292,7 +250,7 @@ export const HumanViewLayer = ({
     let hasRightPose = false;
 
     if (rightInput && rightInput.targetRaySpace && xrFrame) {
-      const refSpace = gl.xr.getReferenceSpace();
+      const refSpace = xrState.originReferenceSpace;
       if (refSpace) {
         const pose = xrFrame.getPose(rightInput.targetRaySpace, refSpace);
         if (pose) {

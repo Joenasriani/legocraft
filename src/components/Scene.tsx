@@ -1,12 +1,65 @@
 import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, Html, Text, Sky, Sparkles, ContactShadows, Environment, Stars } from "@react-three/drei";
-import { XR } from "@react-three/xr";
+import {
+  OrbitControls,
+  Html,
+  Text,
+  Sky,
+  Sparkles,
+  ContactShadows,
+  Environment,
+  Stars,
+} from "@react-three/drei";
+import { XR, XROrigin } from "@react-three/xr";
+
+function Locomotion() {
+  const originRef = useRef<THREE.Group>(null);
+  const { camera, gl } = useThree();
+
+  useFrame((state, delta) => {
+    const session = gl.xr.getSession();
+    if (!session || !originRef.current) return;
+
+    const inputSources = Array.from(session.inputSources);
+    const leftInput = inputSources.find((s) => s.handedness === "left");
+
+    if (leftInput && leftInput.gamepad) {
+      const axes = leftInput.gamepad.axes;
+      // Quest mapping: axis 2 = X, axis 3 = Y (xr-standard)
+      // Fallback for some profiles: axis 0 is X, axis 1 is Y
+      const x = axes[2] ?? axes[0] ?? 0;
+      const y = axes[3] ?? axes[1] ?? 0;
+
+      if (Math.abs(x) > 0.05 || Math.abs(y) > 0.05) {
+        // Headset-yaw relative movement
+        const headsetDir = new THREE.Vector3();
+        camera.getWorldDirection(headsetDir);
+        headsetDir.y = 0; // No vertical movement
+        headsetDir.normalize();
+
+        const headsetRight = new THREE.Vector3();
+        headsetRight.crossVectors(headsetDir, new THREE.Vector3(0, 1, 0));
+
+        const speed = 2.0;
+        const moveVec = new THREE.Vector3();
+        // Forward is -Y on the stick in WebXR gamepad mapping
+        moveVec.addScaledVector(headsetDir, -y * speed * delta);
+        moveVec.addScaledVector(headsetRight, x * speed * delta);
+
+        originRef.current.position.add(moveVec);
+      }
+    }
+  });
+
+  return <XROrigin ref={originRef} position={[0, 0, 1.0]} />;
+}
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
 import { BrickInstances } from "./BrickInstances";
 
-const isQuest = typeof navigator !== 'undefined' && /Quest|OculusBrowser/i.test(navigator.userAgent);
+const isQuest =
+  typeof navigator !== "undefined" &&
+  /Quest|OculusBrowser/i.test(navigator.userAgent);
 
 import {
   useLegoStore,
@@ -50,10 +103,10 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
 };
 
-
-
 const VRDebugVisibilityLayer = () => {
-  const isDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get("debugXR") === "1";
+  const isDebug =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugXR") === "1";
   if (!isDebug) return null;
   return (
     <group position={[0, 0, 0]}>
@@ -130,30 +183,30 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!xrSessionActive) return;
     const session = gl.xr.getSession();
     if (!session) return;
-    
+
     const handleVisibility = (e: any) => {
-       if (e.session && e.session.visibilityState === 'visible') {
-          import("../services/AudioService").then(m => m.audioService.resume());
-          gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-          if (useLegoStore.getState().xrPanel === "waitingControllers") {
-            useLegoStore.getState().setToastMessage("XR Resumed");
-            setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-          }
-       }
+      if (e.session && e.session.visibilityState === "visible") {
+        import("../services/AudioService").then((m) => m.audioService.resume());
+        gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+        if (useLegoStore.getState().xrPanel === "waitingControllers") {
+          useLegoStore.getState().setToastMessage("XR Resumed");
+          setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+        }
+      }
     };
-    
+
     const docVis = () => {
-       if (document.visibilityState === 'visible') {
-          import("../services/AudioService").then(m => m.audioService.resume());
-       }
-    }
-    
-    session.addEventListener('visibilitychange', handleVisibility);
-    document.addEventListener('visibilitychange', docVis);
-    
+      if (document.visibilityState === "visible") {
+        import("../services/AudioService").then((m) => m.audioService.resume());
+      }
+    };
+
+    session.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener("visibilitychange", docVis);
+
     return () => {
-       session.removeEventListener('visibilitychange', handleVisibility);
-       document.removeEventListener('visibilitychange', docVis);
+      session.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener("visibilitychange", docVis);
     };
   }, [gl, xrSessionActive]);
 
@@ -178,7 +231,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           const sess = gl.xr.getSession();
           if (sess) {
             hasTrackedController = Array.from(sess.inputSources).some(
-              (source) => isQuestControllerReady(source)
+              (source) => isQuestControllerReady(source),
             );
           }
         } catch (e) {}
@@ -233,50 +286,70 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const controlsRef = useRef<any>(null);
   const exportGroupRef = useRef<THREE.Group>(null);
-  
+
   useEffect(() => {
     useLegoStore.getState().setExportGLB(() => {
       if (exportGroupRef.current) {
-        import("three/examples/jsm/exporters/GLTFExporter.js").then(({ GLTFExporter }) => {
-          const exporter = new GLTFExporter();
-          exporter.parse(
-            exportGroupRef.current!,
-            (gltf: any) => {
-              const blob = new Blob([gltf], { type: "application/octet-stream" });
-              let canUsePicker = false;
-              if ("showSaveFilePicker" in window) {
-                try { canUsePicker = window.self === window.top; }
-                catch (e) { canUsePicker = false; }
-              }
-              if (canUsePicker) {
-                (window as any).showSaveFilePicker({
-                  suggestedName: "brick-structure.glb",
-                  types: [{ description: "GLB Files", accept: { "model/gltf-binary": [".glb"] } }],
-                }).then((handle: any) => handle.createWritable())
-                  .then((writable: any) => writable.write(blob).then(() => {
-                     writable.close();
-                     useLegoStore.getState().setToastMessage("Exported GLB successfully.");
-                  }))
-                  .catch((e: any) => {
-                    if (e.name !== "AbortError") console.error(e);
-                  });
-              } else {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "brick-structure.glb";
-                a.click();
-                URL.revokeObjectURL(url);
-                useLegoStore.getState().setToastMessage("Exported GLB successfully.");
-              }
-            },
-            (error) => {
-              console.error("An error happened during GLB export", error);
-              useLegoStore.getState().setToastMessage("Error exporting GLB.");
-            },
-            { binary: true }
-          );
-        });
+        import("three/examples/jsm/exporters/GLTFExporter.js").then(
+          ({ GLTFExporter }) => {
+            const exporter = new GLTFExporter();
+            exporter.parse(
+              exportGroupRef.current!,
+              (gltf: any) => {
+                const blob = new Blob([gltf], {
+                  type: "application/octet-stream",
+                });
+                let canUsePicker = false;
+                if ("showSaveFilePicker" in window) {
+                  try {
+                    canUsePicker = window.self === window.top;
+                  } catch (e) {
+                    canUsePicker = false;
+                  }
+                }
+                if (canUsePicker) {
+                  (window as any)
+                    .showSaveFilePicker({
+                      suggestedName: "brick-structure.glb",
+                      types: [
+                        {
+                          description: "GLB Files",
+                          accept: { "model/gltf-binary": [".glb"] },
+                        },
+                      ],
+                    })
+                    .then((handle: any) => handle.createWritable())
+                    .then((writable: any) =>
+                      writable.write(blob).then(() => {
+                        writable.close();
+                        useLegoStore
+                          .getState()
+                          .setToastMessage("Exported GLB successfully.");
+                      }),
+                    )
+                    .catch((e: any) => {
+                      if (e.name !== "AbortError") console.error(e);
+                    });
+                } else {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "brick-structure.glb";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  useLegoStore
+                    .getState()
+                    .setToastMessage("Exported GLB successfully.");
+                }
+              },
+              (error) => {
+                console.error("An error happened during GLB export", error);
+                useLegoStore.getState().setToastMessage("Error exporting GLB.");
+              },
+              { binary: true },
+            );
+          },
+        );
       }
     });
     return () => useLegoStore.getState().setExportGLB(null);
@@ -308,18 +381,35 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // It's hoisted or we can just keep executeCommitRef and update it right after executeCommit is defined later down.
   });
 
-  const handleVRCommit = (point: THREE.Vector3, normal: THREE.Vector3, targetKind: string) => {
+  const handleVRCommit = (
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+    targetKind: string,
+  ) => {
     pointerDownPos.current = null;
     const state = useLegoStore.getState();
     if (executeCommitRef.current) {
       let position = computePlacementTarget(point, normal, targetKind);
-      
+
       let finalTargetKind = targetKind;
-      if (state.mode === "Move" && state.movingBrickId && !state.isDraggingBrick) {
+      if (
+        state.mode === "Move" &&
+        state.movingBrickId &&
+        !state.isDraggingBrick
+      ) {
         finalTargetKind = "rotation-only";
       }
 
-      return executeCommitRef.current({ hit: { point, normal, object: undefined as any, hitPoint: point, targetKind: finalTargetKind }, position });
+      return executeCommitRef.current({
+        hit: {
+          point,
+          normal,
+          object: undefined as any,
+          hitPoint: point,
+          targetKind: finalTargetKind,
+        },
+        position,
+      });
     }
     return false;
   };
@@ -340,10 +430,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         controlsRef.current.enabled =
           !isBrickInteractionRef.current && !isDraggingBrick && !marqueeStart;
       }
-      if (controlsRef.current.target.y < 0 && !xrSessionActive && !gl.xr.isPresenting) {
+      if (
+        controlsRef.current.target.y < 0 &&
+        !xrSessionActive &&
+        !gl.xr.isPresenting
+      ) {
         controlsRef.current.target.y = 0;
       }
-      if (state.camera.position.y < 0.1 && !xrSessionActive && !gl.xr.isPresenting) {
+      if (
+        state.camera.position.y < 0.1 &&
+        !xrSessionActive &&
+        !gl.xr.isPresenting
+      ) {
         state.camera.position.y = 0.1;
       }
     }
@@ -367,7 +465,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         console.warn("[BrickXR] Screenshot capture failed:", err);
         useLegoStore
           .getState()
-          .setToastMessage("Screenshot capture may be unavailable on some browsers.");
+          .setToastMessage(
+            "Screenshot capture may be unavailable on some browsers.",
+          );
       } finally {
         setIsScreenshotting(false);
       }
@@ -431,6 +531,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     y: number;
     z: number;
   }) {
+    if (xrStore) return; // Prevent conflict with PMNDRS XR Locomotion
     if (!gl.xr.isPresenting) return;
     const session = gl.xr.getSession();
     if (!session) return;
@@ -537,13 +638,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const effW = isRot ? d : w;
     const effD = isRot ? w : d;
 
-    const alignSnap = (val: number, count: number, step: number, currentPos: number | null) => {
+    const alignSnap = (
+      val: number,
+      count: number,
+      step: number,
+      currentPos: number | null,
+    ) => {
       const offset = count % 2 === 1 ? step / 2 : 0;
       const rawSnap = Math.round((val - offset) / step) * step + offset;
 
       if (currentPos !== null) {
         const isAligned =
-          Math.abs((currentPos - offset) / step - Math.round((currentPos - offset) / step)) < 0.01;
+          Math.abs(
+            (currentPos - offset) / step -
+              Math.round((currentPos - offset) / step),
+          ) < 0.01;
         if (isAligned && rawSnap !== currentPos) {
           const distToCurrent = Math.abs(val - currentPos);
           // Require moving 20% past the physical cell boundary (which is at step / 2)
@@ -568,8 +677,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     const hitZ = point.z + normal.z * nudge;
 
-    const currentX = latestPlacementCandidateRef.current ? latestPlacementCandidateRef.current.position[0] : null;
-    const currentZ = latestPlacementCandidateRef.current ? latestPlacementCandidateRef.current.position[2] : null;
+    const currentX = latestPlacementCandidateRef.current
+      ? latestPlacementCandidateRef.current.position[0]
+      : null;
+    const currentZ = latestPlacementCandidateRef.current
+      ? latestPlacementCandidateRef.current.position[2]
+      : null;
 
     const baseSnappedX = alignSnap(hitX, effW, MODULE_SIZE, currentX);
     const baseSnappedZ = alignSnap(hitZ, effD, MODULE_SIZE, currentZ);
@@ -580,33 +693,31 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (presetBricksData) {
         const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
         const info = getPresetInfo(activePreset, clipboard);
-        testBricks = presetBricksData
-          .filter(isValidBrickData)
-          .map((b) => {
-            let ox = b.position[0] - info.cx;
-            let oz = b.position[2] - info.cz;
-            let nx = ox,
-              nz = oz;
-            if (rotMod === 90 || rotMod === -270) {
-              nx = -oz;
-              nz = ox;
-            } else if (Math.abs(rotMod) === 180) {
-              nx = -ox;
-              nz = -oz;
-            } else if (rotMod === 270 || rotMod === -90) {
-              nx = oz;
-              nz = -ox;
-            }
-            return {
-              ...b,
-              rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-              position: [nx + baseSnappedX, b.position[1], nz + baseSnappedZ] as [
-                number,
-                number,
-                number,
-              ],
-            };
-          });
+        testBricks = presetBricksData.filter(isValidBrickData).map((b) => {
+          let ox = b.position[0] - info.cx;
+          let oz = b.position[2] - info.cz;
+          let nx = ox,
+            nz = oz;
+          if (rotMod === 90 || rotMod === -270) {
+            nx = -oz;
+            nz = ox;
+          } else if (Math.abs(rotMod) === 180) {
+            nx = -ox;
+            nz = -oz;
+          } else if (rotMod === 270 || rotMod === -90) {
+            nx = oz;
+            nz = -ox;
+          }
+          return {
+            ...b,
+            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
+            position: [nx + baseSnappedX, b.position[1], nz + baseSnappedZ] as [
+              number,
+              number,
+              number,
+            ],
+          };
+        });
       }
     } else if (mode === "Move" && movingBrick) {
       const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
@@ -705,7 +816,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (isDragging || isBuilding || isPlacingPreset) {
       setGhostPosition(position);
     } else if (state.mode === "Move" && movingBrickId) {
-      const mb = state.bricks.find(b => b.id === movingBrickId);
+      const mb = state.bricks.find((b) => b.id === movingBrickId);
       if (mb) setGhostPosition(mb.position);
     }
   };
@@ -830,7 +941,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const updateGhostFromEvent = (e: any) => {
     const hit = getCanonicalHit(e);
     if (!hit) return false;
-    const position = computePlacementTarget(hit.point, hit.normal, hit.targetKind);
+    const position = computePlacementTarget(
+      hit.point,
+      hit.normal,
+      hit.targetKind,
+    );
     latestPlacementCandidateRef.current = { hit, position };
 
     const state = useLegoStore.getState();
@@ -882,26 +997,46 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         if (distance > threshold) {
           if (isMoving && !useLegoStore.getState().isDraggingBrick) {
             // Check if the selection can be moved
-            const { bricks, movingBrickId, selectionMode, multiSelectedBrickIds } = useLegoStore.getState();
-            const anchor = bricks.find(b => b.id === movingBrickId);
+            const {
+              bricks,
+              movingBrickId,
+              selectionMode,
+              multiSelectedBrickIds,
+            } = useLegoStore.getState();
+            const anchor = bricks.find((b) => b.id === movingBrickId);
             if (anchor) {
               let selectionIds = [anchor.id];
               let selectionBricks = [anchor];
               if (selectionMode === "Group") {
                 selectionBricks = getGroupBricks(anchor, bricks);
-                selectionIds = selectionBricks.map(b => b.id);
+                selectionIds = selectionBricks.map((b) => b.id);
               } else if (selectionMode === "Multi") {
                 selectionIds = multiSelectedBrickIds;
-                selectionBricks = bricks.filter(b => selectionIds.includes(b.id));
+                selectionBricks = bricks.filter((b) =>
+                  selectionIds.includes(b.id),
+                );
               }
 
-              const isBlocked = selectionBricks.some(b => 
-                hasBrickAbove(b, bricks, MODULE_SIZE, BRICK_HEIGHT, selectionIds)
+              const isBlocked = selectionBricks.some((b) =>
+                hasBrickAbove(
+                  b,
+                  bricks,
+                  MODULE_SIZE,
+                  BRICK_HEIGHT,
+                  selectionIds,
+                ),
               );
 
               if (isBlocked) {
-                useLegoStore.getState().setToastMessage("Cannot move: selection is blocked by other bricks on top.");
-                setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+                useLegoStore
+                  .getState()
+                  .setToastMessage(
+                    "Cannot move: selection is blocked by other bricks on top.",
+                  );
+                setTimeout(
+                  () => useLegoStore.getState().setToastMessage(null),
+                  3000,
+                );
                 // Reset pointerDownPos so we don't keep trying to start dragging
                 pointerDownPos.current = null;
                 return;
@@ -1315,7 +1450,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const isMoving = mode === "Move" && currentMovingBrickId !== null;
     const isDragging = useLegoStore.getState().isDraggingBrick;
     const isPlacingPreset = activePreset !== null;
-    
+
     // In Move mode, don't snap to pointer on down unless we are already dragging
     if (isBuilding || isPlacingPreset || (isMoving && isDragging)) {
       const hit = getCanonicalHit(e);
@@ -1324,7 +1459,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           controlsRef.current.enabled = false;
         }
         e.stopPropagation();
-        const position = computePlacementTarget(hit.point, hit.normal, hit.targetKind);
+        const position = computePlacementTarget(
+          hit.point,
+          hit.normal,
+          hit.targetKind,
+        );
         const candidate = { hit, position };
         interactionStartCandidateRef.current = candidate;
         latestPlacementCandidateRef.current = candidate;
@@ -1342,27 +1481,31 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     let currentGhostPos = candidate.position;
 
-    if (candidate.hit.targetKind === "rotation-only" && mode === "Move" && movingBrick) {
-        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-        const oxA = movingBrick!.position[0] - movingGroupPivot[0];
-        const ozA = movingBrick!.position[2] - movingGroupPivot[2];
-        let rotatedOxA = oxA,
-          rotatedOzA = ozA;
-        if (rotMod === 90 || rotMod === -270) {
-          rotatedOxA = -ozA;
-          rotatedOzA = oxA;
-        } else if (Math.abs(rotMod) === 180) {
-          rotatedOxA = -oxA;
-          rotatedOzA = -ozA;
-        } else if (rotMod === 270 || rotMod === -90) {
-          rotatedOxA = ozA;
-          rotatedOzA = -oxA;
-        }
-        currentGhostPos = [
-          movingGroupPivot[0] + rotatedOxA,
-          movingBrick!.position[1],
-          movingGroupPivot[2] + rotatedOzA
-        ];
+    if (
+      candidate.hit.targetKind === "rotation-only" &&
+      mode === "Move" &&
+      movingBrick
+    ) {
+      const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+      const oxA = movingBrick!.position[0] - movingGroupPivot[0];
+      const ozA = movingBrick!.position[2] - movingGroupPivot[2];
+      let rotatedOxA = oxA,
+        rotatedOzA = ozA;
+      if (rotMod === 90 || rotMod === -270) {
+        rotatedOxA = -ozA;
+        rotatedOzA = oxA;
+      } else if (Math.abs(rotMod) === 180) {
+        rotatedOxA = -oxA;
+        rotatedOzA = -ozA;
+      } else if (rotMod === 270 || rotMod === -90) {
+        rotatedOxA = ozA;
+        rotatedOzA = -oxA;
+      }
+      currentGhostPos = [
+        movingGroupPivot[0] + rotatedOxA,
+        movingBrick!.position[1],
+        movingGroupPivot[2] + rotatedOzA,
+      ];
     }
 
     setGhostPosition(currentGhostPos);
@@ -1646,7 +1789,17 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     let candidate =
       isClick && interactionStartCandidateRef.current
         ? interactionStartCandidateRef.current
-        : latestPlacementCandidateRef.current || (fallbackHit ? { hit: fallbackHit, position: computePlacementTarget(fallbackHit.point, fallbackHit.normal, fallbackHit.targetKind) } : null);
+        : latestPlacementCandidateRef.current ||
+          (fallbackHit
+            ? {
+                hit: fallbackHit,
+                position: computePlacementTarget(
+                  fallbackHit.point,
+                  fallbackHit.normal,
+                  fallbackHit.targetKind,
+                ),
+              }
+            : null);
 
     const hit = candidate?.hit;
 
@@ -1807,7 +1960,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (cameraZoomTrigger === 0) return;
-    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting) return;
+    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting)
+      return;
     if (cameraZoomDirection === "in") {
       controlsRef.current.dollyIn(1.15);
     } else {
@@ -1818,7 +1972,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (cameraRecenterTrigger === 0) return;
-    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting) return;
+    if (!controlsRef.current || xrSessionActive || isVR || gl.xr.isPresenting)
+      return;
     controlsRef.current.reset();
     controlsRef.current.target.set(0, 0.2, 0);
     camera.position.set(2.8, 2.2, 3.2);
@@ -1867,7 +2022,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         {!xrSessionActive && (
           <>
             <Environment preset="sunset" background blur={0.4} />
-            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+            <Stars
+              radius={100}
+              depth={50}
+              count={5000}
+              factor={4}
+              saturation={0}
+              fade
+              speed={1}
+            />
           </>
         )}
       </Suspense>
@@ -1887,27 +2050,38 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         shadow-camera-top={20}
         shadow-camera-bottom={-20}
       />
-      {!xrSessionActive && <ContactShadows resolution={1024} scale={40} blur={2} opacity={0.3} far={10} color="#000000" position={[0, -0.01, 0]} />}
+      {!xrSessionActive && (
+        <ContactShadows
+          resolution={1024}
+          scale={40}
+          blur={2}
+          opacity={0.3}
+          far={10}
+          color="#000000"
+          position={[0, -0.01, 0]}
+        />
+      )}
 
       <Suspense fallback={null}>
         {xrSessionActive && showXRPerf && <VRStats />}
-        {xrSessionActive && (() => {
-          switch (xrPanel) {
-            case "waitingControllers":
-              return <VRWaitingPanel />;
-            case "onboarding":
-              return <VROnboarding />;
-            case "buildMenu":
-              return <VRRadialMenu vrScale={vrScale} />;
-            case "palette":
-              return <VRPalette />;
-            default:
-              return null;
-          }
-        })()}
-        
+        {xrSessionActive &&
+          (() => {
+            switch (xrPanel) {
+              case "waitingControllers":
+                return <VRWaitingPanel />;
+              case "onboarding":
+                return <VROnboarding />;
+              case "buildMenu":
+                return <VRRadialMenu vrScale={vrScale} />;
+              case "palette":
+                return <VRPalette />;
+              default:
+                return null;
+            }
+          })()}
+
         {xrSessionActive && <VRDebugVisibilityLayer />}
-        
+
         {xrSessionActive && vrScale === "human" && (
           <HumanViewLayer
             currentVRScale={currentVRScale}
@@ -1944,30 +2118,39 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           })}
         </group>
 
-        {!isScreenshotting && mode === "Build" && !activePreset && placementStatus.valid && (
-          <group>
-            <BrickInstances
-              type={selectedType}
-              color={selectedColor}
-              bricks={[{ id: "ghost", position: ghostPosition, rotation: ghostRotation }]}
-              isGhost
-            />
-            {!xrSessionActive && (
-              <mesh
-                position={ghostPosition}
-                rotation={[-Math.PI / 2, 0, 0]}
-                raycast={() => null}
-              >
-                <ringGeometry args={[0.04, 0.05, 32]} />
-                <meshBasicMaterial
-                  color={selectedColor}
-                  transparent
-                  opacity={0.8}
-                />
-              </mesh>
-            )}
-          </group>
-        )}
+        {!isScreenshotting &&
+          mode === "Build" &&
+          !activePreset &&
+          placementStatus.valid && (
+            <group>
+              <BrickInstances
+                type={selectedType}
+                color={selectedColor}
+                bricks={[
+                  {
+                    id: "ghost",
+                    position: ghostPosition,
+                    rotation: ghostRotation,
+                  },
+                ]}
+                isGhost
+              />
+              {!xrSessionActive && (
+                <mesh
+                  position={ghostPosition}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                  raycast={() => null}
+                >
+                  <ringGeometry args={[0.04, 0.05, 32]} />
+                  <meshBasicMaterial
+                    color={selectedColor}
+                    transparent
+                    opacity={0.8}
+                  />
+                </mesh>
+              )}
+            </group>
+          )}
 
         {!isScreenshotting &&
           (mode === "Move" || mode === "Delete") &&
@@ -1975,7 +2158,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <>
               {/* The ghost preview that follows the mouse */}
               {mode === "Move" &&
-                isDraggingBrick && placementStatus.valid &&
+                isDraggingBrick &&
+                placementStatus.valid &&
                 Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
                   const [type, color] = key.split("_");
                   return (
@@ -2122,6 +2306,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
   return xrStore ? (
     <XR store={xrStore}>
+      <Locomotion />
       <SceneContents xrStore={xrStore} />
     </XR>
   ) : (
