@@ -981,10 +981,12 @@ export default function App() {
           }
           sKeyTracker.current.count += 1;
           if (sKeyTracker.current.count >= 3) {
+            state.setMode("Move");
             state.setSelectionMode("Group");
             sKeyTracker.current.count = 0;
           } else {
             sKeyTracker.current.timeout = setTimeout(() => {
+              useLegoStore.getState().setMode("Move");
               if (sKeyTracker.current.count === 1) {
                 useLegoStore.getState().setSelectionMode("Solo");
               } else if (sKeyTracker.current.count === 2) {
@@ -1004,6 +1006,7 @@ export default function App() {
           });
           break;
         case "b":
+          state.setMode("Build");
           setShowBrickMenu((prev) => {
             if (!prev) {
               setShowPresetMenu(false);
