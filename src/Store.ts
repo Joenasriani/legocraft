@@ -489,37 +489,25 @@ const generateLifeSizedCabin = (): BrickData[] => {
   const cabin: BrickData[] = [];
   const brown = "#8B4513";
   const roof = "#3b2f2f";
-  // Walls
+  // 4x4 footprint cabin
   for (let y = 0; y < 3; y++) {
-    // left wall (span Z: -1.5 to 2.5)
-    cabin.push(createBrick("2x4", brown, -2.5, y, 0.5, 0));
-    // right wall
-    cabin.push(createBrick("2x4", brown, 2.5, y, 0.5, 0));
-    // back wall (span X: -1.5 to 1.5)
-    cabin.push(createBrick("2x2", brown, -0.5, y, -2.5, 0));
-    cabin.push(createBrick("1x2", brown, 1.5, y, -2.5, 90));
-    // front wall with door (gap at X=0.5)
-    if (y > 1) {
-      cabin.push(createBrick("1x2", brown, -0.5, y, 2.5, 90));
-    } else {
-      // pillar for the side of the door
-      cabin.push(createBrick("1x1", brown, -0.5, y, 2.5, 0));
+    cabin.push(createBrick("2x4", brown, 1, y, 2, 0)); // left
+    cabin.push(createBrick("2x4", brown, 4, y, 1, 90)); // back
+    cabin.push(createBrick("2x4", brown, 7, y, 2, 0)); // right
+    if (y > 1) { // header
+      cabin.push(createBrick("2x4", brown, 4, y, 3, 90));
+    } else { // door sides
+      cabin.push(createBrick("2x2", brown, 5, y, 3, 0));
     }
   }
-  // Roof - span X: -2.5 to 2.5, Z: -2.5 to 2.5
-  // Left half roof
-  cabin.push(createBrick("2x4", roof, -1.5, 3, 0.5, 0));
-  // Right half roof
-  cabin.push(createBrick("2x4", roof, 1.5, 3, 0.5, 0));
-  // Back roof gap
-  cabin.push(createBrick("1x2", roof, -1.5, 3, -2.5, 90));
-  cabin.push(createBrick("1x2", roof, 1.5, 3, -2.5, 90));
-  // Front roof gap
-  cabin.push(createBrick("1x2", roof, -1.5, 3, 2.5, 90));
-  cabin.push(createBrick("1x2", roof, 1.5, 3, 2.5, 90));
-
-  // Top roof
-  cabin.push(createBrick("2x4", roof, 0.5, 4, 0.5, 0));
+  // Roof y=3
+  cabin.push(createBrick("2x4", roof, 1, 3, 2, 0));
+  cabin.push(createBrick("2x4", roof, 4, 3, 1, 90));
+  cabin.push(createBrick("2x4", roof, 7, 3, 2, 0));
+  cabin.push(createBrick("2x4", roof, 4, 3, 3, 90));
+  // Roof top y=4
+  cabin.push(createBrick("2x4", roof, 4, 4, 2, 90));
+  
   return cabin;
 };
 
@@ -530,19 +518,25 @@ const generateRoundWaterWell = (): BrickData[] => {
   const brown = "#8B4513";
   // Base
   for (let y = 0; y < 2; y++) {
-    well.push(createBrick("2x4", stone, -1.5, y, 0.5, 0)); // Left wall
-    well.push(createBrick("2x4", stone, 2.5, y, 0.5, 0)); // Right wall
-    well.push(createBrick("2x2", stone, 0.5, y, -0.5, 0)); // Back
-    well.push(createBrick("2x2", stone, 0.5, y, 1.5, 0)); // Front
+    well.push(createBrick("2x4", stone, 1, y, 2, 0)); // left 1
+    well.push(createBrick("2x2", stone, 1, y, 5, 0)); // left 2
+    well.push(createBrick("2x4", stone, 5, y, 2, 0)); // right 1
+    well.push(createBrick("2x2", stone, 5, y, 5, 0)); // right 2
+    well.push(createBrick("2x2", stone, 3, y, 1, 0)); // back
+    well.push(createBrick("2x2", stone, 3, y, 5, 0)); // front
   }
-  well.push(createBrick("1x1", blue, 0.5, 0, 0.5));
+  // Water
+  well.push(createBrick("2x2", blue, 3, 0, 3, 0));
+  well.push(createBrick("2x2", blue, 3, 1, 3, 0));
+  
   // Pillars
-  well.push(createBrick("1x1", brown, -1.5, 2, 0.5));
-  well.push(createBrick("1x1", brown, 2.5, 2, 0.5));
-  well.push(createBrick("1x1", brown, -1.5, 3, 0.5));
-  well.push(createBrick("1x1", brown, 2.5, 3, 0.5));
+  well.push(createBrick("2x2", brown, 1, 2, 3, 0));
+  well.push(createBrick("2x2", brown, 1, 3, 3, 0));
+  well.push(createBrick("2x2", brown, 5, 2, 3, 0));
+  well.push(createBrick("2x2", brown, 5, 3, 3, 0));
+  
   // Roof bridging the pillars
-  well.push(createBrick("2x4", brown, 0.5, 4, 0.5, 90));
+  well.push(createBrick("2x4", brown, 3, 4, 3, 90));
   return well;
 };
 
@@ -568,26 +562,28 @@ const generateWalkInCastle = (): BrickData[] => {
   const stone = "#A0A0A0";
   // Walls
   for (let y = 0; y < 3; y++) {
-    castle.push(createBrick("2x4", stone, -2.5, y, 0.5, 90));
-    castle.push(createBrick("2x4", stone, 3.5, y, 0.5, 90));
-    castle.push(createBrick("2x4", stone, 0.5, y, -2.5, 0));
+    castle.push(createBrick("2x4", stone, 1, y, 2, 0));
+    castle.push(createBrick("2x4", stone, 1, y, 6, 0));
+    castle.push(createBrick("2x4", stone, 7, y, 2, 0));
+    castle.push(createBrick("2x4", stone, 7, y, 6, 0));
+    castle.push(createBrick("2x4", stone, 4, y, 1, 90));
     if (y > 1) {
-      castle.push(createBrick("2x2", stone, 0.5, y, 3.5, 0)); // Door gap
+      castle.push(createBrick("2x4", stone, 4, y, 7, 90)); // Door gap
     } else {
-      castle.push(createBrick("1x2", stone, -1.5, y, 3.5, 0));
-      castle.push(createBrick("1x2", stone, 2.5, y, 3.5, 0));
+      castle.push(createBrick("1x2", stone, 2.5, y, 7, 0));
+      castle.push(createBrick("1x2", stone, 5.5, y, 7, 0));
     }
   }
   // Towers
   const corners = [
-    [-2.5, -2.5],
-    [3.5, -2.5],
-    [-2.5, 3.5],
-    [3.5, 3.5],
+    [1, 1],
+    [1, 7],
+    [7, 1],
+    [7, 7],
   ];
-  corners.forEach(([cx, cz]) => {
-    for (let y = 0; y < 5; y++)
-      castle.push(createBrick("1x1", stone, cx, y, cz));
+  corners.forEach(([px, pz]) => {
+    for (let y = 3; y < 5; y++)
+      castle.push(createBrick("2x2", stone, px, y, pz, 0));
   });
   return castle;
 };

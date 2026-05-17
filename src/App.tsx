@@ -1178,8 +1178,8 @@ export default function App() {
                   className="flex flex-col gap-3 w-full pointer-events-none shrink-0 pt-2 sm:pt-4"
                 >
               {/* Top Bar */}
-              <div className="flex justify-between items-start sm:items-center pointer-events-auto flex-wrap gap-2">
-                <div className="flex flex-col">
+              <div className="flex justify-between items-center pointer-events-auto gap-2 scale-ui-top shrink-0">
+                <div className="flex flex-col shrink-0">
                   <div className="text-base sm:text-xl font-extrabold tracking-[2px] flex items-center gap-1 sm:gap-2 shrink-0">
                     BRICK{" "}
                     <span className="font-light opacity-60 hidden sm:inline">
@@ -1212,7 +1212,7 @@ export default function App() {
                     ))}
                   </motion.div>
                 </div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
+                <div className="flex flex-nowrap gap-1.5 sm:gap-4 shrink-0 items-center justify-end">
                   <button
                     onClick={() => setShowHelp(true)}
                     title="Show Help"
@@ -1278,7 +1278,7 @@ export default function App() {
                     </button>
                   )}
                   <div
-                    className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate max-w-full whitespace-normal break-words leading-tight ${
+                    className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate max-w-[100px] sm:max-w-[200px] whitespace-nowrap leading-tight ${
                       vrStatus === "ready"
                         ? "bg-green-500/20 border-green-500/40 text-green-400"
                         : vrStatus === "pending"

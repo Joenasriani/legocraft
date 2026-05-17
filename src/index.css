@@ -55,6 +55,30 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+@media (max-width: 600px), (max-height: 600px) {
+  .scale-ui-top {
+    transform: scale(0.85);
+    transform-origin: top left;
+    width: 117.64%;
+  }
+}
+
+@media (max-width: 480px), (max-height: 520px) {
+  .scale-ui-top {
+    transform: scale(0.75);
+    transform-origin: top left;
+    width: 133.33%;
+  }
+}
+
+@media (max-width: 380px), (max-height: 400px) {
+  .scale-ui-top {
+    transform: scale(0.65);
+    transform-origin: top left;
+    width: 153.84%;
+  }
+}
+
 @media (max-height: 600px) {
   .scale-ui-left {
     transform: scale(0.85);
