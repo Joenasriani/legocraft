@@ -404,6 +404,23 @@ const LoadIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const ExportIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="17 8 12 3 7 8" />
+    <line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+);
+
 const ClearIcon = ({ size = 24 }: { size?: number }) => (
   <svg
     width={size}
@@ -610,14 +627,12 @@ const SaveExportMenuOverlay = ({
   onClose,
   saveMenuRef,
   onSaveProject,
-  onLoadProject,
   onExportGLB,
 }: {
   show: boolean;
   onClose: () => void;
   saveMenuRef: React.RefObject<HTMLDivElement>;
   onSaveProject: () => void;
-  onLoadProject: () => void;
   onExportGLB: () => void;
 }) => {
   return (
@@ -653,26 +668,6 @@ const SaveExportMenuOverlay = ({
 
           <button
             onClick={() => {
-              onLoadProject();
-              onClose();
-            }}
-            className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
-          >
-            <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
-              <LoadIcon size={32} />
-            </span>
-            <div className="text-center w-full">
-              <div className="text-[12px] font-bold text-white leading-tight truncate">
-                Load Project
-              </div>
-              <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
-                .json
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => {
               onExportGLB();
               onClose();
             }}
@@ -680,10 +675,7 @@ const SaveExportMenuOverlay = ({
             title="Exports the current structure to a GLTF file for use in other 3D applications."
           >
             <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
-               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2v20" />
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-               </svg>
+               <ExportIcon size={32} />
             </span>
             <div className="text-center w-full">
               <div className="text-[12px] font-bold text-white leading-tight truncate">
@@ -1151,9 +1143,20 @@ export default function App() {
                     <button
                       onClick={handleScreenshot}
                       className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
-                      title="Capture Screenshot"
+                      title="Screenshot (.png)"
                     >
                       <ScreenshotIcon size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleLoad();
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
+                      title="Import / Load Project (.json)"
+                    >
+                      <LoadIcon size={16} />
                     </button>
                     <button
                       onClick={(e) => {
@@ -1590,7 +1593,6 @@ export default function App() {
               onClose={() => setShowSaveMenu(false)}
               saveMenuRef={saveMenuRef}
               onSaveProject={handleSave}
-              onLoadProject={handleLoad}
               onExportGLB={() => {
                 useLegoStore.getState().exportGLB?.();
               }}
