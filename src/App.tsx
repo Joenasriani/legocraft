@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "motion/react";
 import {
   useLegoStore,
   LEGO_COLORS,
-  BrickType,
   BRICK_TYPES,
   PresetName,
   getGroupBricks,

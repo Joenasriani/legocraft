@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useLegoStore } from "../Store";
@@ -20,7 +20,7 @@ export const VRStats = () => {
   const sessionStartTime = useRef(performance.now());
   const lastUpdate = useRef(0);
 
-  useFrame((state) => {
+  useFrame(() => {
     frames.current++;
     const time = performance.now();
 

@@ -87,7 +87,6 @@ export const VRRadialMenu = ({
 }) => {
   const { gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
-  const mode = useLegoStore((s) => s.mode);
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
 
@@ -103,7 +102,7 @@ export const VRRadialMenu = ({
     }
   }, [visible]);
 
-  useFrame((state, delta) => {
+  useFrame(() => {
     if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
     if (hasPlacedRef.current) return;
 

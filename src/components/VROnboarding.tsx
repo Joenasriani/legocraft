@@ -6,10 +6,10 @@ import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
-  const { camera, gl } = useThree();
+  const { gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     if (!gl.xr.isPresenting || !groupRef.current) return;
     const cam = gl.xr.getCamera();
     const target = getSafePanelTransform(cam);

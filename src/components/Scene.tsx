@@ -1,11 +1,8 @@
-import React, { Suspense, useState, useRef, useEffect, useMemo } from "react";
+import { Suspense, useState, useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
   Html,
-  Text,
-  Sky,
-  Sparkles,
   ContactShadows,
   Environment,
   Stars,
@@ -16,7 +13,7 @@ function Locomotion() {
   const originRef = useRef<THREE.Group>(null);
   const { camera, gl } = useThree();
 
-  useFrame((state, delta) => {
+  useFrame((_, delta) => {
     const locomotionMode = useLegoStore.getState().locomotionMode;
     if (locomotionMode !== "Smooth") return;
 
@@ -84,9 +81,6 @@ import {
 import {
   MODULE_SIZE,
   BRICK_HEIGHT,
-  STUD_RADIUS,
-  STUD_HEIGHT,
-  HALF_MODULE,
 } from "../constants";
 
 import { VRRadialMenu } from "./VRRadialMenu";
@@ -216,7 +210,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   useEffect(() => {
     if (xrSessionActive) {
       let rafId: number;
-      let startTime = Date.now();
 
       const checkReady = async () => {
         // Compile scene to reduce shader stutter
@@ -275,7 +268,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const commitPreset = useLegoStore((state) => state.commitPreset);
   const movingBrickId = useLegoStore((state) => state.movingBrickId);
   const setMovingBrickId = useLegoStore((state) => state.setMovingBrickId);
-  const updateBrick = useLegoStore((state) => state.updateBrick);
   const isDraggingBrick = useLegoStore((state) => state.isDraggingBrick);
   const setIsDraggingBrick = useLegoStore((state) => state.setIsDraggingBrick);
   const selectionMode = useLegoStore((state) => state.selectionMode);
