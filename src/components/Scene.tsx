@@ -1864,8 +1864,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     <>
       <color attach="background" args={["#1c2834"]} />
       <Suspense fallback={null}>
-         <Environment preset="sunset" background blur={0.4} />
-         <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+        {!xrSessionActive && (
+          <>
+            <Environment preset="sunset" background blur={0.4} />
+            <Stars radius={100} depth={50} count={5000} factor={4} saturation={0} fade speed={1} />
+          </>
+        )}
       </Suspense>
       <fog attach="fog" args={["#1c2834", 10, 200]} />
       <ambientLight intensity={0.4} />
