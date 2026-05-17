@@ -1197,7 +1197,7 @@ export default function App() {
                     }`}
                   >
                     {vrStatus === "ready"
-                      ? "VR Ready"
+                      ? "VR Ready (For full Brick XR VR mode, use the in-game Enter VR button)"
                       : vrStatus === "pending"
                         ? "Checking VR..."
                         : vrStatus === "https-required"
