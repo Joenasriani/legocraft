@@ -206,23 +206,40 @@ export const HumanViewLayer = ({
     const store = useLegoStore.getState();
     const currentPanel = store.xrPanel;
 
+    const isQuestController = (input: XRInputSource | null) => 
+       !!(input && input.targetRayMode === "tracked-pointer" && input.gamepad && input.gamepad.buttons.length > 0);
+       
+    if (currentPanel === "waitingControllers" || currentPanel === "onboarding") {
+      if (isQuestController(rightInput) || isQuestController(leftInput)) {
+         // Auto dismiss waiting state if Quest controllers are active.
+         // If they were stuck on waitingControllers or onboarding and controllers are ready, clear it out.
+         if (currentPanel === "waitingControllers") {
+            store.setXRPanel("none");
+         }
+      }
+    }
+
     // Process Left controller UI buttons
     if (leftInput && leftInput.gamepad) {
       const gp = leftInput.gamepad;
-      const xPressed = gp.buttons[4]?.pressed || gp.buttons[3]?.pressed || false;
-      const yPressed = gp.buttons[5]?.pressed || gp.buttons[4]?.pressed || false;
+      const xPressed = gp.buttons[4]?.pressed || false;
+      const yPressed = gp.buttons[5]?.pressed || false;
 
       if (xPressed && !wasXPressed.current) {
-        if (currentPanel === "buildMenu") {
-          store.closeXRPanel();
-        } else {
+        if (currentPanel === "none") {
+          store.setXRPanel("buildMenu");
+        } else if (currentPanel === "buildMenu") {
+          store.setXRPanel("none");
+        } else if (currentPanel === "palette") {
           store.setXRPanel("buildMenu");
         }
       }
       if (yPressed && !wasYPressed.current) {
-        if (currentPanel === "palette") {
-          store.closeXRPanel();
-        } else if (currentPanel !== "buildMenu") {
+        if (currentPanel === "none") {
+          store.setXRPanel("palette");
+        } else if (currentPanel === "palette") {
+          store.setXRPanel("none");
+        } else if (currentPanel === "buildMenu") {
           store.setXRPanel("palette");
         }
       }
@@ -235,24 +252,29 @@ export const HumanViewLayer = ({
     if (rightInput && rightInput.gamepad) {
       const gp = rightInput.gamepad;
       // B button is 5 on right controller, or 4 for some old Oculus mapping
-      const bPressed = gp.buttons[5]?.pressed || gp.buttons[4]?.pressed || false;
+      const bPressed = gp.buttons[5]?.pressed || false;
 
       if (bPressed && !wasBPressed.current) {
+        let handled = false;
         if (currentPanel !== "none") {
-          store.closeXRPanel();
-          squeezeMoveBlockedRef.current = false;
-          movePreviewActiveRef.current = false;
-        } else if (store.mode === "Move" && store.movingBrickId) {
+          store.setXRPanel("none");
+          handled = true;
+        }
+        if (store.mode === "Move" && store.movingBrickId) {
           store.setMovingBrickId(null);
           store.setIsDraggingBrick(false);
-          squeezeMoveBlockedRef.current = false;
-          movePreviewActiveRef.current = false;
           store.setMode("Build");
           updateGhostPosition(new THREE.Vector3(0, -1000, 0), new THREE.Vector3(0, 1, 0), "none");
           triggerHaptics(rightInput, HapticType.BRICK_SELECT);
           audioService.playSelect();
-        } else if (store.mode !== "Build") {
+          handled = true;
+        }
+        if (!handled && store.mode !== "Build") {
           store.setMode("Build");
+        }
+        if (handled) {
+          squeezeMoveBlockedRef.current = false;
+          movePreviewActiveRef.current = false;
         }
       }
 

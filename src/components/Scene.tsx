@@ -200,7 +200,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             setVrReady(true);
             const store = useLegoStore.getState();
             if (store.xrPanel === "waitingControllers") {
-              store.setXRPanel("onboarding");
+              store.setXRPanel("none");
             }
             if ((import.meta as any).env.DEV)
               console.log("[VR] Status: VR ready");
