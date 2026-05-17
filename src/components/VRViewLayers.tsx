@@ -259,8 +259,7 @@ export const HumanViewLayer = ({
         if (currentPanel !== "none") {
           store.setXRPanel("none");
           handled = true;
-        }
-        if (store.mode === "Move" && store.movingBrickId) {
+        } else if (store.mode === "Move" && store.movingBrickId) {
           store.setMovingBrickId(null);
           store.setIsDraggingBrick(false);
           store.setMode("Build");
@@ -268,10 +267,11 @@ export const HumanViewLayer = ({
           triggerHaptics(rightInput, HapticType.BRICK_SELECT);
           audioService.playSelect();
           handled = true;
-        }
-        if (!handled && store.mode !== "Build") {
+        } else if (store.mode !== "Build") {
           store.setMode("Build");
+          handled = true;
         }
+
         if (handled) {
           squeezeMoveBlockedRef.current = false;
           movePreviewActiveRef.current = false;
@@ -727,35 +727,9 @@ export const HumanViewLayer = ({
 
       // Handle Squeeze (Grip) release for dropping/placing
       if (!squeezePressed && wasSqueezePressed.current) {
-        const state = useLegoStore.getState();
-        if (state.mode === "Move") {
-            if (state.isDraggingBrick && movePreviewActiveRef.current) {
-               if (latestValidPlacement.current) {
-                  const success = handleVRCommit(
-                     latestValidPlacement.current.p,
-                     latestValidPlacement.current.n,
-                     latestValidPlacement.current.tk
-                  );
-                  if (success) {
-                    triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                    audioService.playPlace();
-                  } else {
-                    triggerHaptics(rightInput, HapticType.ERROR);
-                    audioService.playInvalid();
-                    state.setMovingBrickId(null);
-                  }
-               } else {
-                  state.setToastMessage("Invalid placement surface.");
-                  setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
-                  triggerHaptics(rightInput, HapticType.ERROR);
-                  audioService.playInvalid();
-                  state.setMovingBrickId(null);
-               }
-               movePreviewActiveRef.current = false;
-            }
-            state.setIsDraggingBrick(false);
-            squeezeMoveBlockedRef.current = false;
-        }
+        // Deliberately do nothing: 
+        // Grip release does not commit nor cancel.
+        // User must use Right Trigger to confirm, or B to cancel.
       }
 
       // Always track state
@@ -765,12 +739,12 @@ export const HumanViewLayer = ({
 
       if (isDebugXR && debugTextRef.current) {
          debugTextRef.current.text = [
-            `L(X/Y): ${wasXPressed.current}/${wasYPressed.current} | RTrig: ${triggerPressed} | A/B: ${actionPressed}/${wasBPressed.current}`,
-            `LAxes: ${leftInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
-            `RAxes: ${rightInput?.gamepad?.axes.map(a => a.toFixed(1)).join(',') || 'none'}`,
+            `xrPanel: ${useLegoStore.getState().xrPanel} | vrReady: true`,
+            `L-Ctrl: ${!!leftController} | R-Ctrl: ${!!rightController}`,
+            `X:${wasXPressed.current} Y:${wasYPressed.current} A:${actionPressed} B:${wasBPressed.current} Trg:${triggerPressed} Grp:${squeezePressed}`,
             `Hit: ${hit ? hit.object.name : 'none'}`,
-            `Sel: ${useLegoStore.getState().multiSelectedBrickIds.join(',')} | Mv: ${useLegoStore.getState().movingBrickId}`,
-            `Drag: ${useLegoStore.getState().isDraggingBrick}`
+            `isMenuItem: ${hit ? !!hitMenuLabel : false} | PlacementValid: ${latestValidPlacement.current ? 'yes' : 'no'}`,
+            `latestHitMenuItem: ${latestHit.current?.hitMenuItem} | HitLoc: ${!!latestHit.current?.hitLoc}`
          ].join('\n');
       }
 
