@@ -628,12 +628,14 @@ const SaveExportMenuOverlay = ({
   saveMenuRef,
   onSaveProject,
   onExportGLB,
+  onScreenshot,
 }: {
   show: boolean;
   onClose: () => void;
   saveMenuRef: React.RefObject<HTMLDivElement>;
   onSaveProject: () => void;
   onExportGLB: () => void;
+  onScreenshot: () => void;
 }) => {
   return (
     <AnimatePresence>
@@ -683,6 +685,27 @@ const SaveExportMenuOverlay = ({
               </div>
               <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
                 .glb
+              </div>
+            </div>
+          </button>
+
+          <button
+            onClick={() => {
+              onScreenshot();
+              onClose();
+            }}
+            className="flex flex-col items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl w-[90px] transition-colors flex-shrink-0"
+            title="Saves a screenshot of your current build."
+          >
+            <span className="text-3xl flex items-center justify-center h-10 w-10 text-white">
+               <ScreenshotIcon size={32} />
+            </span>
+            <div className="text-center w-full">
+              <div className="text-[12px] font-bold text-white leading-tight truncate">
+                Screenshot
+              </div>
+              <div className="text-[10px] text-white/50 leading-tight mt-1 px-1 line-clamp-2">
+                .png
               </div>
             </div>
           </button>
@@ -1150,20 +1173,13 @@ export default function App() {
                 <div className="flex flex-wrap gap-1.5 sm:gap-4 shrink items-center justify-end">
                   <div className="flex gap-1.5 relative">
                     <button
-                      onClick={handleScreenshot}
-                      className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
-                      title="Screenshot (.png)"
-                    >
-                      <ScreenshotIcon size={16} />
-                    </button>
-                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         handleLoad();
                       }}
                       onPointerDown={(e) => e.stopPropagation()}
                       className="bg-black/40 border border-white/20 text-white/80 p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
-                      title="Import / Load Project (.json)"
+                      title="Import Project (.json)"
                     >
                       <LoadIcon size={16} />
                     </button>
@@ -1642,6 +1658,7 @@ export default function App() {
               onExportGLB={() => {
                 useLegoStore.getState().exportGLB?.();
               }}
+              onScreenshot={handleScreenshot}
             />
 
             <HelpModal
