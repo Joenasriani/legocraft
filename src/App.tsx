@@ -35,6 +35,40 @@ const BuildIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const EyeIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const EyeOffIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+    <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+    <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+    <line x1="2" y1="2" x2="22" y2="22" />
+  </svg>
+);
+
 const HomeIcon = ({ size = 16 }: { size?: number }) => (
   <svg
     width={size}
@@ -763,6 +797,7 @@ export default function App() {
   >("pending");
   const [isXRActive, setIsXRActive] = useState(false);
   const [xrError, setXrError] = useState<string | null>(null);
+  const [uiVisible, setUiVisible] = useState(true);
 
   useEffect(() => {
     // Quality Profile Detection
@@ -1134,7 +1169,14 @@ export default function App() {
             )}
 
             {/* Top Area */}
-            <div className="flex flex-col gap-3 w-full pointer-events-none shrink-0">
+            <AnimatePresence>
+              {uiVisible && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="flex flex-col gap-3 w-full pointer-events-none shrink-0 pt-2 sm:pt-4"
+                >
               {/* Top Bar */}
               <div className="flex justify-between items-start sm:items-center pointer-events-auto flex-wrap gap-2">
                 <div className="flex flex-col">
@@ -1340,70 +1382,91 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Absolute Floating Docks (Anchored to middle) */}
             {/* Left Tools */}
             <div className="absolute safe-area-left top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
               <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
                 <ToolIconButton
-                  icon={<MoveIcon size={24} />}
-                  active={mode === "Move"}
-                  onClick={() => setMode("Move")}
-                  title="Move Mode"
-                />
-                <ToolIconButton
-                  icon={<RotateIcon size={24} />}
+                  icon={uiVisible ? <EyeIcon size={24} /> : <EyeOffIcon size={24} />}
                   active={false}
-                  disabled={
-                    mode === "Delete" ||
-                    (mode === "Move" &&
-                      !useLegoStore.getState().movingBrickId &&
-                      useLegoStore.getState().multiSelectedBrickIds.length ===
-                        0)
-                  }
-                  onClick={() => useLegoStore.getState().triggerRotateGhost()}
-                  title="Rotate Brick"
-                />
-                <ToolIconButton
-                  icon={<DeleteIcon size={24} />}
-                  active={mode === "Delete"}
                   onClick={() => {
-                    const state = useLegoStore.getState();
-                    if (
-                      (state.mode === "Move" || state.mode === "Delete") &&
-                      (state.movingBrickId ||
-                        state.multiSelectedBrickIds.length > 0)
-                    ) {
-                      // Delete currently selected brick(s)
-                      if (state.selectionMode === "Group") {
-                        const movingBrick = state.bricks.find(
-                          (b) => b.id === state.movingBrickId,
-                        );
-                        if (movingBrick) {
-                          const allb = state.bricks;
-                          const g = getGroupBricks(movingBrick, allb);
-                          state.removeBricks(g.map((bz: any) => bz.id));
-                        }
-                      } else if (state.selectionMode === "Multi") {
-                        state.removeBricks(state.multiSelectedBrickIds);
-                        state.setMultiSelectedBrickIds([]);
-                      } else {
-                        if (state.movingBrickId)
-                          state.removeBrick(state.movingBrickId);
-                      }
-                      state.setMovingBrickId(null);
-                      state.setIsDraggingBrick(false);
-                    } else {
-                      setMode("Delete");
+                    setUiVisible(!uiVisible);
+                    if (uiVisible) {
+                      setShowPresetMenu(false);
+                      setShowSaveMenu(false);
+                      setShowBrickMenu(false);
+                      setShowHelp(false);
                     }
                   }}
-                  title="Delete Mode"
+                  title={uiVisible ? "Hide UI" : "Show UI"}
                 />
+                {uiVisible && (
+                  <>
+                    <div className="w-[80%] h-px bg-white/10 my-1" />
+                    <ToolIconButton
+                      icon={<MoveIcon size={24} />}
+                      active={mode === "Move"}
+                      onClick={() => setMode("Move")}
+                      title="Move Mode"
+                    />
+                    <ToolIconButton
+                      icon={<RotateIcon size={24} />}
+                      active={false}
+                      disabled={
+                        mode === "Delete" ||
+                        (mode === "Move" &&
+                          !useLegoStore.getState().movingBrickId &&
+                          useLegoStore.getState().multiSelectedBrickIds.length ===
+                            0)
+                      }
+                      onClick={() => useLegoStore.getState().triggerRotateGhost()}
+                      title="Rotate Brick"
+                    />
+                    <ToolIconButton
+                      icon={<DeleteIcon size={24} />}
+                      active={mode === "Delete"}
+                      onClick={() => {
+                        const state = useLegoStore.getState();
+                        if (
+                          (state.mode === "Move" || state.mode === "Delete") &&
+                          (state.movingBrickId ||
+                            state.multiSelectedBrickIds.length > 0)
+                        ) {
+                          // Delete currently selected brick(s)
+                          if (state.selectionMode === "Group") {
+                            const movingBrick = state.bricks.find(
+                              (b) => b.id === state.movingBrickId,
+                            );
+                            if (movingBrick) {
+                              const allb = state.bricks;
+                              const g = getGroupBricks(movingBrick, allb);
+                              state.removeBricks(g.map((bz: any) => bz.id));
+                            }
+                          } else if (state.selectionMode === "Multi") {
+                            state.removeBricks(state.multiSelectedBrickIds);
+                            state.setMultiSelectedBrickIds([]);
+                          } else {
+                            if (state.movingBrickId)
+                              state.removeBrick(state.movingBrickId);
+                          }
+                          state.setMovingBrickId(null);
+                          state.setIsDraggingBrick(false);
+                        } else {
+                          setMode("Delete");
+                        }
+                      }}
+                      title="Delete Mode"
+                    />
+                  </>
+                )}
               </div>
 
               <AnimatePresence>
-                {(mode === "Move" || mode === "Delete") && (
+                {uiVisible && (mode === "Move" || mode === "Delete") && (
                   <motion.div
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -1449,36 +1512,52 @@ export default function App() {
             </div>
 
             {/* Right Colors */}
-            <div className="absolute safe-area-right top-[55%] -translate-y-1/2 pointer-events-none z-20">
-              <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
-                <div className="grid grid-cols-2 gap-1 sm:gap-2">
-                  {LEGO_COLORS.map((color) => (
-                    <button
-                      key={color}
-                      onClick={() => setSelectedColor(color)}
-                      className="w-[34px] h-[34px] sm:w-[46px] sm:h-[46px] flex items-center justify-center shrink-0"
-                      title={`Select color: ${color}`}
-                      aria-label={`Select color: ${color}`}
-                    >
-                      <div
-                        className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 transition-all shadow-sm ${
-                          selectedColor === color
-                            ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)] ring-1 ring-white/50"
-                            : "border-white/10 opacity-80 hover:opacity-100 hover:scale-105"
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <AnimatePresence>
+              {uiVisible && (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="absolute safe-area-right top-[55%] -translate-y-1/2 pointer-events-none z-20"
+                >
+                  <div className="glass-panel p-1.5 sm:p-3 rounded-xl sm:rounded-2xl pointer-events-auto shadow-xl max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
+                    <div className="grid grid-cols-2 gap-1 sm:gap-2">
+                      {LEGO_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          className="w-[34px] h-[34px] sm:w-[46px] sm:h-[46px] flex items-center justify-center shrink-0"
+                          title={`Select color: ${color}`}
+                          aria-label={`Select color: ${color}`}
+                        >
+                          <div
+                            className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 transition-all shadow-sm ${
+                              selectedColor === color
+                                ? "border-white scale-110 shadow-[0_0_10px_rgba(255,255,255,0.3)] ring-1 ring-white/50"
+                                : "border-white/10 opacity-80 hover:opacity-100 hover:scale-105"
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Spacer to push Bottom Toolbar Area down since Center UI is absolute */}
             <div className="flex-1" />
 
             {/* Bottom Toolbar Area */}
-            <div className="flex flex-col items-center gap-2 sm:gap-6 w-full pointer-events-none shrink-0">
+            <AnimatePresence>
+              {uiVisible && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="flex flex-col items-center gap-2 sm:gap-6 w-full pointer-events-none shrink-0"
+                >
               {/* Brick Type Selector (Build Mode Only) */}
               <AnimatePresence>
                 {mode === "Build" && !activePreset && showBrickMenu && (
@@ -1638,7 +1717,9 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Preset Menu Overlay */}
