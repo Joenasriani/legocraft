@@ -1,8 +1,13 @@
 import * as THREE from "three";
 
-export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.Vector3, quaternion: THREE.Quaternion } {
+export function getSafePanelTransform(camera: THREE.Camera): {
+  position: THREE.Vector3;
+  quaternion: THREE.Quaternion;
+} {
   const camPos = new THREE.Vector3().setFromMatrixPosition(camera.matrixWorld);
-  const camFwd = new THREE.Vector3(0, 0, -1).transformDirection(camera.matrixWorld);
+  const camFwd = new THREE.Vector3(0, 0, -1).transformDirection(
+    camera.matrixWorld,
+  );
   // Flatten forward direction
   camFwd.y = 0;
   if (camFwd.lengthSq() < 0.001) camFwd.set(0, 0, -1);
@@ -10,13 +15,13 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
 
   const distance = 1.35; // 1.35m in front of headset
   const position = camPos.clone().add(camFwd.multiplyScalar(distance));
-  
+
   // Allow it to be relative to the headset height, so seated players can reach it.
   position.y = Math.max(0.6, camPos.y - 0.15); // Ensure it's at least 60cm above floor
 
   // Instead of lookAt which can flip depending on height and axis,
   // we just use the camera's Y-rotation so the panel reliably faces the user.
-  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ');
+  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
   euler.x = 0; // Remove pitch (so it stands vertically straight)
   euler.z = 0; // Remove roll
   const quaternion = new THREE.Quaternion().setFromEuler(euler);
@@ -28,17 +33,25 @@ export function getSafePanelTransform(camera: THREE.Camera): { position: THREE.V
   if (toCamera.lengthSq() > 0.001) {
     toCamera.normalize();
     if (panelForward.dot(toCamera) < 0) {
-      quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI));
+      quaternion.multiply(
+        new THREE.Quaternion().setFromAxisAngle(
+          new THREE.Vector3(0, 1, 0),
+          Math.PI,
+        ),
+      );
     }
   }
 
   return { position, quaternion };
 }
 
-export function isQuestControllerReady(inputSource?: XRInputSource | null): boolean {
+export function isQuestControllerReady(
+  inputSource?: XRInputSource | null,
+): boolean {
   if (!inputSource) return false;
-  if (inputSource.targetRayMode !== "tracked-pointer") return false;
-  if (!inputSource.gamepad) return false;
-  if (inputSource.gamepad.buttons.length === 0) return false;
+  const isHand =
+    inputSource.hand ||
+    (inputSource.profiles && inputSource.profiles.includes("generic-hand"));
+  if (isHand) return false;
   return true;
 }
