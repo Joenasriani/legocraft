@@ -734,7 +734,7 @@ export default function App() {
   const [showVRPrompt, setShowVRPrompt] = useState(false);
   const [isFadingToVR, setIsFadingToVR] = useState(false);
   const [vrStatus, setVrStatus] = useState<
-    "pending" | "ready" | "unsupported" | "https-required" | "denied"
+    "pending" | "ready" | "unsupported" | "https-required" | "no-xr" | "denied"
   >("pending");
   const [isXRActive, setIsXRActive] = useState(false);
   const [xrError, setXrError] = useState<string | null>(null);
@@ -787,7 +787,7 @@ export default function App() {
           setVrStatus("unsupported");
         });
     } else {
-      setVrStatus("unsupported");
+      setVrStatus("no-xr");
     }
   }, []);
 
@@ -1181,11 +1181,24 @@ export default function App() {
                       </span>
                     )}
                   </div>
-                  {vrStatus === "ready" && (
+                  {vrStatus === "ready" ? (
                     <button
                       onClick={() => setShowVRPrompt(true)}
                       className="bg-purple-600/80 backdrop-blur-md border border-purple-400/50 text-white px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:bg-purple-500 transition-colors"
                       title="Enter VR Session"
+                    >
+                      Enter VR
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="bg-gray-600/50 backdrop-blur-md border border-gray-500/30 text-gray-400/50 px-3 py-1.5 sm:px-5 sm:py-2 rounded-full text-[10px] sm:text-[12px] font-bold uppercase tracking-wider cursor-not-allowed"
+                      title={
+                        vrStatus === "https-required" ? "VR requires HTTPS or localhost." :
+                        vrStatus === "no-xr" ? "WebXR is not available in this browser. Open on Meta Quest Browser to use VR." :
+                        vrStatus === "unsupported" ? "Immersive VR is not supported on this device/browser." :
+                        "Checking VR support..."
+                      }
                     >
                       Enter VR
                     </button>
@@ -1204,8 +1217,10 @@ export default function App() {
                       : vrStatus === "pending"
                         ? "Checking VR..."
                         : vrStatus === "https-required"
-                          ? "HTTPS Required"
-                          : "VR requires Meta Quest Browser or another WebXR-capable browser over HTTPS."}
+                          ? "VR requires HTTPS or localhost."
+                          : vrStatus === "no-xr"
+                            ? "WebXR is not available in this browser."
+                            : "Immersive VR is not supported on this device/browser."}
                   </div>
                 </div>
               </div>
