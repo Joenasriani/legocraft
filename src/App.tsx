@@ -1400,6 +1400,12 @@ export default function App() {
                     </button>
                   )}
                   <div
+                    title={
+                      vrStatus === "https-required" ? "VR requires HTTPS or localhost." :
+                      vrStatus === "no-xr" ? "WebXR is not available in this browser." :
+                      vrStatus === "unsupported" ? "Immersive VR is not supported on this device/browser." :
+                      "VR Status"
+                    }
                     className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate max-w-[100px] sm:max-w-[200px] whitespace-nowrap leading-tight ${
                       vrStatus === "ready"
                         ? "bg-green-500/20 border-green-500/40 text-green-400"
@@ -1411,12 +1417,10 @@ export default function App() {
                     {vrStatus === "ready"
                       ? "VR Ready"
                       : vrStatus === "pending"
-                        ? "Checking VR..."
+                        ? "Checking..."
                         : vrStatus === "https-required"
-                          ? "VR requires HTTPS or localhost."
-                          : vrStatus === "no-xr"
-                            ? "WebXR is not available in this browser."
-                            : "Immersive VR is not supported on this device/browser."}
+                          ? "HTTPS Required"
+                          : "VR Unavailable"}
                   </div>
                 </div>
               </div>
