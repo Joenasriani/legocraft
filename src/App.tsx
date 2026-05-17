@@ -789,6 +789,7 @@ export default function App() {
   const brickMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = React.useRef<HTMLDivElement>(null);
+  const sKeyTracker = useRef<{ count: number, timeout: any }>({ count: 0, timeout: null });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showVRPrompt, setShowVRPrompt] = useState(false);
   const [isFadingToVR, setIsFadingToVR] = useState(false);
@@ -973,6 +974,26 @@ export default function App() {
       const state = useLegoStore.getState();
 
       switch (e.key.toLowerCase()) {
+        case "s":
+          if (sKeyTracker.current.timeout) {
+            clearTimeout(sKeyTracker.current.timeout);
+            sKeyTracker.current.timeout = null;
+          }
+          sKeyTracker.current.count += 1;
+          if (sKeyTracker.current.count >= 3) {
+            state.setSelectionMode("Group");
+            sKeyTracker.current.count = 0;
+          } else {
+            sKeyTracker.current.timeout = setTimeout(() => {
+              if (sKeyTracker.current.count === 1) {
+                useLegoStore.getState().setSelectionMode("Solo");
+              } else if (sKeyTracker.current.count === 2) {
+                useLegoStore.getState().setSelectionMode("Multi");
+              }
+              sKeyTracker.current.count = 0;
+            }, 350);
+          }
+          break;
         case "p":
           setShowPresetMenu((prev) => {
             if (!prev) {
@@ -995,7 +1016,13 @@ export default function App() {
           state.triggerRotateGhost();
           break;
         case "c":
-          state.setIsCameraLocked(!state.isCameraLocked);
+          if (state.isCameraLocked) {
+            state.setIsCameraLocked(false);
+            state.setMode("Move");
+            state.setIsDraggingBrick(false);
+          } else {
+            state.setIsCameraLocked(true);
+          }
           break;
         case "e":
           if (state.mode === "Delete") {
@@ -1507,6 +1534,19 @@ export default function App() {
                   <>
                     <div className="w-[80%] h-px bg-white/10 my-1" />
                     <ToolIconButton
+                      icon={<BuildIcon size={24} />}
+                      active={mode === "Build"}
+                      onClick={() => {
+                        if (mode !== "Build") {
+                          setMode("Build");
+                          setShowBrickMenu(true);
+                        } else {
+                          setShowBrickMenu(!showBrickMenu);
+                        }
+                      }}
+                      title="Build Mode"
+                    />
+                    <ToolIconButton
                       icon={<MoveIcon size={24} />}
                       active={mode === "Move"}
                       onClick={() => setMode("Move")}
@@ -1742,32 +1782,6 @@ export default function App() {
                 <div className="w-px h-6 bg-glass-border shrink-0" />
 
                 <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
-                  <div className="relative flex items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (mode !== "Build") {
-                          setMode("Build");
-                          setShowBrickMenu(true);
-                        } else {
-                          setShowBrickMenu(!showBrickMenu);
-                        }
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title="Build"
-                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 rounded-xl transition-colors ${
-                        mode === "Build"
-                          ? "bg-blue-500/20 border border-blue-500/40 text-blue-300 hover:bg-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]"
-                          : "bg-white/5 border border-glass-border text-white/80 hover:text-white hover:bg-white/10"
-                      }`}
-                    >
-                      <BuildIcon size={18} />
-                      <span className="hidden sm:inline text-[13px] font-semibold">
-                        Build
-                      </span>
-                    </button>
-                  </div>
-
                   <div className="relative flex items-center">
                     <button
                       onClick={(e) => {
