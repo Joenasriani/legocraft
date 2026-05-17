@@ -952,6 +952,98 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        (e.target as HTMLElement).isContentEditable
+      ) {
+        return;
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      const state = useLegoStore.getState();
+
+      switch (e.key.toLowerCase()) {
+        case "p":
+          setShowPresetMenu((prev) => {
+            if (!prev) {
+              setShowBrickMenu(false);
+              setShowSaveMenu(false);
+            }
+            return !prev;
+          });
+          break;
+        case "b":
+          setShowBrickMenu((prev) => {
+            if (!prev) {
+              setShowPresetMenu(false);
+              setShowSaveMenu(false);
+            }
+            return !prev;
+          });
+          break;
+        case "r":
+          state.triggerRotateGhost();
+          break;
+        case "c":
+          state.setIsCameraLocked(!state.isCameraLocked);
+          break;
+        case "e":
+          if (state.mode === "Delete") {
+            state.setMode("Build");
+          } else {
+            state.setMode("Delete");
+            state.setIsDraggingBrick(false);
+          }
+          break;
+        case "h":
+          setUiVisible((prev) => !prev);
+          break;
+        case "escape":
+          let menuClosed = false;
+          if (showPresetMenu) { setShowPresetMenu(false); menuClosed = true; }
+          if (showBrickMenu) { setShowBrickMenu(false); menuClosed = true; }
+          if (showSaveMenu) { setShowSaveMenu(false); menuClosed = true; }
+          if (showHelp) { setShowHelp(false); menuClosed = true; }
+          if (showClearConfirm) { setShowClearConfirm(false); menuClosed = true; }
+          if (menuClosed) {
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+          }
+          break;
+        case "delete":
+        case "backspace":
+          if (state.selectionMode === "Multi" && state.multiSelectedBrickIds.length > 0) {
+            const toRender = state.bricks.filter(
+              (b) => !state.multiSelectedBrickIds.includes(b.id),
+            );
+            state.setBricks(toRender);
+            state.setMultiSelectedBrickIds([]);
+            state.setMode("Build");
+          } else if (state.mode === "Move" && state.movingBrickId) {
+            const toRender = state.bricks.filter(
+              (b) => b.id !== state.movingBrickId,
+            );
+            state.setBricks(toRender);
+            state.setMode("Build");
+            state.setIsDraggingBrick(false);
+          }
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown, { capture: true });
+  }, [showPresetMenu, showBrickMenu, showSaveMenu, showHelp, showClearConfirm]);
+
   const handleLoad = async () => {
     try {
       let canUsePicker = false;
