@@ -17,6 +17,9 @@ function Locomotion() {
   const { camera, gl } = useThree();
 
   useFrame((state, delta) => {
+    const locomotionMode = useLegoStore.getState().locomotionMode;
+    if (locomotionMode !== "Smooth") return;
+
     const session = gl.xr.getSession();
     if (!session || !originRef.current) return;
 

@@ -26,15 +26,15 @@ export const VROnboarding = () => {
   });
 
   const instructions = [
-    { key: "Right trigger", action: "Place / select" },
-    { key: "Right grip", action: "Move brick" },
-    { key: "A", action: "Rotate brick" },
-    { key: "B", action: "Cancel / close" },
-    { key: "X", action: "Build menu" },
-    { key: "Y", action: "Palette" },
+    { key: "Right Trigger", action: "Click / Confirm" },
+    { key: "Right Grip", action: "Select / Move" },
+    { key: "A", action: "Rotate" },
+    { key: "B", action: "Cancel / Close" },
+    { key: "Left Stick", action: "Move around" },
+    { key: "Left X / Y", action: "Menus" },
   ];
 
-  const subtext = "Stationary VR: move physically in your play space. Controller locomotion is disabled.";
+  const subtext = "Smooth Locomotion: use the left stick to move. Right Stick is disabled.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
