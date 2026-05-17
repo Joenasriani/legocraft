@@ -281,64 +281,7 @@ export const HumanViewLayer = ({
       wasBPressed.current = bPressed;
     }
 
-    // Handle Locomotion (Thumbsticks)
-    const dt = Math.min(delta, 0.05);
-
-    if (leftInput && leftInput.gamepad) {
-      const xAxis = leftInput.gamepad.axes[2] || 0; // x strafe
-      const zAxis = leftInput.gamepad.axes[3] || 0; // z forward/back
-
-      if (locomotionMode === "Smooth") {
-        if (Math.abs(xAxis) > 0.1 || Math.abs(zAxis) > 0.1) {
-          const speed = movementSpeed * dt;
-          const camForward = new THREE.Vector3(0, 0, -1)
-            .transformDirection(gl.xr.getCamera().matrixWorld)
-            .setY(0)
-            .normalize();
-          const camRight = new THREE.Vector3(1, 0, 0)
-            .transformDirection(gl.xr.getCamera().matrixWorld)
-            .setY(0)
-            .normalize();
-
-          const moveVec = new THREE.Vector3()
-            .addScaledVector(camRight, xAxis * speed)
-            .addScaledVector(camForward, zAxis * speed);
-
-          const refSpace = gl.xr.getReferenceSpace();
-          if (refSpace) {
-            const transform = new XRRigidTransform({
-              x: -moveVec.x,
-              y: -moveVec.y,
-              z: -moveVec.z,
-            });
-            const newRefSpace = refSpace.getOffsetReferenceSpace(transform);
-            gl.xr.setReferenceSpace(newRefSpace);
-          }
-        }
-      }
-    }
-
-    // Snap turn
-    if (rightInput && rightInput.gamepad) {
-      const xAxis = rightInput.gamepad.axes[2] || 0;
-      if (Math.abs(xAxis) > 0.5) {
-        if (!snapTurnCooldown.current) {
-          snapTurnCooldown.current = true;
-          const turnAngle = xAxis > 0 ? -snapTurnAngle : snapTurnAngle;
-          const turnAngleRad = THREE.MathUtils.degToRad(turnAngle);
-          const refSpace = gl.xr.getReferenceSpace();
-          if (refSpace) {
-            const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), turnAngleRad);
-            const transform = new XRRigidTransform(new DOMPoint(0,0,0), new DOMPoint(q.x, q.y, q.z, q.w));
-            gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
-          }
-          setTimeout(() => snapTurnCooldown.current = false, 500);
-        }
-      } else if (Math.abs(xAxis) < 0.2) {
-        snapTurnCooldown.current = false;
-      }
-    }
-
+    // Handle Locomotion (Thumbsticks) disabled for stabilization
     if (rightController && rightInput && rightInput.gamepad) {
       const pos = new THREE.Vector3().setFromMatrixPosition(
         rightController.matrixWorld,
