@@ -728,6 +728,8 @@ export default function App() {
   });
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
+  const [showBrickMenu, setShowBrickMenu] = useState(false);
+  const brickMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = React.useRef<HTMLDivElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -801,6 +803,13 @@ export default function App() {
         setShowPresetMenu(false);
       }
       if (
+        showBrickMenu &&
+        brickMenuRef.current &&
+        !brickMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowBrickMenu(false);
+      }
+      if (
         showSaveMenu &&
         saveMenuRef.current &&
         !saveMenuRef.current.contains(e.target as Node)
@@ -808,11 +817,11 @@ export default function App() {
         setShowSaveMenu(false);
       }
     };
-    if (showPresetMenu || showSaveMenu) {
+    if (showPresetMenu || showSaveMenu || showBrickMenu) {
       window.addEventListener("pointerdown", handleGlobalClick);
       return () => window.removeEventListener("pointerdown", handleGlobalClick);
     }
-  }, [showPresetMenu, showSaveMenu]);
+  }, [showPresetMenu, showSaveMenu, showBrickMenu]);
 
   // Load save on startup
   useEffect(() => {
@@ -1322,12 +1331,6 @@ export default function App() {
             <div className="absolute safe-area-left top-[55%] -translate-y-1/2 flex items-center gap-2 pointer-events-none z-20">
               <div className="glass-panel w-auto p-1.5 sm:p-3 rounded-xl sm:rounded-2xl flex flex-col items-center gap-1 sm:gap-3 pointer-events-auto shrink-0 max-h-[85vh] overflow-y-auto no-scrollbar scroll-panel mobile-landscape-compact mobile-landscape-panel">
                 <ToolIconButton
-                  icon={<BuildIcon size={24} />}
-                  active={mode === "Build"}
-                  onClick={() => setMode("Build")}
-                  title="Build Mode"
-                />
-                <ToolIconButton
                   icon={<MoveIcon size={24} />}
                   active={mode === "Move"}
                   onClick={() => setMode("Move")}
@@ -1462,8 +1465,9 @@ export default function App() {
             <div className="flex flex-col items-center gap-2 sm:gap-6 w-full pointer-events-none shrink-0">
               {/* Brick Type Selector (Build Mode Only) */}
               <AnimatePresence>
-                {mode === "Build" && !activePreset && (
+                {mode === "Build" && !activePreset && showBrickMenu && (
                   <motion.div
+                    ref={brickMenuRef}
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
@@ -1475,6 +1479,7 @@ export default function App() {
                         onClick={() => {
                           setSelectedType(type);
                           setMode("Build");
+                          setShowBrickMenu(false);
                         }}
                         className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all ${
                           selectedType === type
@@ -1561,6 +1566,32 @@ export default function App() {
                       Clear
                     </span>
                   </button>
+
+                  <div className="relative flex items-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (mode !== "Build") {
+                          setMode("Build");
+                          setShowBrickMenu(true);
+                        } else {
+                          setShowBrickMenu(!showBrickMenu);
+                        }
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      title="Build"
+                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 rounded-xl transition-colors ${
+                        mode === "Build"
+                          ? "bg-blue-500/20 border border-blue-500/40 text-blue-300 hover:bg-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.2)]"
+                          : "bg-white/5 border border-glass-border text-white/80 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <BuildIcon size={18} />
+                      <span className="hidden sm:inline text-[13px] font-semibold">
+                        Build
+                      </span>
+                    </button>
+                  </div>
 
                   <div className="relative flex items-center">
                     <button
