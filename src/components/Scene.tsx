@@ -9,7 +9,6 @@ import {
 } from "@react-three/drei";
 import { XR, XROrigin } from "@react-three/xr";
 import * as THREE from "three";
-import { LegoBrick } from "./LegoBrick";
 import { BrickInstances } from "./BrickInstances";
 import { SelectionToolbar } from "./SelectionToolbar";
 import {
