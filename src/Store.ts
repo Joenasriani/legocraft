@@ -731,6 +731,7 @@ interface LegoStore {
 
   // Actions
   addBrick: (brick: Omit<BrickData, "id">) => void;
+  addBricks: (bricks: BrickData[]) => void;
   removeBrick: (id: string) => void;
   removeBricks: (ids: string[]) => void;
   updateBrick: (id: string, updates: Partial<BrickData>) => void;
@@ -1171,6 +1172,17 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     // Save to local storage
     scheduleSave([...bricks, newBrick]);
+  },
+
+  addBricks: (newBricks) => {
+    const { bricks, undoStack } = get();
+    const allBricks = [...bricks, ...newBricks];
+    set({
+      undoStack: pushHistory(undoStack, bricks),
+      redoStack: [],
+      bricks: allBricks,
+    });
+    scheduleSave(allBricks);
   },
 
   removeBrick: (id) => {

@@ -11,6 +11,7 @@ import { XR, XROrigin } from "@react-three/xr";
 import * as THREE from "three";
 import { LegoBrick } from "./LegoBrick";
 import { BrickInstances } from "./BrickInstances";
+import { SelectionToolbar } from "./SelectionToolbar";
 import {
   useLegoStore,
   checkPlacementValid,
@@ -1411,52 +1412,57 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }
       }
 
-      const { bricks, mode, selectionMode, multiSelectedBrickIds } =
+      const { bricks, mode, selectionMode, multiSelectedBrickIds, movingBrickId, removeBrick } =
         useLegoStore.getState();
+
+      if (e.key === "Backspace" || e.key === "Delete") {
+        if (mode === "Move" && movingGroupOriginalBricks.length > 0) {
+          movingGroupOriginalBricks.forEach(b => removeBrick(b.id));
+          useLegoStore.getState().setMovingBrickId(null);
+          useLegoStore.getState().setMultiSelectedBrickIds([]);
+        }
+      }
 
       // Copy
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
-        if (
-          mode === "Move" &&
-          selectionMode === "Multi" &&
-          multiSelectedBrickIds.length > 0
-        ) {
-          const copied = bricks.filter((b) =>
-            multiSelectedBrickIds.includes(b.id),
-          );
-
-          if (copied.length > 0) {
-            // Create relative offsets based on their center so they aren't offset wildly
-            let minX = Infinity,
-              minZ = Infinity;
-            copied.forEach((b) => {
-              if (b.position[0] < minX) minX = b.position[0];
-              if (b.position[2] < minZ) minZ = b.position[2];
-            });
-            const normalized = copied.map((b) => ({
-              ...b,
-              position: [
-                b.position[0] - minX,
-                b.position[1],
-                b.position[2] - minZ,
-              ] as [number, number, number],
-            }));
-            setClipboard(normalized);
-          }
+        if (mode === "Move" && movingGroupOriginalBricks.length > 0) {
+          useLegoStore.getState().setClipboardBricks(movingGroupOriginalBricks);
+          useLegoStore.getState().setToastMessage("Copied to clipboard");
         }
       }
 
       // Paste
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") {
-        if (clipboard.length > 0) {
-          useLegoStore.getState().setClipboardBricks(clipboard);
-          useLegoStore.getState().loadPreset("clipboard" as any);
+        const { clipboardBricks, addBricks, setSelectionMode, setMovingBrickId, setMultiSelectedBrickIds } = useLegoStore.getState();
+        if (clipboardBricks.length > 0) {
+          const newBricks = clipboardBricks.map((b) => ({
+            ...b,
+            id: crypto.randomUUID(),
+            position: [
+              b.position[0] + getBrickDimensions("1x1").w * MODULE_SIZE,
+              b.position[1],
+              b.position[2] + getBrickDimensions("1x1").d * MODULE_SIZE,
+            ] as [number, number, number],
+          }));
+
+          addBricks(newBricks);
+          
+          if (newBricks.length === 1) {
+            setSelectionMode("Solo");
+            setMovingBrickId(newBricks[0].id);
+            setMultiSelectedBrickIds([]);
+          } else {
+            setSelectionMode("Multi");
+            setMultiSelectedBrickIds(newBricks.map((b) => b.id));
+            setMovingBrickId(null);
+          }
+          useLegoStore.getState().setToastMessage("Pasted!");
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [marqueeStart, clipboard]);
+  }, [marqueeStart, movingGroupOriginalBricks]);
 
   useEffect(() => {
     if (!marqueeStart) return;
@@ -2361,6 +2367,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               )}
             </group>
           )}
+
+        {!isScreenshotting && <SelectionToolbar selectedBricks={movingGroupOriginalBricks} />}
 
         {!isScreenshotting &&
           (mode === "Move" || mode === "Delete") &&
