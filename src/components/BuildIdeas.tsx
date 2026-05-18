@@ -1,6 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Home, Castle, Bot, GitCommit, DoorOpen } from "lucide-react";
+import { audioService } from "../services/audioService";
 
 interface BuildIdea {
   id: string;
@@ -148,7 +149,10 @@ export const BuildIdeas = ({ show, onClose }: { show: boolean; onClose: () => vo
                       key={idea.id}
                       whileHover={{ scale: 1.02, translateY: -4 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => setSelectedIdea(idea)}
+                      onClick={() => {
+                        setSelectedIdea(idea);
+                        audioService.play("select");
+                      }}
                       className="bg-white/5 border border-white/10 rounded-[28px] cursor-pointer hover:bg-white/10 hover:border-white/20 transition-all group overflow-hidden flex flex-col p-6"
                     >
                       <div className="w-12 h-12 bg-accent/20 rounded-2xl flex items-center justify-center mb-4 text-accent group-hover:scale-110 transition-transform">
@@ -164,7 +168,10 @@ export const BuildIdeas = ({ show, onClose }: { show: boolean; onClose: () => vo
                   {/* Detail View */}
                   <div className="flex-1">
                     <button 
-                      onClick={() => setSelectedIdea(null)}
+                      onClick={() => {
+                        setSelectedIdea(null);
+                        audioService.play("select");
+                      }}
                       className="mb-6 flex items-center gap-2 text-white/50 hover:text-white transition-colors text-sm font-medium"
                     >
                       <X size={16} /> Back to all ideas

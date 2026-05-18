@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { audioService } from "./services/audioService";
 import {
   MODULE_SIZE,
   BRICK_HEIGHT,
@@ -1170,6 +1171,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       bricks: [...bricks, newBrick],
     });
 
+    audioService.play("place");
+
     // Save to local storage
     scheduleSave([...bricks, newBrick]);
   },
@@ -1182,6 +1185,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: allBricks,
     });
+    audioService.play("place");
     scheduleSave(allBricks);
   },
 
@@ -1196,6 +1200,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         get().setToastMessage(
           "Cannot delete: brick has another brick above it.",
         );
+        audioService.play("error");
       }
       return;
     }
@@ -1207,6 +1212,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: newBricks,
     });
+
+    audioService.play("remove");
 
     scheduleSave(newBricks);
   },
@@ -1243,6 +1250,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
         get().setToastMessage(
           "Cannot delete: some bricks have others above them.",
         );
+        audioService.play("error");
       }
       return;
     }
@@ -1253,6 +1261,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: newBricks,
     });
+    audioService.play("remove");
     scheduleSave(newBricks);
   },
 
@@ -1297,14 +1306,18 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       multiSelectedBrickIds: [],
     }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
-  setSelectedType: (selectedType) =>
+  setSelectedType: (selectedType) => {
+    if (get().selectedType !== selectedType) {
+      audioService.play("select");
+    }
     set({
       selectedType,
       activePreset: null,
       movingBrickId: null,
       isDraggingBrick: false,
       multiSelectedBrickIds: [],
-    }),
+    });
+  },
   setSelectedColor: (selectedColor) => {
     const {
       mode,
@@ -1314,6 +1327,10 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       updateBricks,
       selectionMode,
     } = get();
+    
+    if (get().selectedColor !== selectedColor) {
+      audioService.play("select");
+    }
     set({ selectedColor });
 
     if (mode === "Move") {
@@ -1352,7 +1369,10 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
   undo: () => {
     const { bricks, undoStack, redoStack } = get();
-    if (undoStack.length === 0) return;
+    if (undoStack.length === 0) {
+      audioService.play("error");
+      return;
+    }
 
     const prevState = undoStack[undoStack.length - 1];
     const newUndoStack = undoStack.slice(0, -1);
@@ -1367,12 +1387,16 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       justSelectedBrick: false,
     });
 
+    audioService.play("remove"); // Undo placement / remove feels like removing
     scheduleSave(prevState.bricks);
   },
 
   redo: () => {
     const { bricks, undoStack, redoStack } = get();
-    if (redoStack.length === 0) return;
+    if (redoStack.length === 0) {
+      audioService.play("error");
+      return;
+    }
 
     const nextState = redoStack[redoStack.length - 1];
     const newRedoStack = redoStack.slice(0, -1);
@@ -1387,6 +1411,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       justSelectedBrick: false,
     });
 
+    audioService.play("place");
     scheduleSave(nextState.bricks);
   },
 
@@ -1481,6 +1506,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     );
     if (!check.valid) {
       console.warn("Preset placement blocked:", check.reason);
+      audioService.play("error");
       return;
     }
 
@@ -1490,6 +1516,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       redoStack: [],
       bricks: newBricks,
     };
+
+    audioService.play("place");
 
     if (activePreset === "clipboard") {
       updates.activePreset = null;

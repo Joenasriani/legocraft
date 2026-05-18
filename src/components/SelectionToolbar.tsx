@@ -4,6 +4,7 @@ import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDime
 import { BRICK_HEIGHT, MODULE_SIZE } from "../constants";
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { audioService } from "../services/audioService";
 
 interface SelectionToolbarProps {
   selectedBricks: BrickData[];
@@ -47,6 +48,7 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
   const handlePaste = () => {
     const { addBricks, setSelectionMode, setMovingBrickId, setMultiSelectedBrickIds } = useLegoStore.getState();
     if (clipboardBricks.length === 0) return;
+    
     
     const newBricks = clipboardBricks.map((b) => ({
       ...b,

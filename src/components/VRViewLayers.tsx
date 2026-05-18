@@ -4,7 +4,7 @@ import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { useLegoStore, getGroupBricks, hasBrickAbove } from "../Store";
 import { MODULE_SIZE, BRICK_HEIGHT } from "../constants";
-import { audioService } from "../services/AudioService";
+import { audioService } from "../services/audioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
@@ -253,7 +253,7 @@ export const HumanViewLayer = ({
             "none",
           );
           triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-          audioService.playDelete();
+          audioService.play("remove");
           handled = true;
         } else if (store.mode !== "Build") {
           store.setMode("Build");
@@ -446,7 +446,7 @@ export const HumanViewLayer = ({
           if (isMenuItem && onTriggerFn) {
             onTriggerFn();
             triggerHaptics(rightInput, HapticType.UI_CLICK);
-            audioService.playMenu();
+            audioService.play("select");
           } else if (useLegoStore.getState().xrPanel !== "none") {
             // Do nothing to the world if a panel is open!
           } else if (mode === "Delete" && hit) {
@@ -475,16 +475,16 @@ export const HumanViewLayer = ({
                       3000,
                     );
                     triggerHaptics(rightInput, HapticType.ERROR);
-                    audioService.playInvalid();
+                    audioService.play("error");
                   } else {
                     useLegoStore.getState().toggleMultiSelectBrickId(b.id);
                     triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                    audioService.playDelete();
+                    audioService.play("remove");
                   }
                 } else {
                   removeBrick(b.id);
                   triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                  audioService.playDelete();
+                  audioService.play("remove");
                 }
               }
             }
@@ -508,11 +508,11 @@ export const HumanViewLayer = ({
               );
               if (success) {
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.playPlace();
+                audioService.play("place");
                 movePreviewActiveRef.current = false;
               } else {
                 triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.playInvalid();
+                audioService.play("error");
               }
             } else if (canCommitRotationOnly) {
               const success = handleVRCommit(
@@ -522,11 +522,11 @@ export const HumanViewLayer = ({
               );
               if (success) {
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.playPlace();
+                audioService.play("place");
                 movePreviewActiveRef.current = false;
               } else {
                 triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.playInvalid();
+                audioService.play("error");
               }
             } else if (mode === "Move" && !state.movingBrickId) {
               useLegoStore
@@ -537,13 +537,13 @@ export const HumanViewLayer = ({
                 3000,
               );
               triggerHaptics(rightInput, HapticType.ERROR);
-              audioService.playInvalid();
+              audioService.play("error");
             } else {
               useLegoStore
                 .getState()
                 .setToastMessage("Invalid placement surface.");
               triggerHaptics(rightInput, HapticType.ERROR);
-              audioService.playInvalid();
+              audioService.play("error");
             }
           }
         }
@@ -605,16 +605,16 @@ export const HumanViewLayer = ({
                         3000,
                       );
                       triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.playInvalid();
+                      audioService.play("error");
                     } else {
                       removeBricks(gIds);
                       triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                      audioService.playDelete();
+                      audioService.play("remove");
                     }
                   } else if (selectionMode === "Multi") {
                     useLegoStore.getState().toggleMultiSelectBrickId(b.id);
                     triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                    audioService.playDelete();
+                    audioService.play("remove");
                   } else {
                     if (
                       hasBrickAbove(
@@ -634,11 +634,11 @@ export const HumanViewLayer = ({
                         3000,
                       );
                       triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.playInvalid();
+                      audioService.play("error");
                     } else {
                       removeBrick(b.id);
                       triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                      audioService.playDelete();
+                      audioService.play("remove");
                     }
                   }
                 } else if (currentMode === "Move" && !movingBrickId) {
@@ -667,12 +667,12 @@ export const HumanViewLayer = ({
                         3000,
                       );
                       triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.playInvalid();
+                      audioService.play("error");
                     }
 
                     setJustSelectedBrick(true);
                     triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.playSelect();
+                    audioService.play("select");
                     useLegoStore.getState().triggerSetGhostRotation(b.rotation);
                   } else if (selectionMode === "Multi") {
                     const stateBefore = useLegoStore.getState();
@@ -716,7 +716,7 @@ export const HumanViewLayer = ({
                           3000,
                         );
                         triggerHaptics(rightInput, HapticType.ERROR);
-                        audioService.playInvalid();
+                        audioService.play("error");
                       }
                     } else if (stateBefore.movingBrickId === b.id) {
                       const newAnchorId =
@@ -734,7 +734,7 @@ export const HumanViewLayer = ({
                     }
                     setJustSelectedBrick(true);
                     triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.playSelect();
+                    audioService.play("select");
                     useLegoStore.getState().triggerSetGhostRotation(b.rotation);
                   } else {
                     setMovingBrickId(b.id);
@@ -761,11 +761,11 @@ export const HumanViewLayer = ({
                         3000,
                       );
                       triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.playInvalid();
+                      audioService.play("error");
                     }
                     setJustSelectedBrick(true);
                     triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.playSelect();
+                    audioService.play("select");
                     useLegoStore.getState().triggerSetGhostRotation(b.rotation);
                   }
                 }
@@ -814,11 +814,11 @@ export const HumanViewLayer = ({
               );
               if (success) {
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.playPlace();
+                audioService.play("place");
                 movePreviewActiveRef.current = false;
               } else {
                 triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.playInvalid();
+                audioService.play("error");
               }
             } else if (canCommitRotationOnly) {
               const success = handleVRCommit(
@@ -828,11 +828,11 @@ export const HumanViewLayer = ({
               );
               if (success) {
                 triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.playPlace();
+                audioService.play("place");
                 movePreviewActiveRef.current = false;
               } else {
                 triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.playInvalid();
+                audioService.play("error");
               }
             }
           }
@@ -844,7 +844,6 @@ export const HumanViewLayer = ({
         if (mode === "Build" || (mode === "Move" && movingBrickId)) {
           useLegoStore.getState().triggerRotateGhost();
           triggerHaptics(rightInput, HapticType.ROTATE);
-          audioService.playRotate();
         }
       }
 

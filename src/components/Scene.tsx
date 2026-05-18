@@ -31,6 +31,7 @@ import {
   hasBrickStuds,
   getBrickHeightUnit,
 } from "../Store";
+import { audioService } from "../services/audioService";
 
 import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT } from "../constants";
 import { createBrickGeometry, createStudGeometry } from "../lib/geometry";
@@ -276,7 +277,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     const handleVisibility = (e: any) => {
       if (e.session && e.session.visibilityState === "visible") {
-        import("../services/AudioService").then((m) => m.audioService.resume());
+        audioService.resume();
         gl.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         if (useLegoStore.getState().xrPanel === "waitingControllers") {
           useLegoStore.getState().setToastMessage("XR Resumed");
@@ -287,7 +288,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     const docVis = () => {
       if (document.visibilityState === "visible") {
-        import("../services/AudioService").then((m) => m.audioService.resume());
+        audioService.resume();
       }
     };
 

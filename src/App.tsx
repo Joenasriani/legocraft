@@ -11,6 +11,7 @@ import {
   isValidBrickData,
   SHAPE_DEFS,
 } from "./Store";
+import { audioService } from "./services/audioService";
 import { createXRStore } from "@react-three/xr";
 import { Undo2 as LucideUndo2, Redo2 as LucideRedo2, Blocks as LucideBlocks, Shapes as LucideShapes, LayoutGrid as LucideLayoutGrid, Trash2 as LucideTrash2, Lightbulb as LucideLightbulb } from "lucide-react";
 
@@ -817,14 +818,45 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(() => {
     return localStorage.getItem("brickxr-help-dismissed") !== "true";
   });
+  
+  useEffect(() => {
+    if (showHelp) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showHelp]);
+
   const [showBuildIdeas, setShowBuildIdeas] = useState(false);
+  useEffect(() => {
+    if (showBuildIdeas) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showBuildIdeas]);
+
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  useEffect(() => {
+    if (showPresetMenu) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showPresetMenu]);
+
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showBrickMenu, setShowBrickMenu] = useState(false);
+  useEffect(() => {
+    if (showBrickMenu) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showBrickMenu]);
+
   const brickMenuRef = React.useRef<HTMLDivElement>(null);
   const [showShapesMenu, setShowShapesMenu] = useState(false);
+  useEffect(() => {
+    if (showShapesMenu) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showShapesMenu]);
+
   const shapesMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  useEffect(() => {
+    if (showSaveMenu) audioService.play("menu-open");
+    else audioService.play("menu-close");
+  }, [showSaveMenu]);
+
   const saveMenuRef = React.useRef<HTMLDivElement>(null);
   const sKeyTracker = useRef<{ count: number, timeout: any }>({ count: 0, timeout: null });
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -1231,7 +1263,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => {
-                    import("./services/AudioService").then((m) => m.audioService.resume());
+                    audioService.play("select");
                     if ((import.meta as any).env.DEV)
                       console.log("[VR] enterVR requested");
                     setShowVRPrompt(false);
