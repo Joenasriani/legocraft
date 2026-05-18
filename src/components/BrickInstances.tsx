@@ -213,7 +213,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       depthWrite: !isGhost,
       depthTest: true,
       toneMapped: !isGhost,
-      color: isGhost ? "#4da6ff" : color,
+      color: color,
     });
   }, [color, isGhost]);
 

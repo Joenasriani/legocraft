@@ -2511,8 +2511,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               top: Math.min(marqueeStart.y, marqueeCurrent.y),
               width: Math.abs(marqueeCurrent.x - marqueeStart.x),
               height: Math.abs(marqueeCurrent.y - marqueeStart.y),
-              border: "1px solid #4da6ff",
-              backgroundColor: "rgba(77, 166, 255, 0.2)",
+              border: `1px solid ${selectedColor}`,
+              backgroundColor: `${selectedColor}33`, // 20% opacity (0x33)
               pointerEvents: "none",
             }}
           />
