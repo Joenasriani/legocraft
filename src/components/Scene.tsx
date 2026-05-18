@@ -39,6 +39,12 @@ import { createBrickGeometry, createStudGeometry } from "../lib/geometry";
 import { VRRadialMenu } from "./VRRadialMenu";
 import { VRPalette } from "./VRPalette";
 import { vrTargetManager } from "../lib/vrTargets";
+import {
+  calculateRotMod,
+  transformBricks,
+  calculatePivotPosition,
+  rotateRelative,
+} from "../lib/transformUtils";
 import { isQuestControllerReady } from "../lib/vrHelpers";
 import { clientToCanvasNDC } from "../lib/pointer";
 
@@ -753,51 +759,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         });
       }
     } else if (mode === "Move" && movingBrick) {
-      const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-      const oxA = movingBrick.position[0] - movingGroupPivot[0];
-      const ozA = movingBrick.position[2] - movingGroupPivot[2];
-      let rXA = oxA,
-        rZA = ozA;
-      if (rotMod === 90 || rotMod === -270) {
-        rXA = -ozA;
-        rZA = oxA;
-      } else if (Math.abs(rotMod) === 180) {
-        rXA = -oxA;
-        rZA = -ozA;
-      } else if (rotMod === 270 || rotMod === -90) {
-        rXA = ozA;
-        rZA = -oxA;
-      }
+      const rotMod = calculateRotMod(ghostRotation);
+      const currentPivot = calculatePivotPosition(
+        movingBrick.position,
+        movingGroupPivot as [number, number, number],
+        [baseSnappedX, 0, baseSnappedZ], // We are testing at baseSnappedX/Z (and Y=0 relative to movingBrick?)
+        rotMod,
+      );
 
-      const cPX = baseSnappedX - rXA;
-      const cPZ = baseSnappedZ - rZA;
-      const cPY = 0 - (movingBrick.position[1] - movingGroupPivot[1]);
-
-      testBricks = movingGroupOriginalBricks.map((b) => {
-        const ox = b.position[0] - movingGroupPivot[0];
-        const oz = b.position[2] - movingGroupPivot[2];
-        let nx = ox,
-          nz = oz;
-        if (rotMod === 90 || rotMod === -270) {
-          nx = -oz;
-          nz = ox;
-        } else if (Math.abs(rotMod) === 180) {
-          nx = -ox;
-          nz = -oz;
-        } else if (rotMod === 270 || rotMod === -90) {
-          nx = oz;
-          nz = -ox;
-        }
-        return {
-          ...b,
-          rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-          position: [
-            cPX + nx,
-            cPY + (b.position[1] - movingGroupPivot[1]),
-            cPZ + nz,
-          ] as [number, number, number],
-        };
-      });
+      testBricks = transformBricks(
+        movingGroupOriginalBricks,
+        movingGroupPivot as [number, number, number],
+        currentPivot,
+        rotMod,
+      );
     } else {
       testBricks = [
         {
@@ -1112,53 +1087,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const ghostGroupBricks = useMemo(() => {
     if (mode !== "Move" || !movingBrick) return [];
-    const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-    const oxA = movingBrick.position[0] - movingGroupPivot[0];
-    const ozA = movingBrick.position[2] - movingGroupPivot[2];
-    let rotatedOxA = oxA,
-      rotatedOzA = ozA;
-    if (rotMod === 90 || rotMod === -270) {
-      rotatedOxA = -ozA;
-      rotatedOzA = oxA;
-    } else if (Math.abs(rotMod) === 180) {
-      rotatedOxA = -oxA;
-      rotatedOzA = -ozA;
-    } else if (rotMod === 270 || rotMod === -90) {
-      rotatedOxA = ozA;
-      rotatedOzA = -oxA;
-    }
+    const rotMod = calculateRotMod(ghostRotation);
 
-    const currentPivotX = ghostPosition[0] - rotatedOxA;
-    const currentPivotZ = ghostPosition[2] - rotatedOzA;
-    const currentPivotY =
-      ghostPosition[1] - (movingBrick.position[1] - movingGroupPivot[1]);
+    const currentPivot = calculatePivotPosition(
+      movingBrick.position,
+      movingGroupPivot as [number, number, number],
+      ghostPosition,
+      rotMod,
+    );
 
-    return movingGroupOriginalBricks.map((b) => {
-      const ox = b.position[0] - movingGroupPivot[0];
-      const oz = b.position[2] - movingGroupPivot[2];
-      let nx = ox,
-        nz = oz;
-      if (rotMod === 90 || rotMod === -270) {
-        nx = -oz;
-        nz = ox;
-      } else if (Math.abs(rotMod) === 180) {
-        nx = -ox;
-        nz = -oz;
-      } else if (rotMod === 270 || rotMod === -90) {
-        nx = oz;
-        nz = -ox;
-      }
-
-      return {
-        ...b,
-        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-        position: [
-          currentPivotX + nx,
-          currentPivotY + (b.position[1] - movingGroupPivot[1]),
-          currentPivotZ + nz,
-        ] as [number, number, number],
-      };
-    });
+    return transformBricks(
+      movingGroupOriginalBricks,
+      movingGroupPivot as [number, number, number],
+      currentPivot,
+      rotMod,
+    );
   }, [
     movingGroupOriginalBricks,
     movingGroupPivot,
@@ -1224,35 +1167,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     });
 
     const info = getPresetInfo(activePreset, clipboard);
+    const rotMod = calculateRotMod(ghostRotation);
 
-    return validPresetBricks.map((b) => {
-      let ox = b.position[0] - info.cx;
-      let oz = b.position[2] - info.cz;
-      let nx = ox,
-        nz = oz;
-
-      const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-      if (rotMod === 90 || rotMod === -270) {
-        nx = -oz;
-        nz = ox;
-      } else if (Math.abs(rotMod) === 180) {
-        nx = -ox;
-        nz = -oz;
-      } else if (rotMod === 270 || rotMod === -90) {
-        nx = oz;
-        nz = -ox;
-      }
-
-      return {
-        ...b,
-        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-        position: [
-          nx + ghostPosition[0],
-          b.position[1] + ghostPosition[1],
-          nz + ghostPosition[2],
-        ] as [number, number, number],
-      };
-    });
+    return transformBricks(
+      validPresetBricks,
+      [info.cx, 0, info.cz],
+      ghostPosition,
+      rotMod
+    );
   }, [activePreset, ghostPosition, ghostRotation]);
 
   const presetPlacementStatus = useMemo(() => {
@@ -1561,25 +1483,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       mode === "Move" &&
       movingBrick
     ) {
-      const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-      const oxA = movingBrick!.position[0] - movingGroupPivot[0];
-      const ozA = movingBrick!.position[2] - movingGroupPivot[2];
-      let rotatedOxA = oxA,
-        rotatedOzA = ozA;
-      if (rotMod === 90 || rotMod === -270) {
-        rotatedOxA = -ozA;
-        rotatedOzA = oxA;
-      } else if (Math.abs(rotMod) === 180) {
-        rotatedOxA = -oxA;
-        rotatedOzA = -ozA;
-      } else if (rotMod === 270 || rotMod === -90) {
-        rotatedOxA = ozA;
-        rotatedOzA = -oxA;
-      }
+      const rotMod = calculateRotMod(ghostRotation);
+      const oxA = movingBrick.position[0] - movingGroupPivot[0];
+      const ozA = movingBrick.position[2] - movingGroupPivot[2];
+      const rotated = rotateRelative(oxA, ozA, rotMod);
+
       currentGhostPos = [
-        movingGroupPivot[0] + rotatedOxA,
-        movingBrick!.position[1],
-        movingGroupPivot[2] + rotatedOzA,
+        movingGroupPivot[0] + rotated.x,
+        movingBrick.position[1],
+        movingGroupPivot[2] + rotated.z,
       ];
     }
 
@@ -1595,53 +1507,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             ghostGroupBricks: [] as any[],
           };
         // validate the whole group
-        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-        const oxA = movingBrick!.position[0] - movingGroupPivot[0];
-        const ozA = movingBrick!.position[2] - movingGroupPivot[2];
-        let rotatedOxA = oxA,
-          rotatedOzA = ozA;
-        if (rotMod === 90 || rotMod === -270) {
-          rotatedOxA = -ozA;
-          rotatedOzA = oxA;
-        } else if (Math.abs(rotMod) === 180) {
-          rotatedOxA = -oxA;
-          rotatedOzA = -ozA;
-        } else if (rotMod === 270 || rotMod === -90) {
-          rotatedOxA = ozA;
-          rotatedOzA = -oxA;
-        }
+        const rotMod = calculateRotMod(ghostRotation);
+        const currentPivot = calculatePivotPosition(
+          movingBrick.position,
+          movingGroupPivot as [number, number, number],
+          currentGhostPos,
+          rotMod,
+        );
 
-        const currentPivotX = currentGhostPos[0] - rotatedOxA;
-        const currentPivotZ = currentGhostPos[2] - rotatedOzA;
-        const currentPivotY =
-          currentGhostPos[1] - (movingBrick!.position[1] - movingGroupPivot[1]);
-
-        const testGroupBricks = movingGroupOriginalBricks.map((b) => {
-          const ox = b.position[0] - movingGroupPivot[0];
-          const oz = b.position[2] - movingGroupPivot[2];
-          let nx = ox,
-            nz = oz;
-          if (rotMod === 90 || rotMod === -270) {
-            nx = -oz;
-            nz = ox;
-          } else if (Math.abs(rotMod) === 180) {
-            nx = -ox;
-            nz = -oz;
-          } else if (rotMod === 270 || rotMod === -90) {
-            nx = oz;
-            nz = -ox;
-          }
-
-          return {
-            ...b,
-            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-            position: [
-              currentPivotX + nx,
-              currentPivotY + (b.position[1] - movingGroupPivot[1]),
-              currentPivotZ + nz,
-            ] as [number, number, number],
-          };
-        });
+        const testGroupBricks = transformBricks(
+          movingGroupOriginalBricks,
+          movingGroupPivot as [number, number, number],
+          currentPivot,
+          rotMod,
+        );
 
         const otherBricks = bricks.filter(
           (b) => !movingGroupOriginalBricks.some((m) => m.id === b.id),
@@ -1679,36 +1558,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       if (!activePreset || !presetBricksData)
         return { valid: false, reason: "inactive" };
       const info = getPresetInfo(activePreset, clipboard);
-      const testPresetBricks = presetBricksData
-        .filter(isValidBrickData)
-        .map((b) => {
-          let ox = b.position[0] - info.cx;
-          let oz = b.position[2] - info.cz;
-          let nx = ox,
-            nz = oz;
+      const rotMod = calculateRotMod(ghostRotation);
 
-          const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
-          if (rotMod === 90 || rotMod === -270) {
-            nx = -oz;
-            nz = ox;
-          } else if (Math.abs(rotMod) === 180) {
-            nx = -ox;
-            nz = -oz;
-          } else if (rotMod === 270 || rotMod === -90) {
-            nx = oz;
-            nz = -ox;
-          }
+      const testPresetBricks = transformBricks(
+        presetBricksData.filter(isValidBrickData),
+        [info.cx, 0, info.cz],
+        currentGhostPos,
+        rotMod,
+      );
 
-          return {
-            ...b,
-            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-            position: [
-              nx + currentGhostPos[0],
-              b.position[1] + currentGhostPos[1],
-              nz + currentGhostPos[2],
-            ] as [number, number, number],
-          };
-        });
       return checkStructureValid(
         bricks,
         testPresetBricks,

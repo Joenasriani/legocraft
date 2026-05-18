@@ -2,6 +2,10 @@ import { create } from "zustand";
 import { audioService } from "./services/audioService";
 import { vrTargetManager } from "./lib/vrTargets";
 import {
+  calculateRotMod,
+  transformBricks,
+} from "./lib/transformUtils";
+import {
   MODULE_SIZE,
   BRICK_HEIGHT,
   STUD_RADIUS,
@@ -1465,36 +1469,21 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     const info = getPresetInfo(activePreset, clipboardBricks);
 
     const groupId = crypto.randomUUID();
-    const presetBricks = validPresetBricks.map((b) => {
-      let ox = b.position[0] - info.cx;
-      let oz = b.position[2] - info.cz;
-      let nx = ox,
-        nz = oz;
+    const rotMod = calculateRotMod(rotation);
+    const newPivot = position; // In commitPreset, position is the target center/pivot
 
-      const rotMod = (Math.round(rotation / 90) * 90) % 360;
-      if (rotMod === 90 || rotMod === -270) {
-        nx = -oz;
-        nz = ox;
-      } else if (Math.abs(rotMod) === 180) {
-        nx = -ox;
-        nz = -oz;
-      } else if (rotMod === 270 || rotMod === -90) {
-        nx = oz;
-        nz = -ox;
-      }
+    const transformed = transformBricks(
+      validPresetBricks,
+      [info.cx, 0, info.cz], // Pivot in original preset space
+      newPivot,
+      rotMod
+    );
 
-      return {
-        ...b,
-        id: crypto.randomUUID(),
-        groupId,
-        rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-        position: [
-          nx + position[0],
-          b.position[1] + position[1],
-          nz + position[2],
-        ] as [number, number, number],
-      };
-    });
+    const presetBricks = transformed.map((b) => ({
+      ...b,
+      id: crypto.randomUUID(),
+      groupId,
+    }));
 
     // STRUCTURE PLACEMENT VALIDATION
     const check = checkStructureValid(
