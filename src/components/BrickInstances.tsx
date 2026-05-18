@@ -227,10 +227,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   }, []);
 
   const material = useMemo(() => {
-    let finalColor = color;
     let finalOpacity = isGhost ? 0.35 : 1;
     if (isGhost && !isValid) {
-      finalColor = "#ff0000";
       finalOpacity = 0.5;
     }
 
@@ -242,7 +240,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       depthWrite: !isGhost,
       depthTest: true,
       toneMapped: !isGhost,
-      color: finalColor,
+      color: color,
     });
   }, [color, isGhost, isValid]);
 
