@@ -1532,7 +1532,13 @@ export default function App() {
                     initial={{ opacity: 0, scale: 0.9, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    className="bg-red-600/90 border border-red-400 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-[0_0_20px_rgba(220,38,38,0.3)] font-bold text-xs sm:text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 self-center mt-2 shrink-0 z-50"
+                    className={`${
+                      toastMessage.toLowerCase().includes("fail") ||
+                      toastMessage.toLowerCase().includes("clear") ||
+                      toastMessage.toLowerCase().includes("could not")
+                        ? "bg-red-600/90 border-red-400 shadow-[0_0_20px_rgba(220,38,38,0.3)]"
+                        : "bg-blue-600/90 border-blue-400 shadow-[0_0_20px_rgba(37,99,235,0.3)]"
+                    } border text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl font-bold text-xs sm:text-sm pointer-events-auto backdrop-blur-md flex items-center gap-2 self-center mt-2 shrink-0 z-50`}
                   >
                     <InfoIcon size={16} />
                     {toastMessage}
@@ -2030,15 +2036,18 @@ export default function App() {
   );
 }
 
-function ToolIconButton({ icon, active, onClick, title }: any) {
+function ToolIconButton({ icon, active, disabled, onClick, title }: any) {
   return (
     <button
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
       title={title}
-      className={`w-11 h-11 sm:w-[60px] sm:h-14 rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer border ${
-        active
-          ? "bg-accent border-white/40 shadow-lg text-white"
-          : "border-transparent text-white/60 hover:bg-white/5 hover:text-white"
+      disabled={disabled}
+      className={`w-11 h-11 sm:w-[60px] sm:h-14 rounded-xl flex flex-col items-center justify-center transition-all border ${
+        disabled
+          ? "opacity-30 cursor-not-allowed border-transparent text-white/40"
+          : active
+          ? "bg-accent border-white/40 shadow-lg text-white hover:bg-accent/80 cursor-pointer"
+          : "border-transparent text-white/60 hover:bg-white/5 hover:text-white cursor-pointer"
       }`}
     >
       <div className="scale-75 sm:scale-100 flex items-center justify-center">

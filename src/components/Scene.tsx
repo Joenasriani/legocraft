@@ -1581,7 +1581,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   } | null>(null);
 
   const isMultiTouchRef = useRef(false);
-  const orbitPivotCandidateRef = useRef<THREE.Vector3 | null>(null);
 
   const handlePointerDown = (e: any) => {
     const isTouch =
@@ -1596,73 +1595,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     const hit = getCanonicalHit(e);
     const hitPoint = hit ? hit.point.clone() : null;
-
-    if (isTouch && touchesCount <= 1) {
-      orbitPivotCandidateRef.current = hitPoint;
-    }
-
-    let isOrbitGesture = false;
-    if (isTouch) {
-      if (touchesCount >= 2) {
-        isOrbitGesture = true;
-      }
-    } else {
-      if (
-        e.button === 1 ||
-        e.button === 2 ||
-        e.nativeEvent?.type === "contextmenu"
-      ) {
-        isOrbitGesture = true;
-      } else if (e.button === 0 && isCameraLocked) {
-        const isMarquee =
-          mode === "Move" && e.object?.name === "Grid" && !isTouch;
-        if (!isMarquee) isOrbitGesture = true;
-      }
-    }
-
-    if (isOrbitGesture && controlsRef.current) {
-      let targetPoint: THREE.Vector3 | null = null;
-          
-      // The target of the camera should be the structure that is in the middle of the screen
-      if (sceneGroupRef.current && camera) {
-        const rc = new THREE.Raycaster();
-        rc.setFromCamera(new THREE.Vector2(0, 0), camera);
-        const centerHits = rc.intersectObject(sceneGroupRef.current, true);
-        for (const h of centerHits) {
-          if (!h.object) continue;
-          let isGhost = false;
-          let isIgnored = false;
-          let ptr: THREE.Object3D | null = h.object;
-          while (ptr) {
-            if (ptr.name === "ghost" || (ptr as any).isPlacementGhost)
-              isGhost = true;
-            if (
-              ptr.name === "GridHelper" ||
-              ptr.name === "VRMenu" ||
-              ptr.name.startsWith("presetPreview")
-            )
-              isIgnored = true;
-            ptr = ptr.parent;
-          }
-          if (!isGhost && !isIgnored && h.object.name !== "GridHelper") {
-            targetPoint = h.point.clone();
-            break;
-          }
-        }
-      }
-
-      // Fallback to the hit point from the pointer gesture if no structure is in the center
-      if (!targetPoint) {
-        targetPoint =
-          isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current
-            ? orbitPivotCandidateRef.current
-            : hitPoint;
-      }
-
-      if (targetPoint) {
-        controlsRef.current.target.copy(targetPoint);
-      }
-    }
 
     const isBrickHit = e.intersections?.some(
       (hitData: any) =>
@@ -2211,7 +2143,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const touches = useMemo(() => {
     if (mode === "Build" || isCameraLocked || activePreset !== null) {
-      return { ONE: undefined as any, TWO: THREE.TOUCH.DOLLY_PAN };
+      const two = cameraMode === "Orbit" ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;
+      return { ONE: undefined as any, TWO: two };
     }
     // We cast undefined as any to bypass Drei's strict typing if it doesn't allow undefined
     switch (cameraMode) {
