@@ -12,7 +12,7 @@ import {
   SHAPE_DEFS,
 } from "./Store";
 import { createXRStore } from "@react-three/xr";
-import { Undo2 as LucideUndo2, Redo2 as LucideRedo2, Blocks as LucideBlocks, Shapes as LucideShapes, LayoutGrid as LucideLayoutGrid, Trash2 as LucideTrash2 } from "lucide-react";
+import { Undo2 as LucideUndo2, Redo2 as LucideRedo2, Blocks as LucideBlocks, Shapes as LucideShapes, LayoutGrid as LucideLayoutGrid, Trash2 as LucideTrash2, Lightbulb as LucideLightbulb } from "lucide-react";
 
 const Scene = lazy(() =>
   import("./components/Scene").then((m) => ({ default: m.Scene })),
@@ -20,6 +20,9 @@ const Scene = lazy(() =>
 const HelpModal = lazy(() => import("./components/HelpModal"));
 const ClearConfirmModal = lazy(() => import("./components/ClearConfirmModal"));
 const PresetMenuOverlay = lazy(() => import("./components/PresetMenuOverlay"));
+const BuildIdeas = lazy(() =>
+  import("./components/BuildIdeas").then((m) => ({ default: m.BuildIdeas })),
+);
 
 const BuildIcon = ({ size = 24 }: { size?: number }) => <LucideBlocks size={size} strokeWidth={2} />;
 
@@ -814,6 +817,7 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(() => {
     return localStorage.getItem("brickxr-help-dismissed") !== "true";
   });
+  const [showBuildIdeas, setShowBuildIdeas] = useState(false);
   const [showPresetMenu, setShowPresetMenu] = useState(false);
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showBrickMenu, setShowBrickMenu] = useState(false);
@@ -1061,6 +1065,7 @@ export default function App() {
           if (showShapesMenu) { setShowShapesMenu(false); menuClosed = true; }
           if (showSaveMenu) { setShowSaveMenu(false); menuClosed = true; }
           if (showHelp) { setShowHelp(false); menuClosed = true; }
+          if (showBuildIdeas) { setShowBuildIdeas(false); menuClosed = true; }
           if (showClearConfirm) { setShowClearConfirm(false); menuClosed = true; }
           if (menuClosed) {
             e.stopPropagation();
@@ -1345,6 +1350,13 @@ export default function App() {
                   </motion.div>
                 </div>
                 <div className="flex flex-nowrap gap-1.5 sm:gap-4 shrink-0 items-center justify-end">
+                  <button
+                    onClick={() => setShowBuildIdeas(true)}
+                    title="Build Ideas"
+                    className="bg-black/40 border border-white/20 text-accent p-1.5 sm:p-2 rounded-lg hover:bg-white/10 transition-colors"
+                  >
+                    <LucideLightbulb size={16} />
+                  </button>
                   <button
                     onClick={() => setShowHelp(true)}
                     title="Show Help"
@@ -2012,6 +2024,10 @@ export default function App() {
               onScreenshot={handleScreenshot}
             />
 
+            <BuildIdeas
+              show={showBuildIdeas}
+              onClose={() => setShowBuildIdeas(false)}
+            />
             <HelpModal
               show={showHelp}
               onClose={() => {
