@@ -48,7 +48,11 @@ export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
     Math.min(a1.maxZ, a2.maxZ) - Math.max(a1.minZ, a2.minZ),
   );
 
-  if (dy > BRICK_HEIGHT + PLACEMENT_EPSILON) return false;
+  const h1 = getBrickHeightUnit(b1.type) * BRICK_HEIGHT;
+  const h2 = getBrickHeightUnit(b2.type) * BRICK_HEIGHT;
+  const maxDy = Math.max(h1, h2);
+
+  if (dy > maxDy + PLACEMENT_EPSILON) return false;
 
   if (dy < PLACEMENT_EPSILON) {
     const touchX =
@@ -112,7 +116,40 @@ export const isValidBrickData = (item: any): boolean => {
   return true;
 };
 
+export interface ShapeDef {
+  id: BrickType;
+  name: string;
+  w: number;
+  d: number;
+  h: number; // height scalar, 1 = BRICK_HEIGHT
+  hasStuds: boolean;
+  allowedRotations: number[];
+  enabled: boolean;
+}
+
+export const SHAPE_DEFS: Record<string, ShapeDef> = {
+  "1x1_round_cylinder": { id: "1x1_round_cylinder", name: "1x1 Round", w: 1, d: 1, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
+  "2x2_round_cylinder": { id: "2x2_round_cylinder", name: "2x2 Round", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
+  "1x1_cone": { id: "1x1_cone", name: "1x1 Cone", w: 1, d: 1, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
+  "2x2_dome": { id: "2x2_dome", name: "2x2 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
+  "1x2_slope": { id: "1x2_slope", name: "1x2 Slope", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "2x2_slope": { id: "2x2_slope", name: "2x2 Slope", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "curved_corner": { id: "curved_corner", name: "Curved Corner", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "arch": { id: "arch", name: "Arch", w: 1, d: 4, h: 1, hasStuds: true, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "quarter_cylinder": { id: "quarter_cylinder", name: "1/4 Cylinder", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "half_cylinder": { id: "half_cylinder", name: "1/2 Cylinder", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "wedge": { id: "wedge", name: "Wedge", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "corner_slope": { id: "corner_slope", name: "Corner Slope", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "inverted_slope": { id: "inverted_slope", name: "Inv Slope", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "quarter_dome": { id: "quarter_dome", name: "1/4 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "half_dome": { id: "half_dome", name: "1/2 Dome", w: 2, d: 4, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+};
+
 export const getBrickDimensions = (type: BrickType) => {
+  if (SHAPE_DEFS[type]) {
+    const ds = SHAPE_DEFS[type];
+    return { w: ds.w, d: ds.d };
+  }
   switch (type) {
     case "1x1": return { w: 1, d: 1 };
     case "1x2": return { w: 1, d: 2 };
@@ -125,24 +162,18 @@ export const getBrickDimensions = (type: BrickType) => {
     case "4x4": return { w: 4, d: 4 };
     case "4x5": return { w: 4, d: 5 };
     case "5x5": return { w: 5, d: 5 };
-    case "1x1_round_cylinder": return { w: 1, d: 1 };
-    case "2x2_round_cylinder": return { w: 2, d: 2 };
-    case "1x1_cone": return { w: 1, d: 1 };
-    case "2x2_dome": return { w: 2, d: 2 };
-    case "1x2_slope": return { w: 1, d: 2 };
-    case "2x2_slope": return { w: 2, d: 2 };
-    case "curved_corner": return { w: 2, d: 2 };
-    case "arch": return { w: 1, d: 4 };
-    case "quarter_cylinder": return { w: 2, d: 2 };
-    case "half_cylinder": return { w: 1, d: 2 };
-    case "wedge": return { w: 2, d: 2 };
-    case "corner_slope": return { w: 2, d: 2 };
-    case "inverted_slope": return { w: 2, d: 2 };
-    case "quarter_dome": return { w: 2, d: 2 };
-    case "half_dome": return { w: 2, d: 4 };
-    default:
-      return { w: 2, d: 2 };
+    default: return { w: 2, d: 2 };
   }
+};
+
+export const getBrickHeightUnit = (type: BrickType) => {
+  if (SHAPE_DEFS[type]) return SHAPE_DEFS[type].h;
+  return 1;
+};
+
+export const hasBrickStuds = (type: BrickType) => {
+  if (SHAPE_DEFS[type]) return SHAPE_DEFS[type].hasStuds;
+  return true;
 };
 
 export interface AABB {
@@ -269,7 +300,8 @@ export const hasBrickAbove = (
   ignoreIds: string[] = [],
   epsilon: number = PLACEMENT_EPSILON,
 ) => {
-  const targetTopY = brick.position[1] + brickHeight;
+  const dynamicHeight = getBrickHeightUnit(brick.type) * brickHeight;
+  const targetTopY = brick.position[1] + dynamicHeight;
 
   // Find bricks exactly one layer above the selected brick
   const bricksDirectlyAbove = bricks.filter(

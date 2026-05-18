@@ -1959,7 +1959,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     bricks.forEach((brick) => {
       if ((mode === "Move" || mode === "Delete") && movingIds.has(brick.id))
         return;
-      const key = `${brick.type}_${brick.color}`;
+      const key = `${brick.type}::${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
     });
@@ -1973,7 +1973,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       movingGroupOriginalBricks.length > 0
     ) {
       movingGroupOriginalBricks.forEach((brick) => {
-        const key = `${brick.type}_${brick.color}`;
+        const key = `${brick.type}::${brick.color}`;
         if (!groups[key]) groups[key] = [];
         groups[key].push(brick);
       });
@@ -1984,7 +1984,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const groupedPresetBricks = useMemo(() => {
     const groups: Record<string, any[]> = {};
     presetBricks.forEach((brick) => {
-      const key = `${brick.type}_${brick.color}`;
+      const key = `${brick.type}::${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
     });
@@ -1994,7 +1994,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const groupedGhostGroupBricks = useMemo(() => {
     const groups: Record<string, any[]> = {};
     ghostGroupBricks.forEach((brick) => {
-      const key = `${brick.type}_${brick.color}`;
+      const key = `${brick.type}::${brick.color}`;
       if (!groups[key]) groups[key] = [];
       groups[key].push(brick);
     });
@@ -2195,7 +2195,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         <group ref={exportGroupRef}>
           {/* Visualized Bricks using InstancedMesh */}
           {Object.entries(groupedBricks).map(([key, group]) => {
-            const [type, color] = key.split("_");
+            const [type, color] = key.split("::");
             return (
               <BrickInstances
                 key={key}
@@ -2250,7 +2250,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                 isDraggingBrick &&
                 placementStatus.valid &&
                 Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
-                  const [type, color] = key.split("_");
+                  const [type, color] = key.split("::");
                   return (
                     <BrickInstances
                       key={`moving-ghost-${key}`}
@@ -2264,7 +2264,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               {/* The original bricks left in place (visual only) */}
               {Object.entries(groupedOriginalSelectedBricks).map(
                 ([key, group]) => {
-                  const [type, color] = key.split("_");
+                  const [type, color] = key.split("::");
                   return (
                     <BrickInstances
                       key={`original-ghost-${key}`}
@@ -2282,7 +2282,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         {!isScreenshotting && activePreset && presetPlacementStatus.valid && (
           <>
             {Object.entries(groupedPresetBricks).map(([key, group]) => {
-              const [type, color] = key.split("_");
+              const [type, color] = key.split("::");
               return (
                 <BrickInstances
                   key={`preset-ghost-${key}`}

@@ -9,6 +9,7 @@ import {
   PresetName,
   getGroupBricks,
   isValidBrickData,
+  SHAPE_DEFS,
 } from "./Store";
 import { createXRStore } from "@react-three/xr";
 import { Undo2 as LucideUndo2, Redo2 as LucideRedo2, Blocks as LucideBlocks, Shapes as LucideShapes, LayoutGrid as LucideLayoutGrid, Trash2 as LucideTrash2 } from "lucide-react";
@@ -590,6 +591,13 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
            <polygon points="12,4 4,20 20,20" />
          </svg>
       );
+    case "quarter_dome":
+      return (
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
+           <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" fill={color} fillOpacity="0.2"/>
+           <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" />
+         </svg>
+      );
     case "half_dome":
       return (
          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
@@ -602,23 +610,11 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
   }
 };
 
-export const SHAPE_OPTIONS = [
-  { id: "1x1_round_cylinder", name: "1x1 Round", supported: true },
-  { id: "2x2_round_cylinder", name: "2x2 Round", supported: true },
-  { id: "1x1_cone", name: "1x1 Cone", supported: true },
-  { id: "2x2_dome", name: "2x2 Dome", supported: true },
-  { id: "1x2_slope", name: "1x2 Slope", supported: true },
-  { id: "2x2_slope", name: "2x2 Slope", supported: true },
-  { id: "curved_corner", name: "Curved Corner", supported: true },
-  { id: "arch", name: "Arch", supported: true },
-  { id: "quarter_cylinder", name: "1/4 Cylinder", supported: true },
-  { id: "half_cylinder", name: "1/2 Cylinder", supported: true },
-  { id: "wedge", name: "Wedge", supported: true },
-  { id: "corner_slope", name: "Corner Slope", supported: true },
-  { id: "inverted_slope", name: "Inv. Slope", supported: true },
-  { id: "quarter_dome", name: "1/4 Dome", supported: false },
-  { id: "half_dome", name: "1/2 Dome", supported: true },
-];
+export const SHAPE_OPTIONS = Object.values(SHAPE_DEFS).map(def => ({
+  id: def.id,
+  name: def.name,
+  supported: def.enabled
+}));
 
 export const PRESET_OPTIONS: {
   id: PresetName;

@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useEffect } from "react";
 import * as THREE from "three";
 import {
   getBrickDimensions,
+  hasBrickStuds,
   useLegoStore,
   hasBrickAbove,
   getGroupBricks,
@@ -237,9 +238,12 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         bevelEnabled: false,
       };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geom.center();
-      geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateX(Math.PI / 2);
+      
+      geom.computeBoundingBox();
+      const alignCenter = new THREE.Vector3();
+      geom.boundingBox?.getCenter(alignCenter);
+      geom.translate(-alignCenter.x, -(geom.boundingBox?.min.y || 0), -alignCenter.z);
     } else if (type === "arch") {
       const shape = new THREE.Shape();
       shape.moveTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2);
@@ -261,29 +265,35 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       geom.rotateY(Math.PI / 2);
     } else if (type === "quarter_cylinder") {
       const shape = new THREE.Shape();
-      const r = MODULE_SIZE - 0.001;
+      const r = Math.min(width, depth) - 0.001; // use full footprint size as radius, assuming w=d
       shape.moveTo(0, 0);
       shape.lineTo(r, 0);
       shape.absarc(0, 0, r, 0, Math.PI / 2, false);
       shape.lineTo(0, 0);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geom.center();
-      // Center of sector is approx (r/3, r/3), we shift it to center of grid space
-      geom.translate(-r/2, BRICK_HEIGHT / 2, -r/2);
       geom.rotateX(Math.PI / 2);
+      
+      geom.computeBoundingBox();
+      const alignCenter = new THREE.Vector3();
+      geom.boundingBox?.getCenter(alignCenter);
+      geom.translate(-alignCenter.x, -(geom.boundingBox?.min.y || 0), -alignCenter.z);
     } else if (type === "half_cylinder") {
       const shape = new THREE.Shape();
-      const r = width / 2 - 0.001;
+      // for w:1 d:2, the radius is depth/2 or width depending on how it's oriented
+      const r = depth / 2 - 0.001;
       shape.moveTo(-r, 0);
       shape.lineTo(r, 0);
       shape.absarc(0, 0, r, 0, Math.PI, false);
       shape.lineTo(-r, 0);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geom.center();
-      geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateX(Math.PI / 2);
+      
+      geom.computeBoundingBox();
+      const alignCenter = new THREE.Vector3();
+      geom.boundingBox?.getCenter(alignCenter);
+      geom.translate(-alignCenter.x, -(geom.boundingBox?.min.y || 0), -alignCenter.z);
     } else if (type === "wedge") {
       const shape = new THREE.Shape();
       shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
@@ -292,9 +302,12 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       shape.lineTo(-width / 2 + 0.001, -depth / 2 + 0.001);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-      geom.center();
-      geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateX(Math.PI / 2);
+      
+      geom.computeBoundingBox();
+      const alignCenter = new THREE.Vector3();
+      geom.boundingBox?.getCenter(alignCenter);
+      geom.translate(-alignCenter.x, -(geom.boundingBox?.min.y || 0), -alignCenter.z);
     } else if (type === "inverted_slope") {
       const shape = new THREE.Shape();
       shape.moveTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
@@ -308,10 +321,30 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       geom.center();
       geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateY(Math.PI / 2);
+    } else if (type === "quarter_dome") {
+      const radius = Math.min(width, depth) - 0.001;
+      geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI / 2, 0, Math.PI / 2);
+      geom.scale(1, BRICK_HEIGHT / radius, 1);
+      
+      // Compute bounding box to center it like other geometries
+      geom.computeBoundingBox();
+      const center = new THREE.Vector3();
+      geom.boundingBox?.getCenter(center);
+      geom.translate(-center.x, -center.y, -center.z);
+      
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateY(Math.PI / 2);
     } else if (type === "half_dome") {
-      const radius = width / 2 - 0.001;
+      const radius = Math.max(width, depth) / 2 - 0.001;
       geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI, 0, Math.PI / 2);
       geom.scale(1, BRICK_HEIGHT / radius, 1);
+      
+      geom.computeBoundingBox();
+      const center = new THREE.Vector3();
+      geom.boundingBox?.getCenter(center);
+      geom.translate(-center.x, -center.y, -center.z);
+      
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateY(Math.PI / 2);
     } else if (type === "corner_slope") {
       // Sloped corner piece
@@ -403,8 +436,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     const count = bricks.length;
 
     let studIndex = 0;
-    const isCustomShape = type.includes("_") || type === "arch" || type === "wedge";
-    const showStuds = !isCustomShape || type === "1x1_round_cylinder" || type === "2x2_round_cylinder" || type === "1x1_cone";
+    const showStuds = hasBrickStuds(type);
 
     for (let i = 0; i < count; i++) {
       const brick = bricks[i];
