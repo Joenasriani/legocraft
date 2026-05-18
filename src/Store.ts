@@ -123,7 +123,18 @@ export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
       (overlapX > PLACEMENT_EPSILON && overlapZ > PLACEMENT_EPSILON)
     );
   } else {
-    return overlapX > PLACEMENT_EPSILON && overlapZ > PLACEMENT_EPSILON;
+    if (overlapX > PLACEMENT_EPSILON && overlapZ > PLACEMENT_EPSILON) {
+      // Determine which brick is on the bottom
+      const b1IsBottom = b2.position[1] > b1.position[1];
+      const bottomBrick = b1IsBottom ? b1 : b2;
+      const bottomH = b1IsBottom ? h1 : h2;
+
+      if (Math.abs(dy - bottomH) <= PLACEMENT_EPSILON || (needsClearance && Math.abs(dy - (bottomH + STUD_HEIGHT)) <= PLACEMENT_EPSILON)) {
+        if (!hasBrickStuds(bottomBrick.type)) return false;
+        return true;
+      }
+    }
+    return false;
   }
 };
 
@@ -268,7 +279,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   "2x2_slope": {
     id: "2x2_slope",
@@ -278,7 +289,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   quarter_cylinder: {
     id: "quarter_cylinder",
@@ -288,7 +299,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   half_cylinder: {
     id: "half_cylinder",
@@ -298,7 +309,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   wedge: {
     id: "wedge",
@@ -308,7 +319,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   "2x2_corner_triangle": {
     id: "2x2_corner_triangle",
@@ -318,7 +329,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   inverted_slope: {
     id: "inverted_slope",
@@ -328,7 +339,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: true,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
   },
   quarter_dome: {
     id: "quarter_dome",
@@ -338,7 +349,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
     needsStudClearance: true,
   },
 };
