@@ -421,20 +421,17 @@ export const HumanViewLayer = ({
 
           if (isFrozenPreview) {
             // Keep frozen
-          } else if (isValidPlacement) {
-            latestValidPlacement.current = {
-              p: unscaledP3,
-              n: normal,
-              tk: targetKind,
-            };
-            updateGhostPosition(unscaledP3, normal, targetKind);
           } else {
-            latestValidPlacement.current = null;
-            updateGhostPosition(
-              new THREE.Vector3(0, -1000, 0),
-              new THREE.Vector3(0, 1, 0),
-              "none",
-            );
+            latestValidPlacement.current = isValidPlacement
+              ? {
+                  p: unscaledP3,
+                  n: normal,
+                  tk: targetKind,
+                }
+              : null;
+            // Always update ghost position if we hit a valid physical target, 
+            // so the user sees feedback even if placement is rejected.
+            updateGhostPosition(unscaledP3, normal, targetKind);
           }
         } // End of placement calc
 

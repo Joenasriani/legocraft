@@ -930,7 +930,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }
       }
 
-      if (targetKind === "brick-side" || targetKind === "brick-bottom") {
+      if (targetKind === "brick-bottom") {
         continue;
       }
 
@@ -2065,7 +2065,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         {!isScreenshotting &&
           mode === "Build" &&
           !activePreset &&
-          placementStatus.valid && (
+          (placementStatus.valid || (ghostPosition[0] !== 0 || ghostPosition[2] !== 0)) && (
             <group>
               <BrickInstances
                 type={selectedType}
@@ -2078,8 +2078,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                   },
                 ]}
                 isGhost
+                isValid={placementStatus.valid}
               />
-              {!xrSessionActive && (
+              {!xrSessionActive && placementStatus.valid && (
                 <mesh
                   position={ghostPosition}
                   rotation={[-Math.PI / 2, 0, 0]}
@@ -2096,7 +2097,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </group>
           )}
 
-        {!isScreenshotting && <SelectionToolbar selectedBricks={movingGroupOriginalBricks} />}
+        {!isScreenshotting && !xrSessionActive && <SelectionToolbar selectedBricks={movingGroupOriginalBricks} />}
 
         {!isScreenshotting &&
           (mode === "Move" || mode === "Delete") &&
@@ -2105,7 +2106,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
               {/* The ghost preview that follows the mouse */}
               {mode === "Move" &&
                 isDraggingBrick &&
-                placementStatus.valid &&
                 Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
                   const [type, color] = key.split("::");
                   return (
@@ -2115,6 +2115,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                       color={color}
                       bricks={group}
                       isGhost
+                      isValid={placementStatus.valid}
                     />
                   );
                 })}
@@ -2136,7 +2137,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </>
           )}
 
-        {!isScreenshotting && activePreset && presetPlacementStatus.valid && (
+        {!isScreenshotting && activePreset && (
           <>
             {Object.entries(groupedPresetBricks).map(([key, group]) => {
               const [type, color] = key.split("::");
@@ -2147,6 +2148,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                   color={color}
                   bricks={group}
                   isGhost
+                  isValid={presetPlacementStatus.valid}
                 />
               );
             })}

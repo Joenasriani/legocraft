@@ -22,6 +22,7 @@ interface BrickInstancesProps {
   color: string;
   bricks: any[];
   isGhost?: boolean;
+  isValid?: boolean;
 }
 
 export const BrickInstances: React.FC<BrickInstancesProps> = ({
@@ -29,6 +30,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   color,
   bricks,
   isGhost,
+  isValid = true,
 }) => {
   const bodyMeshRef = useRef<THREE.InstancedMesh>(null);
   const studMeshRef = useRef<THREE.InstancedMesh>(null);
@@ -225,17 +227,24 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   }, []);
 
   const material = useMemo(() => {
+    let finalColor = color;
+    let finalOpacity = isGhost ? 0.35 : 1;
+    if (isGhost && !isValid) {
+      finalColor = "#ff0000";
+      finalOpacity = 0.5;
+    }
+
     return new THREE.MeshStandardMaterial({
       roughness: 0.0,
       metalness: 0.5,
       transparent: !!isGhost,
-      opacity: isGhost ? 0.35 : 1,
+      opacity: finalOpacity,
       depthWrite: !isGhost,
       depthTest: true,
       toneMapped: !isGhost,
-      color: color,
+      color: finalColor,
     });
-  }, [color, isGhost]);
+  }, [color, isGhost, isValid]);
 
   useEffect(() => {
     return () => {
