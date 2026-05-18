@@ -32,6 +32,7 @@ import {
 } from "../Store";
 
 import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT } from "../constants";
+import { createBrickGeometry, createStudGeometry } from "../lib/geometry";
 
 import { VRRadialMenu } from "./VRRadialMenu";
 import { VRPalette } from "./VRPalette";
@@ -375,68 +376,144 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     useLegoStore.getState().setExportGLB(() => {
-      if (exportGroupRef.current) {
-        import("three/examples/jsm/exporters/GLTFExporter.js").then(
-          ({ GLTFExporter }) => {
-            const exporter = new GLTFExporter();
-            exporter.parse(
-              exportGroupRef.current!,
-              (gltf: any) => {
-                const blob = new Blob([gltf], {
-                  type: "application/octet-stream",
-                });
-                let canUsePicker = false;
-                if ("showSaveFilePicker" in window) {
-                  try {
-                    canUsePicker = window.self === window.top;
-                  } catch (e) {
-                    canUsePicker = false;
-                  }
-                }
-                if (canUsePicker) {
-                  (window as any)
-                    .showSaveFilePicker({
-                      suggestedName: "brick-structure.glb",
-                      types: [
-                        {
-                          description: "GLB Files",
-                          accept: { "model/gltf-binary": [".glb"] },
-                        },
-                      ],
-                    })
-                    .then((handle: any) => handle.createWritable())
-                    .then((writable: any) =>
-                      writable.write(blob).then(() => {
-                        writable.close();
-                        useLegoStore
-                          .getState()
-                          .setToastMessage("Exported GLB successfully.");
-                      }),
-                    )
-                    .catch((e: any) => {
-                      if (e.name !== "AbortError") console.error(e);
-                    });
-                } else {
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  a.href = url;
-                  a.download = "brick-structure.glb";
-                  a.click();
-                  URL.revokeObjectURL(url);
-                  useLegoStore
-                    .getState()
-                    .setToastMessage("Exported GLB successfully.");
-                }
-              },
-              (error) => {
-                console.error("An error happened during GLB export", error);
-                useLegoStore.getState().setToastMessage("Error exporting GLB.");
-              },
-              { binary: true },
-            );
-          },
+      const state = useLegoStore.getState();
+      const allBricks = state.bricks;
+
+      if (!allBricks || allBricks.length === 0) {
+        state.setToastMessage("Warning: No structures to export.");
+        return;
+      }
+
+      const exportGroup = new THREE.Group();
+      exportGroup.name = "ExportGroup";
+
+      const geometries: Record<string, THREE.BufferGeometry> = {};
+      const materials: Record<string, THREE.MeshStandardMaterial> = {};
+
+      let exportedCount = 0;
+
+      for (const brick of allBricks) {
+        const { w, d } = getBrickDimensions(brick.type);
+        const width = w * MODULE_SIZE;
+        const depth = d * MODULE_SIZE;
+
+        let geom = geometries[brick.type];
+        if (!geom) {
+          geom = createBrickGeometry(brick.type, width, depth);
+          geometries[brick.type] = geom;
+        }
+
+        let mat = materials[brick.color];
+        if (!mat) {
+          mat = new THREE.MeshStandardMaterial({
+            color: brick.color,
+            roughness: 0.0,
+            metalness: 0.5,
+          });
+          materials[brick.color] = mat;
+        }
+
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.set(
+          brick.position[0],
+          brick.position[1],
+          brick.position[2],
+        );
+        mesh.rotation.y = (brick.rotation || 0) * (Math.PI / 180);
+        exportGroup.add(mesh);
+
+        if (hasBrickStuds(brick.type)) {
+          let studGeom = geometries["__stud"];
+          if (!studGeom) {
+            studGeom = createStudGeometry();
+            geometries["__stud"] = studGeom;
+          }
+
+          for (let x = 0; x < w; x++) {
+            for (let z = 0; z < d; z++) {
+              const localX = (x - (w - 1) / 2) * MODULE_SIZE;
+              const localZ = (z - (d - 1) / 2) * MODULE_SIZE;
+
+              const studPos = new THREE.Vector3(localX, 0, localZ);
+              studPos.applyEuler(mesh.rotation);
+              studPos.add(mesh.position);
+
+              const studMesh = new THREE.Mesh(studGeom, mat);
+              studMesh.position.copy(studPos);
+              studMesh.rotation.copy(mesh.rotation);
+              exportGroup.add(studMesh);
+            }
+          }
+        }
+        exportedCount++;
+      }
+
+      if (exportedCount !== allBricks.length) {
+        console.warn(
+          `Exported count (${exportedCount}) does not match placed array (${allBricks.length})`,
         );
       }
+
+      import("three/examples/jsm/exporters/GLTFExporter.js").then(
+        ({ GLTFExporter }) => {
+          const exporter = new GLTFExporter();
+          exporter.parse(
+            exportGroup,
+            (gltf: any) => {
+              const blob = new Blob([gltf], {
+                type: "application/octet-stream",
+              });
+              let canUsePicker = false;
+              if ("showSaveFilePicker" in window) {
+                try {
+                  canUsePicker = window.self === window.top;
+                } catch (e) {
+                  canUsePicker = false;
+                }
+              }
+              if (canUsePicker) {
+                (window as any)
+                  .showSaveFilePicker({
+                    suggestedName: "brick-structure.glb",
+                    types: [
+                      {
+                        description: "GLB Files",
+                        accept: { "model/gltf-binary": [".glb"] },
+                      },
+                    ],
+                  })
+                  .then((handle: any) => handle.createWritable())
+                  .then((writable: any) =>
+                    writable.write(blob).then(() => {
+                      writable.close();
+                      useLegoStore
+                        .getState()
+                        .setToastMessage("Exported GLB successfully.");
+                    }),
+                  )
+                  .catch((e: any) => {
+                    if (e.name !== "AbortError") console.error(e);
+                  });
+              } else {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "brick-structure.glb";
+                a.click();
+                URL.revokeObjectURL(url);
+                useLegoStore
+                  .getState()
+                  .setToastMessage("Exported GLB successfully.");
+              }
+            },
+            (error) => {
+              console.error("An error happened during GLB export", error);
+              useLegoStore.getState().setToastMessage("Error exporting GLB.");
+            },
+            { binary: true },
+          );
+        },
+      );
     });
     return () => useLegoStore.getState().setExportGLB(null);
   }, []);
@@ -1544,10 +1621,44 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     if (isOrbitGesture && controlsRef.current) {
-      const targetPoint =
-        isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current
-          ? orbitPivotCandidateRef.current
-          : hitPoint;
+      let targetPoint: THREE.Vector3 | null = null;
+          
+      // The target of the camera should be the structure that is in the middle of the screen
+      if (sceneGroupRef.current && camera) {
+        const rc = new THREE.Raycaster();
+        rc.setFromCamera(new THREE.Vector2(0, 0), camera);
+        const centerHits = rc.intersectObject(sceneGroupRef.current, true);
+        for (const h of centerHits) {
+          if (!h.object) continue;
+          let isGhost = false;
+          let isIgnored = false;
+          let ptr: THREE.Object3D | null = h.object;
+          while (ptr) {
+            if (ptr.name === "ghost" || (ptr as any).isPlacementGhost)
+              isGhost = true;
+            if (
+              ptr.name === "GridHelper" ||
+              ptr.name === "VRMenu" ||
+              ptr.name.startsWith("presetPreview")
+            )
+              isIgnored = true;
+            ptr = ptr.parent;
+          }
+          if (!isGhost && !isIgnored && h.object.name !== "GridHelper") {
+            targetPoint = h.point.clone();
+            break;
+          }
+        }
+      }
+
+      // Fallback to the hit point from the pointer gesture if no structure is in the center
+      if (!targetPoint) {
+        targetPoint =
+          isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current
+            ? orbitPivotCandidateRef.current
+            : hitPoint;
+      }
+
       if (targetPoint) {
         controlsRef.current.target.copy(targetPoint);
       }
@@ -1558,9 +1669,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         hitData.object.name.includes("BrickBody") ||
         hitData.object.name.includes("BrickStud"),
     );
-    if (isBrickHit) {
+    if (isBrickHit && touchesCount <= 1) {
       isBrickInteractionRef.current = true;
       useLegoStore.getState().setIsInteractingWithBrick(true);
+    } else if (touchesCount >= 2) {
+      isBrickInteractionRef.current = false;
+      useLegoStore.getState().setIsInteractingWithBrick(false);
     }
 
     // Check multi-touch
@@ -1610,9 +1724,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // In Move mode, don't snap to pointer on down unless we are already dragging
     if (isBuilding || isPlacingPreset || (isMoving && isDragging)) {
       if (hit) {
-        if (!isCameraLocked && controlsRef.current) {
-          controlsRef.current.enabled = false;
-        }
         e.stopPropagation();
         const position = computePlacementTarget(
           hit.point,
@@ -2069,6 +2180,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [ghostGroupBricks]);
 
   const mouseButtons = useMemo(() => {
+    if (mode === "Build" || isCameraLocked || activePreset !== null) {
+      return {
+        LEFT: undefined as any,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: cameraMode === "Pan" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+      };
+    }
     switch (cameraMode) {
       case "Orbit":
         return {
@@ -2089,9 +2207,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           RIGHT: THREE.MOUSE.ROTATE,
         };
     }
-  }, [cameraMode]);
+  }, [cameraMode, mode, isCameraLocked, activePreset]);
 
   const touches = useMemo(() => {
+    if (mode === "Build" || isCameraLocked || activePreset !== null) {
+      return { ONE: undefined as any, TWO: THREE.TOUCH.DOLLY_PAN };
+    }
     // We cast undefined as any to bypass Drei's strict typing if it doesn't allow undefined
     switch (cameraMode) {
       case "Orbit":
@@ -2104,7 +2225,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         // to avoid "moving" (panning) which confused the user.
         return { ONE: undefined as any, TWO: THREE.TOUCH.DOLLY_PAN };
     }
-  }, [cameraMode]);
+  }, [cameraMode, mode, isCameraLocked, activePreset]);
 
   const cameraZoomTrigger = useLegoStore((state) => state.cameraZoomTrigger);
   const cameraZoomDirection = useLegoStore(
