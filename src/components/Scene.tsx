@@ -1477,10 +1477,51 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   } | null>(null);
 
   const isMultiTouchRef = useRef(false);
+  const orbitPivotCandidateRef = useRef<THREE.Vector3 | null>(null);
 
   const handlePointerDown = (e: any) => {
-    const isBrickHit = e.intersections?.some((hit: any) => 
-      hit.object.name.includes("BrickBody") || hit.object.name.includes("BrickStud")
+    const isTouch =
+      e.pointerType === "touch" ||
+      e.nativeEvent?.pointerType === "touch" ||
+      e.nativeEvent?.type?.includes("touch") ||
+      false;
+
+    const touchesCount = e.nativeEvent?.touches
+      ? e.nativeEvent.touches.length
+      : 0;
+
+    const hit = getCanonicalHit(e);
+    const hitPoint = hit ? hit.point.clone() : null;
+
+    if (isTouch && touchesCount <= 1) {
+      orbitPivotCandidateRef.current = hitPoint;
+    }
+
+    let isOrbitGesture = false;
+    if (isTouch) {
+      if (touchesCount >= 2) {
+        isOrbitGesture = true;
+      }
+    } else {
+      if (e.button === 1 || e.button === 2 || e.nativeEvent?.type === "contextmenu") {
+        isOrbitGesture = true;
+      } else if (e.button === 0 && isCameraLocked) {
+        const isMarquee = mode === "Move" && e.object?.name === "Grid" && !isTouch;
+        if (!isMarquee) isOrbitGesture = true;
+      }
+    }
+
+    if (isOrbitGesture && controlsRef.current) {
+      const targetPoint = (isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current) 
+        ? orbitPivotCandidateRef.current 
+        : hitPoint;
+      if (targetPoint) {
+        controlsRef.current.target.copy(targetPoint);
+      }
+    }
+
+    const isBrickHit = e.intersections?.some((hitData: any) => 
+      hitData.object.name.includes("BrickBody") || hitData.object.name.includes("BrickStud")
     );
     if (isBrickHit) {
       isBrickInteractionRef.current = true;
@@ -1488,9 +1529,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     // Check multi-touch
-    const touchesCount = e.nativeEvent?.touches
-      ? e.nativeEvent.touches.length
-      : 0;
     if (touchesCount >= 2) {
       isMultiTouchRef.current = true;
       pointerDownPos.current = null;
@@ -1506,11 +1544,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
     const coords = getPointerCoords(e);
     if (!coords) return;
-    const isTouch =
-      e.pointerType === "touch" ||
-      e.nativeEvent?.pointerType === "touch" ||
-      e.nativeEvent?.type?.includes("touch") ||
-      false;
 
     if (
       e.object?.name === "Grid" &&
@@ -1541,7 +1574,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     // In Move mode, don't snap to pointer on down unless we are already dragging
     if (isBuilding || isPlacingPreset || (isMoving && isDragging)) {
-      const hit = getCanonicalHit(e);
       if (hit) {
         if (!isCameraLocked && controlsRef.current) {
           controlsRef.current.enabled = false;

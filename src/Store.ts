@@ -10,7 +10,7 @@ import {
 export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5" |
   "1x1_round_cylinder" | "2x2_round_cylinder" | "1x1_cone" | "2x2_cone" | "3x3_cone" | "2x2_dome" | "4x4_dome" | "1x2_slope" | "2x2_slope" |
   "quarter_cylinder" | "half_cylinder" | "wedge" | "2x2_corner_triangle" |
-  "inverted_slope" | "quarter_dome";
+  "inverted_slope" | "quarter_dome" | "corner_slope" | "curved_corner" | "arch" | "half_dome";
 export const BRICK_TYPES: BrickType[] = [
   "1x1", "1x2", "1x3", "2x2", "2x3", "2x4",
   "3x3", "3x4", "4x4", "4x5", "5x5",
@@ -20,7 +20,7 @@ export const ALL_VALID_BRICK_TYPES: BrickType[] = [
   ...BRICK_TYPES,
   "1x1_round_cylinder", "2x2_round_cylinder", "1x1_cone", "2x2_cone", "3x3_cone", "2x2_dome", "4x4_dome", "1x2_slope", "2x2_slope",
   "quarter_cylinder", "half_cylinder", "wedge", "2x2_corner_triangle",
-  "inverted_slope", "quarter_dome"
+  "inverted_slope", "quarter_dome", "corner_slope", "curved_corner", "arch", "half_dome"
 ];
 
 export const PLACEMENT_EPSILON = 0.002;
@@ -162,6 +162,8 @@ export const getBrickDimensions = (type: BrickType) => {
     case "4x4": return { w: 4, d: 4 };
     case "4x5": return { w: 4, d: 5 };
     case "5x5": return { w: 5, d: 5 };
+    case "arch": return { w: 1, d: 4 };
+    case "half_dome": return { w: 2, d: 4 };
     default: return { w: 2, d: 2 };
   }
 };
