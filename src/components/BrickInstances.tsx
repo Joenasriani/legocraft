@@ -195,14 +195,160 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     if (type === "1x1_round_cylinder" || type === "2x2_round_cylinder") {
       const radius = type === "1x1_round_cylinder" ? (MODULE_SIZE / 2) - 0.001 : MODULE_SIZE - 0.001;
       geom = new THREE.CylinderGeometry(radius, radius, BRICK_HEIGHT, 32);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+    } else if (type === "1x1_cone") {
+      const radius = (MODULE_SIZE / 2) - 0.001;
+      const topRadius = radius * 0.4;
+      geom = new THREE.CylinderGeometry(topRadius, radius, BRICK_HEIGHT, 32);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+    } else if (type === "2x2_dome") {
+      const radius = MODULE_SIZE - 0.001;
+      geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+      // SphereGeometry is centered at origin, top hemisphere goes from y=0 to y=radius
+      geom.scale(1, BRICK_HEIGHT / radius, 1);
+      // We don't need to translate because the base is at y=0 and it scales up to BRICK_HEIGHT
+    } else if (type === "1x2_slope" || type === "2x2_slope") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2);
+      shape.lineTo(depth / 2 - 0.001, -BRICK_HEIGHT / 2);
+      const lipHeight = BRICK_HEIGHT * 0.3;
+      shape.lineTo(depth / 2 - 0.001, -BRICK_HEIGHT / 2 + lipHeight);
+      shape.lineTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
+      shape.lineTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2);
+      const extrudeSettings = {
+        depth: width - 0.002,
+        bevelEnabled: false,
+      };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateY(Math.PI / 2);
+    } else if (type === "curved_corner") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
+      shape.lineTo(width / 2 - 0.001, -depth / 2 + 0.001);
+      shape.quadraticCurveTo(
+        width / 2 - 0.001, depth / 2 - 0.001,
+        -width / 2 + 0.001, depth / 2 - 0.001
+      );
+      shape.lineTo(-width / 2 + 0.001, -depth / 2 + 0.001);
+      const extrudeSettings = {
+        depth: BRICK_HEIGHT,
+        bevelEnabled: false,
+      };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateX(Math.PI / 2);
+    } else if (type === "arch") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2);
+      shape.lineTo(depth / 2 - 0.001, -BRICK_HEIGHT / 2);
+      shape.lineTo(depth / 2 - 0.001, BRICK_HEIGHT / 2);
+      shape.lineTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
+      shape.lineTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2);
+      const hole = new THREE.Path();
+      hole.moveTo(-depth / 2 + MODULE_SIZE, -BRICK_HEIGHT / 2);
+      hole.lineTo(-depth / 2 + MODULE_SIZE, 0);
+      hole.absarc(0, 0, depth / 2 - MODULE_SIZE, Math.PI, 0, false);
+      hole.lineTo(depth / 2 - MODULE_SIZE, -BRICK_HEIGHT / 2);
+      hole.lineTo(-depth / 2 + MODULE_SIZE, -BRICK_HEIGHT / 2);
+      shape.holes.push(hole);
+      const extrudeSettings = { depth: width - 0.002, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateY(Math.PI / 2);
+    } else if (type === "quarter_cylinder") {
+      const shape = new THREE.Shape();
+      const r = MODULE_SIZE - 0.001;
+      shape.moveTo(0, 0);
+      shape.lineTo(r, 0);
+      shape.absarc(0, 0, r, 0, Math.PI / 2, false);
+      shape.lineTo(0, 0);
+      const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      // Center of sector is approx (r/3, r/3), we shift it to center of grid space
+      geom.translate(-r/2, BRICK_HEIGHT / 2, -r/2);
+      geom.rotateX(Math.PI / 2);
+    } else if (type === "half_cylinder") {
+      const shape = new THREE.Shape();
+      const r = width / 2 - 0.001;
+      shape.moveTo(-r, 0);
+      shape.lineTo(r, 0);
+      shape.absarc(0, 0, r, 0, Math.PI, false);
+      shape.lineTo(-r, 0);
+      const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateX(Math.PI / 2);
+    } else if (type === "wedge") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
+      shape.lineTo(width / 2 - 0.001, -depth / 2 + 0.001);
+      shape.lineTo(-width / 2 + 0.001, depth / 2 - 0.001);
+      shape.lineTo(-width / 2 + 0.001, -depth / 2 + 0.001);
+      const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateX(Math.PI / 2);
+    } else if (type === "inverted_slope") {
+      const shape = new THREE.Shape();
+      shape.moveTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
+      shape.lineTo(depth / 2 - 0.001, BRICK_HEIGHT / 2);
+      shape.lineTo(depth / 2 - 0.001, -BRICK_HEIGHT / 2);
+      const lipHeight = BRICK_HEIGHT * 0.3;
+      shape.lineTo(-depth / 2 + 0.001, -BRICK_HEIGHT / 2 + lipHeight);
+      shape.lineTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
+      const extrudeSettings = { depth: width - 0.002, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateY(Math.PI / 2);
+    } else if (type === "half_dome") {
+      const radius = width / 2 - 0.001;
+      geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI, 0, Math.PI / 2);
+      geom.scale(1, BRICK_HEIGHT / radius, 1);
+      geom.rotateY(Math.PI / 2);
+    } else if (type === "corner_slope") {
+      // Sloped corner piece
+      geom = new THREE.BoxGeometry(width - 0.002, BRICK_HEIGHT, depth - 0.002);
+      // Wait we don't need box
+      const w = width - 0.002;
+      const d = depth - 0.002;
+      const h = BRICK_HEIGHT;
+      // It's a pyramid basically. 
+      const bGeom = new THREE.BufferGeometry();
+      const vertices = new Float32Array([
+         -w/2, 0, -d/2, // 0: bottom back left
+          w/2, 0, -d/2, // 1: bottom back right
+          w/2, 0,  d/2, // 2: bottom front right
+         -w/2, 0,  d/2, // 3: bottom front left
+         -w/2, h, -d/2, // 4: top tip
+      ]);
+      const indices = [
+         0, 1, 4,
+         1, 2, 4,
+         2, 3, 4,
+         3, 0, 4,
+         0, 3, 2,  
+         0, 2, 1
+      ];
+      bGeom.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+      bGeom.setIndex(indices);
+      bGeom.computeVertexNormals();
+      geom = bGeom;
     } else {
       geom = new THREE.BoxGeometry(
         width - 0.002,
         BRICK_HEIGHT,
         depth - 0.002,
       );
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     }
-    geom.translate(0, BRICK_HEIGHT / 2, 0);
     geom.computeBoundsTree();
     return geom;
   }, [width, depth, type]);
@@ -257,6 +403,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     const count = bricks.length;
 
     let studIndex = 0;
+    const isCustomShape = type.includes("_") || type === "arch" || type === "wedge";
+    const showStuds = !isCustomShape || type === "1x1_round_cylinder" || type === "2x2_round_cylinder" || type === "1x1_cone";
 
     for (let i = 0; i < count; i++) {
       const brick = bricks[i];
@@ -273,18 +421,20 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
         bodyMesh.setMatrixAt(i, matrix);
 
         // Place studs
-        for (let x = 0; x < w; x++) {
-          for (let z = 0; z < d; z++) {
-            const localX = (x - (w - 1) / 2) * MODULE_SIZE;
-            const localZ = (z - (d - 1) / 2) * MODULE_SIZE;
+        if (showStuds) {
+          for (let x = 0; x < w; x++) {
+            for (let z = 0; z < d; z++) {
+              const localX = (x - (w - 1) / 2) * MODULE_SIZE;
+              const localZ = (z - (d - 1) / 2) * MODULE_SIZE;
 
-            studPos.set(localX, 0, localZ);
-            studPos.applyQuaternion(quaternion);
-            studPos.add(position);
+              studPos.set(localX, 0, localZ);
+              studPos.applyQuaternion(quaternion);
+              studPos.add(position);
 
-            studMatrix.compose(studPos, quaternion, scale);
-            studMesh.setMatrixAt(studIndex, studMatrix);
-            studIndex++;
+              studMatrix.compose(studPos, quaternion, scale);
+              studMesh.setMatrixAt(studIndex, studMatrix);
+              studIndex++;
+            }
           }
         }
       }
@@ -297,7 +447,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     studMesh.computeBoundingSphere();
 
     bodyMesh.count = count;
-    studMesh.count = Math.max(0, count * w * d);
+    studMesh.count = showStuds ? Math.max(0, count * w * d) : 0;
 
     // Store bricks on userData so custom raycasters can retrieve them
     bodyMesh.userData.bricks = bricks;
