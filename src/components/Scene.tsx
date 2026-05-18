@@ -173,16 +173,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   useEffect(() => {
     if (xrSessionActive) {
+      // Compile scene once per XR session start to reduce shader stutter
+      try {
+        gl.compile(scene, camera);
+      } catch (e) {
+        console.warn("[BrickXR] VR shader pre-compile warning:", e);
+      }
+
       let rafId: number;
 
       const checkReady = async () => {
-        // Compile scene to reduce shader stutter
-        try {
-          gl.compile(scene, camera);
-        } catch (e) {
-          console.warn("[BrickXR] VR shader pre-compile warning:", e);
-        }
-
         const targets = vrTargetManager.getValidTargets();
         const hasFloor = targets.some((t) => t.name === "VRFloorCollider");
 
