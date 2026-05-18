@@ -26,15 +26,16 @@ export const VROnboarding = () => {
   });
 
   const instructions = [
-    { key: "Right Trigger", action: "Click / Confirm" },
-    { key: "Right Grip", action: "Select / Move" },
-    { key: "A", action: "Rotate" },
-    { key: "B", action: "Cancel / Close" },
-    { key: "Left Stick", action: "Move around" },
-    { key: "Left X / Y", action: "Menus" },
+    { key: "Right Trigger", action: "Place / Confirm" },
+    { key: "Right Grip", action: "Pick Up / Move" },
+    { key: "A (Right)", action: "Rotate Brick" },
+    { key: "B (Right)", action: "Delete / Cancel" },
+    { key: "Left Stick", action: "Move & Strafe" },
+    { key: "Right Stick", action: "Snap Turn" },
+    { key: "X / Y (Left)", action: "Menus / Palette" },
   ];
 
-  const subtext = "Smooth Locomotion: use the left stick to move. Right Stick is disabled.";
+  const subtext = "Focus on the floor to move or turn. Use Left Stick to navigate.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
@@ -46,10 +47,10 @@ export const VROnboarding = () => {
   }, [closeXRPanel]);
 
   return (
-    <group ref={groupRef} position={[0, 100, 0]}>
+    <group ref={groupRef} position={[0, 100, 0]} scale={0.6}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.4, 2.2]} />
-        <meshBasicMaterial color="#111111" transparent opacity={0.85} depthWrite={false} />
+        <meshBasicMaterial color="#111111" transparent opacity={0.9} depthWrite={false} />
       </mesh>
       <Text
         position={[0, 0.9, 0]}

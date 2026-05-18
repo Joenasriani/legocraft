@@ -18,6 +18,12 @@ class VRTargetManager {
     this.targets = this.targets.filter((t) => t !== obj);
   }
 
+  clearBrickTargets() {
+    this.targets = this.targets.filter(
+      (t) => t.name === "VRFloorCollider"
+    );
+  }
+
   getValidTargets(): THREE.Object3D[] {
     // Filter every frame to ensure we only raycast objects that are actually in the scene graph.
     // This avoids caching bugs where objects are temporarily detached during React renders.

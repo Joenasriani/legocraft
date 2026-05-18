@@ -1,24 +1,9 @@
 import React, { useRef, useState, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import { useLegoStore, BRICK_TYPES } from "../Store";
+import { useLegoStore, BRICK_TYPES, LEGO_COLORS } from "../Store";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 import { vrTargetManager } from "../lib/vrTargets";
-
-const PRESET_COLORS = [
-  "#ff0000",
-  "#00ff00",
-  "#0000ff",
-  "#ffff00",
-  "#ff00ff",
-  "#00ffff",
-  "#ffffff",
-  "#888888",
-  "#222222",
-  "#8b4513",
-  "#ffa500",
-  "#800080",
-];
 
 const createTextTexture = (text: string, color: string, bgColor: string) => {
   const canvas = document.createElement("canvas");
@@ -152,7 +137,7 @@ export const VRPalette = () => {
 
       {/* Colors Grid */}
       <group position={[-0.12, 0.05, 0]}>
-        {PRESET_COLORS.map((color, i) => {
+        {LEGO_COLORS.map((color, i) => {
           const col = i % 4;
           const row = Math.floor(i / 4);
           return (

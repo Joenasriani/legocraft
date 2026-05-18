@@ -7,11 +7,22 @@ import {
   HALF_MODULE,
 } from "./constants";
 
-export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5";
+export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5" |
+  "1x1_round_cylinder" | "2x2_round_cylinder" | "1x1_cone" | "2x2_dome" | "1x2_slope" | "2x2_slope" |
+  "curved_corner" | "arch" | "quarter_cylinder" | "half_cylinder" | "wedge" | "corner_slope" |
+  "inverted_slope" | "quarter_dome" | "half_dome";
 export const BRICK_TYPES: BrickType[] = [
   "1x1", "1x2", "1x3", "2x2", "2x3", "2x4",
   "3x3", "3x4", "4x4", "4x5", "5x5",
 ];
+
+export const ALL_VALID_BRICK_TYPES: BrickType[] = [
+  ...BRICK_TYPES,
+  "1x1_round_cylinder", "2x2_round_cylinder", "1x1_cone", "2x2_dome", "1x2_slope", "2x2_slope",
+  "curved_corner", "arch", "quarter_cylinder", "half_cylinder", "wedge", "corner_slope",
+  "inverted_slope", "quarter_dome", "half_dome"
+];
+
 export const PLACEMENT_EPSILON = 0.002;
 
 export interface BrickData {
@@ -86,7 +97,7 @@ export const getGroupBricks = (
 export const isValidBrickData = (item: any): boolean => {
   if (!item || typeof item !== "object") return false;
   if (typeof item.id !== "string") return false;
-  if (!BRICK_TYPES.includes(item.type)) return false;
+  if (!ALL_VALID_BRICK_TYPES.includes(item.type)) return false;
   if (typeof item.color !== "string") return false;
   if (
     !Array.isArray(item.position) ||
@@ -114,6 +125,21 @@ export const getBrickDimensions = (type: BrickType) => {
     case "4x4": return { w: 4, d: 4 };
     case "4x5": return { w: 4, d: 5 };
     case "5x5": return { w: 5, d: 5 };
+    case "1x1_round_cylinder": return { w: 1, d: 1 };
+    case "2x2_round_cylinder": return { w: 2, d: 2 };
+    case "1x1_cone": return { w: 1, d: 1 };
+    case "2x2_dome": return { w: 2, d: 2 };
+    case "1x2_slope": return { w: 1, d: 2 };
+    case "2x2_slope": return { w: 2, d: 2 };
+    case "curved_corner": return { w: 2, d: 2 };
+    case "arch": return { w: 1, d: 4 };
+    case "quarter_cylinder": return { w: 2, d: 2 };
+    case "half_cylinder": return { w: 1, d: 2 };
+    case "wedge": return { w: 2, d: 2 };
+    case "corner_slope": return { w: 2, d: 2 };
+    case "inverted_slope": return { w: 2, d: 2 };
+    case "quarter_dome": return { w: 2, d: 2 };
+    case "half_dome": return { w: 2, d: 4 };
     default:
       return { w: 2, d: 2 };
   }
@@ -343,6 +369,8 @@ interface LegoStore {
   toastMessage: string | null;
   movingBrickId: string | null;
   isDraggingBrick: boolean;
+  isInteractingWithBrick: boolean;
+  setIsInteractingWithBrick: (val: boolean) => void;
 
   justSelectedBrick: boolean;
   setJustSelectedBrick: (val: boolean) => void;
@@ -451,6 +479,10 @@ const COLORS = [
   "#00AD3C", // Green
   "#8B4513", // Wood/Brown
   "#9CA3AF", // Grey
+  "#FF1493", // Pink
+  "#A020F0", // Purple
+  "#FFA500", // Orange
+  "#008080", // Teal
 ];
 
 const ms = MODULE_SIZE;
@@ -744,6 +776,8 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   toastTimeoutId: null,
   movingBrickId: null,
   isDraggingBrick: false,
+  isInteractingWithBrick: false,
+  setIsInteractingWithBrick: (val) => set({ isInteractingWithBrick: val }),
   justSelectedBrick: false,
   clipboardBricks: [],
   setClipboardBricks: (bricks) => set({ clipboardBricks: bricks }),
@@ -1057,12 +1091,26 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   },
 
   clearAll: () => {
-    const { bricks, undoStack } = get();
     set({
-      undoStack: pushHistory(undoStack, bricks),
+      undoStack: [],
       redoStack: [],
       bricks: [],
+      movingBrickId: null,
+      isDraggingBrick: false,
+      multiSelectedBrickIds: [],
+      clipboardBricks: [],
+      activePreset: null,
+      justSelectedBrick: false,
     });
+    
+    // Clear any stale VR targets for bricks
+    try {
+      const { vrTargetManager } = require("./lib/vrTargets");
+      vrTargetManager.clearBrickTargets();
+    } catch (e) {
+      console.warn("Could not clear VR targets", e);
+    }
+
     scheduleSave([], true);
   },
 

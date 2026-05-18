@@ -486,6 +486,23 @@ const ScreenshotIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
+const ShapesIcon = ({ size = 24 }: { size?: number }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M4.5 3h15a1.5 1.5 0 0 1 1.5 1.5v15a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5v-15A1.5 1.5 0 0 1 4.5 3z" />
+    <path d="M3 9h18" />
+    <path d="M9 21V9" />
+  </svg>
+);
+
 const HorseIcon = ({ size = 24 }: { size?: number }) => (
   <svg
     width={size}
@@ -574,6 +591,24 @@ const MountainIcon = ({ size = 24 }: { size?: number }) => (
     <path d="M8 3l4 8 5-5 5 15H2L8 3z" />
   </svg>
 );
+
+const SHAPE_OPTIONS = [
+  { id: "1x1_round_cylinder", name: "1x1 Round", supported: true },
+  { id: "2x2_round_cylinder", name: "2x2 Round", supported: true },
+  { id: "1x1_cone", name: "1x1 Cone", supported: false },
+  { id: "2x2_dome", name: "2x2 Dome", supported: false },
+  { id: "1x2_slope", name: "1x2 Slope", supported: false },
+  { id: "2x2_slope", name: "2x2 Slope", supported: false },
+  { id: "curved_corner", name: "Curved Corner", supported: false },
+  { id: "arch", name: "Arch", supported: false },
+  { id: "quarter_cylinder", name: "1/4 Cylinder", supported: false },
+  { id: "half_cylinder", name: "1/2 Cylinder", supported: false },
+  { id: "wedge", name: "Wedge", supported: false },
+  { id: "corner_slope", name: "Corner Slope", supported: false },
+  { id: "inverted_slope", name: "Inv. Slope", supported: false },
+  { id: "quarter_dome", name: "1/4 Dome", supported: false },
+  { id: "half_dome", name: "1/2 Dome", supported: false },
+];
 
 const PRESET_OPTIONS: {
   id: PresetName;
@@ -772,6 +807,8 @@ export default function App() {
     setSelectedType,
     selectedColor,
     setSelectedColor,
+    undoStack,
+    redoStack,
     undo,
     redo,
     clearAll,
@@ -792,6 +829,8 @@ export default function App() {
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showBrickMenu, setShowBrickMenu] = useState(false);
   const brickMenuRef = React.useRef<HTMLDivElement>(null);
+  const [showShapesMenu, setShowShapesMenu] = useState(false);
+  const shapesMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
   const saveMenuRef = React.useRef<HTMLDivElement>(null);
   const sKeyTracker = useRef<{ count: number, timeout: any }>({ count: 0, timeout: null });
@@ -849,6 +888,13 @@ export default function App() {
         setShowBrickMenu(false);
       }
       if (
+        showShapesMenu &&
+        shapesMenuRef.current &&
+        !shapesMenuRef.current.contains(e.target as Node)
+      ) {
+        setShowShapesMenu(false);
+      }
+      if (
         showSaveMenu &&
         saveMenuRef.current &&
         !saveMenuRef.current.contains(e.target as Node)
@@ -856,11 +902,11 @@ export default function App() {
         setShowSaveMenu(false);
       }
     };
-    if (showPresetMenu || showSaveMenu || showBrickMenu) {
+    if (showPresetMenu || showSaveMenu || showBrickMenu || showShapesMenu) {
       window.addEventListener("pointerdown", handleGlobalClick);
       return () => window.removeEventListener("pointerdown", handleGlobalClick);
     }
-  }, [showPresetMenu, showSaveMenu, showBrickMenu]);
+  }, [showPresetMenu, showSaveMenu, showBrickMenu, showShapesMenu]);
 
   // Load save on startup
   useEffect(() => {
@@ -991,6 +1037,7 @@ export default function App() {
             if (!prev) {
               setShowPresetMenu(false);
               setShowSaveMenu(false);
+              setShowShapesMenu(false);
             }
             return !prev;
           });
@@ -1022,6 +1069,7 @@ export default function App() {
           let menuClosed = false;
           if (showPresetMenu) { setShowPresetMenu(false); menuClosed = true; }
           if (showBrickMenu) { setShowBrickMenu(false); menuClosed = true; }
+          if (showShapesMenu) { setShowShapesMenu(false); menuClosed = true; }
           if (showSaveMenu) { setShowSaveMenu(false); menuClosed = true; }
           if (showHelp) { setShowHelp(false); menuClosed = true; }
           if (showClearConfirm) { setShowClearConfirm(false); menuClosed = true; }
@@ -1524,19 +1572,22 @@ export default function App() {
                       icon={<BuildIcon size={24} />}
                       active={mode === "Build"}
                       onClick={() => {
-                        if (mode !== "Build") {
-                          setMode("Build");
-                          setShowBrickMenu(true);
-                        } else {
-                          setShowBrickMenu(!showBrickMenu);
-                        }
+                        setMode("Build");
+                        setShowBrickMenu(false);
+                        setShowShapesMenu(false);
+                        setShowPresetMenu(false);
                       }}
                       title="Build Mode"
                     />
                     <ToolIconButton
                       icon={<MoveIcon size={24} />}
                       active={mode === "Move"}
-                      onClick={() => setMode("Move")}
+                      onClick={() => {
+                        setMode("Move");
+                        setShowBrickMenu(false);
+                        setShowShapesMenu(false);
+                        setShowPresetMenu(false);
+                      }}
                       title="Move Mode"
                     />
                     <ToolIconButton
@@ -1583,6 +1634,9 @@ export default function App() {
                           state.setIsDraggingBrick(false);
                         } else {
                           setMode("Delete");
+                          setShowBrickMenu(false);
+                          setShowShapesMenu(false);
+                          setShowPresetMenu(false);
                         }
                       }}
                       title="Delete Mode"
@@ -1715,6 +1769,46 @@ export default function App() {
                   </motion.div>
                 )}
 
+                {mode === "Build" && !activePreset && showShapesMenu && (
+                  <motion.div
+                    ref={shapesMenuRef}
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: 20, opacity: 0 }}
+                    className="glass-panel p-3 sm:p-4 rounded-2xl pointer-events-auto flex flex-col gap-2 shadow-2xl min-w-[280px] max-h-[60vh] overflow-y-auto"
+                  >
+                    <div className="text-white/40 text-[10px] sm:text-xs font-bold uppercase tracking-widest px-1 sticky top-0 bg-[#1a1a1a]/90 backdrop-blur-sm z-10 py-1">
+                      Special Shapes
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      {SHAPE_OPTIONS.map((shape) => (
+                        <button
+                          key={shape.id}
+                          disabled={!shape.supported}
+                          onClick={() => {
+                            if (shape.supported) {
+                              setSelectedType(shape.id as any);
+                              setShowShapesMenu(false);
+                            }
+                          }}
+                          className={`border p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors ${
+                            !shape.supported
+                              ? "bg-white/5 border-white/5 opacity-40 grayscale cursor-not-allowed"
+                              : selectedType === shape.id
+                              ? "bg-accent/20 border-accent/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                              : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                          }`}
+                        >
+                          <div className={`w-8 h-8 rounded-sm rotate-45 ${shape.supported ? 'bg-accent/60' : 'bg-white/20'}`} />
+                          <span className={`text-[10px] font-bold ${shape.supported ? 'text-white' : 'text-white/60'}`}>
+                            {shape.name}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
                 {mode === "Build" && activePreset && (
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
@@ -1746,8 +1840,9 @@ export default function App() {
                 <div className="flex gap-1.5 sm:gap-2 shrink-0">
                   <button
                     onClick={undo}
+                    disabled={undoStack.length === 0}
                     title="Undo"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${undoStack.length === 0 ? "opacity-50 cursor-not-allowed bg-black/20 border-white/5 text-white/30" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
                   >
                     <UndoIcon size={18} />
                     <span className="hidden sm:inline text-[13px] font-semibold">
@@ -1756,8 +1851,9 @@ export default function App() {
                   </button>
                   <button
                     onClick={redo}
+                    disabled={redoStack.length === 0}
                     title="Redo"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-white/5 border border-glass-border rounded-xl hover:bg-white/10 transition-colors text-white/80 hover:text-white"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${redoStack.length === 0 ? "opacity-50 cursor-not-allowed bg-black/20 border-white/5 text-white/30" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
                   >
                     <RedoIcon size={18} />
                     <span className="hidden sm:inline text-[13px] font-semibold">
@@ -1769,15 +1865,68 @@ export default function App() {
                 <div className="w-px h-6 bg-glass-border shrink-0" />
 
                 <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
-                  <div className="relative flex items-center">
+                  <div className="relative flex gap-1.5 sm:gap-2 items-center">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setShowPresetMenu(!showPresetMenu);
+                        if (showBrickMenu) {
+                          setShowBrickMenu(false);
+                        } else {
+                          setShowBrickMenu(true);
+                          setShowShapesMenu(false);
+                          setShowPresetMenu(false);
+                          setShowSaveMenu(false);
+                          if (mode !== "Build") setMode("Build");
+                        }
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      title="Bricks"
+                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showBrickMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
+                    >
+                      <BuildIcon size={18} />
+                      <span className="hidden sm:inline text-[13px] font-semibold">
+                        Bricks
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (showShapesMenu) {
+                          setShowShapesMenu(false);
+                        } else {
+                          setShowShapesMenu(true);
+                          setShowBrickMenu(false);
+                          setShowPresetMenu(false);
+                          setShowSaveMenu(false);
+                          if (mode !== "Build") setMode("Build");
+                        }
+                      }}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      title="Shapes"
+                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showShapesMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
+                    >
+                      <ShapesIcon size={18} />
+                      <span className="hidden sm:inline text-[13px] font-semibold">
+                        Shapes
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (showPresetMenu) {
+                          setShowPresetMenu(false);
+                        } else {
+                          setShowPresetMenu(true);
+                          setShowBrickMenu(false);
+                          setShowShapesMenu(false);
+                          setShowSaveMenu(false);
+                        }
                       }}
                       onPointerDown={(e) => e.stopPropagation()}
                       title="Toggle Presets Menu"
-                      className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-emerald-500/10 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition-colors text-emerald-400 hover:text-emerald-300"
+                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showPresetMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
                     >
                       <PresetsIcon size={18} />
                       <span className="hidden sm:inline text-[13px] font-semibold">
@@ -1796,8 +1945,9 @@ export default function App() {
                         setShowClearConfirm(true);
                       }
                     }}
+                    disabled={bricks.length === 0}
                     title="Clear all bricks"
-                    className="w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors text-red-400 hover:text-red-300"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${bricks.length === 0 ? "opacity-50 cursor-not-allowed bg-black/20 border-white/5 text-white/30" : "bg-white/5 border-glass-border hover:bg-white/10 text-white/80 hover:text-white"}`}
                   >
                     <ClearIcon size={18} />
                     <span className="hidden sm:inline text-[13px] font-semibold">

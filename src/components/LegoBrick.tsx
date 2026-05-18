@@ -39,6 +39,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   const depth = d * MODULE_SIZE;
 
   const handleSelectStart = (e: any) => {
+    useLegoStore.getState().setIsInteractingWithBrick(true);
     if (mode === "Delete") {
       e.stopPropagation();
       removeBrick(id);
@@ -50,6 +51,7 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
   };
 
   const handleSelectEnd = (e: any) => {
+    useLegoStore.getState().setIsInteractingWithBrick(false);
     if (isGrabbed) {
       e.stopPropagation();
       setIsGrabbed(false);

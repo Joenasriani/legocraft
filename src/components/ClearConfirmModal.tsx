@@ -30,7 +30,7 @@ const ClearConfirmModal = ({
               Clear all bricks?
             </h3>
             <p className="text-white/70 text-sm mb-6">
-              This can be undone if you have a save.
+              This cannot be undone. Clearing the scene will remove all bricks from the current workspace.
             </p>
             <div className="flex gap-3 w-full">
               <button

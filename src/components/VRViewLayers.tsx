@@ -131,18 +131,30 @@ export const HumanViewLayer = ({
     let rightInput: XRInputSource | null = null;
 
     const inputSourcesArray = Array.from(xrState.inputSourceStates);
+    
+    // Improved detection: find by handedness first, then check if it is a controller (not a hand)
     let rightState = inputSourcesArray.find(
-      (s) => s.type === "controller" && s.inputSource.handedness === "right",
+      (s) => s.inputSource.handedness === "right" && !s.inputSource.hand,
     ) as any;
     let leftState = inputSourcesArray.find(
-      (s) => s.type === "controller" && s.inputSource.handedness === "left",
+      (s) => s.inputSource.handedness === "left" && !s.inputSource.hand,
     ) as any;
 
-    if (!rightState && !leftState && inputSourcesArray.length >= 2) {
-      leftState = inputSourcesArray[0];
-      rightState = inputSourcesArray[1];
-    } else if (!rightState && inputSourcesArray.length === 1) {
-      rightState = inputSourcesArray[0];
+    if (isDebugXR) {
+      const now = Date.now();
+      if (!(window as any)._lastVRLaserLog || now - (window as any)._lastVRLaserLog > 1000) {
+        (window as any)._lastVRLaserLog = now;
+        console.log("[VR] Controller Match:", {
+          leftFound: !!leftState,
+          rightFound: !!rightState,
+          rightObjName: rightState?.object?.name || "none",
+          leftObjName: leftState?.object?.name || "none",
+          inputSources: inputSourcesArray.map(s => ({
+            handedness: s.inputSource.handedness,
+            profiles: s.inputSource.profiles
+          }))
+        });
+      }
     }
 
     if (rightState) {
@@ -218,6 +230,20 @@ export const HumanViewLayer = ({
           store.setXRPanel("none");
           handled = true;
         } else if (store.mode === "Move" && store.movingBrickId) {
+          const targetBrickId = store.movingBrickId;
+          const targetBrick = store.bricks.find((b) => b.id === targetBrickId);
+          
+          if (targetBrick) {
+            if (store.selectionMode === "Group") {
+              const g = getGroupBricks(targetBrick, store.bricks);
+              store.removeBricks(g.map((bz) => bz.id));
+            } else if (store.selectionMode === "Multi") {
+              store.removeBricks(store.multiSelectedBrickIds);
+            } else {
+              store.removeBrick(targetBrickId);
+            }
+          }
+          
           store.setMovingBrickId(null);
           store.setIsDraggingBrick(false);
           store.setMode("Build");
@@ -226,8 +252,8 @@ export const HumanViewLayer = ({
             new THREE.Vector3(0, 1, 0),
             "none",
           );
-          triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-          audioService.playSelect();
+          triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+          audioService.playDelete();
           handled = true;
         } else if (store.mode !== "Build") {
           store.setMode("Build");
@@ -276,6 +302,14 @@ export const HumanViewLayer = ({
     if (hasRightPose && rightInput && rightInput.gamepad) {
       const pos = controllerPos;
       const fwd = controllerFwd;
+      
+      // Update laser visual immediately if we have a pose
+      if (laserRef.current) {
+        laserRef.current.visible = true;
+        laserRef.current.position.copy(pos);
+        laserRef.current.quaternion.copy(controllerQuat);
+      }
+      
       raycaster.set(pos, fwd);
 
       const targets = vrTargetManager.getValidTargets();
@@ -814,11 +848,8 @@ export const HumanViewLayer = ({
         }
       }
 
-      // Render laser
+      // Render laser (removed redundant assignment, handled above for responsiveness)
       if (laserRef.current) {
-        laserRef.current.visible = true;
-        laserRef.current.position.copy(pos);
-        laserRef.current.quaternion.copy(controllerQuat);
         laserRef.current.scale.set(1, 1, laserDistance);
       }
 
@@ -871,12 +902,11 @@ export const HumanViewLayer = ({
 
       if (isDebugXR && debugTextRef.current) {
         debugTextRef.current.text = [
-          `xrPanel: ${useLegoStore.getState().xrPanel} | vrReady: true`,
-          `L-Ctrl: ${!!leftController} | R-Ctrl: ${!!rightController}`,
+          `L-Ctrl: ${!!leftController} | R-Ctrl: ${!!rightController} | R-Obj: ${rightController?.name || "none"}`,
+          `R-Stick: ${rightInput?.gamepad?.axes.map(a => a.toFixed(2)).join(",")}`,
           `X:${wasXPressed.current} Y:${wasYPressed.current} A:${actionPressed} B:${wasBPressed.current} Trg:${triggerPressed} Grp:${squeezePressed}`,
           `Hit: ${hit ? hit.object.name : "none"}`,
-          `isMenuItem: ${hit ? !!hitMenuLabel : false} | PlacementValid: ${latestValidPlacement.current ? "yes" : "no"}`,
-          `latestHitMenuItem: ${latestHit.current?.hitMenuItem} | HitLoc: ${!!latestHit.current?.hitLoc}`,
+          `PlacementValid: ${latestValidPlacement.current ? "yes" : "no"}`,
         ].join("\n");
       }
     } else {

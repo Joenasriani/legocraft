@@ -49,6 +49,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
   const handlePointerDown = (e: any) => {
     if (isGhost) return;
+    useLegoStore.getState().setIsInteractingWithBrick(true);
 
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === "contextmenu";
     if (mode === "Delete" || mode === "Move" || isSqueeze) {
@@ -190,15 +191,21 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
   const studCapacity = MAX_CAPACITY * w * d;
 
   const bodyGeom = useMemo(() => {
-    const geom = new THREE.BoxGeometry(
-      width - 0.002,
-      BRICK_HEIGHT,
-      depth - 0.002,
-    );
+    let geom: THREE.BufferGeometry;
+    if (type === "1x1_round_cylinder" || type === "2x2_round_cylinder") {
+      const radius = type === "1x1_round_cylinder" ? (MODULE_SIZE / 2) - 0.001 : MODULE_SIZE - 0.001;
+      geom = new THREE.CylinderGeometry(radius, radius, BRICK_HEIGHT, 32);
+    } else {
+      geom = new THREE.BoxGeometry(
+        width - 0.002,
+        BRICK_HEIGHT,
+        depth - 0.002,
+      );
+    }
     geom.translate(0, BRICK_HEIGHT / 2, 0);
     geom.computeBoundsTree();
     return geom;
-  }, [width, depth]);
+  }, [width, depth, type]);
 
   const studGeom = useMemo(() => {
     const geom = new THREE.CylinderGeometry(
