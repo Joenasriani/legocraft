@@ -459,12 +459,32 @@ export const HumanViewLayer = ({
                   const g = getGroupBricks(b, allb);
                   removeBricks(g.map((bz: any) => bz.id));
                 } else if (selectionMode === "Multi") {
+                  const multiIds = useLegoStore.getState().multiSelectedBrickIds;
+                  const isPart = multiIds.includes(b.id);
+                  const idsToDelete = isPart ? multiIds : [b.id];
+
                   const allb = useLegoStore.getState().bricks;
-                  if (hasBrickAbove(b, allb, MODULE_SIZE, BRICK_HEIGHT)) {
+                  const isBlocked = idsToDelete.some((id) => {
+                    const br = allb.find((bk) => bk.id === id);
+                    return (
+                      br &&
+                      hasBrickAbove(
+                        br,
+                        allb,
+                        MODULE_SIZE,
+                        BRICK_HEIGHT,
+                        idsToDelete,
+                      )
+                    );
+                  });
+
+                  if (isBlocked) {
                     useLegoStore
                       .getState()
                       .setToastMessage(
-                        "Cannot select: brick has another brick above it.",
+                        idsToDelete.length > 1
+                          ? "Cannot delete selection: blocked by other bricks."
+                          : "Cannot delete: brick has another brick above it.",
                       );
                     setTimeout(
                       () => useLegoStore.getState().setToastMessage(null),
@@ -473,7 +493,10 @@ export const HumanViewLayer = ({
                     triggerHaptics(rightInput, HapticType.ERROR);
                     audioService.play("error");
                   } else {
-                    useLegoStore.getState().toggleMultiSelectBrickId(b.id);
+                    useLegoStore.getState().removeBricks(idsToDelete);
+                    if (isPart) {
+                      useLegoStore.getState().setMultiSelectedBrickIds([]);
+                    }
                     triggerHaptics(rightInput, HapticType.BRICK_DELETE);
                     audioService.play("remove");
                   }
@@ -608,9 +631,48 @@ export const HumanViewLayer = ({
                       audioService.play("remove");
                     }
                   } else if (selectionMode === "Multi") {
-                    useLegoStore.getState().toggleMultiSelectBrickId(b.id);
-                    triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                    audioService.play("remove");
+                    const multiIds =
+                      useLegoStore.getState().multiSelectedBrickIds;
+                    const isPart = multiIds.includes(b.id);
+                    const idsToDelete = isPart ? multiIds : [b.id];
+
+                    const allb = useLegoStore.getState().bricks;
+                    const isBlocked = idsToDelete.some((id) => {
+                      const br = allb.find((bk) => bk.id === id);
+                      return (
+                        br &&
+                        hasBrickAbove(
+                          br,
+                          allb,
+                          MODULE_SIZE,
+                          BRICK_HEIGHT,
+                          idsToDelete,
+                        )
+                      );
+                    });
+
+                    if (isBlocked) {
+                      useLegoStore
+                        .getState()
+                        .setToastMessage(
+                          idsToDelete.length > 1
+                            ? "Cannot delete selection: blocked by other bricks."
+                            : "Cannot delete: brick has another brick above it.",
+                        );
+                      setTimeout(
+                        () => useLegoStore.getState().setToastMessage(null),
+                        3000,
+                      );
+                      triggerHaptics(rightInput, HapticType.ERROR);
+                      audioService.play("error");
+                    } else {
+                      useLegoStore.getState().removeBricks(idsToDelete);
+                      if (isPart) {
+                        useLegoStore.getState().setMultiSelectedBrickIds([]);
+                      }
+                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+                      audioService.play("remove");
+                    }
                   } else {
                     if (
                       hasBrickAbove(

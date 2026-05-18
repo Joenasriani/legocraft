@@ -89,19 +89,39 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
               } else {
                 useLegoStore.getState().removeBricks(groupIds);
               }
-            } else if (selectionMode === "Multi") {
-              // In Delete mode, we toggle multi-select too?
-              // Or should it delete the selection?
-              // The original code was just toggling.
-              useLegoStore.getState().toggleMultiSelectBrickId(brick.id);
             } else {
-              if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+              // Delete mode in Solo or Multi selection mode should delete the targeted brick(s).
+              // It should NOT toggle selection.
+              const multiSelected = useLegoStore.getState().multiSelectedBrickIds;
+              const isPartOfSelection = multiSelected.includes(brick.id);
+              const idsToDelete = isPartOfSelection ? multiSelected : [brick.id];
+
+              const isAnyBlocked = idsToDelete.some((id) => {
+                const b = allBricks.find((brick) => brick.id === id);
+                return (
+                  b &&
+                  hasBrickAbove(
+                    b,
+                    allBricks,
+                    MODULE_SIZE,
+                    BRICK_HEIGHT,
+                    idsToDelete,
+                  )
+                );
+              });
+
+              if (isAnyBlocked) {
                 setToastMessage(
-                  "Cannot delete: brick has another brick above it.",
+                  idsToDelete.length > 1
+                    ? "Cannot delete selection: one or more bricks are blocked by bricks above."
+                    : "Cannot delete: brick has another brick above it.",
                 );
                 setTimeout(() => setToastMessage(null), 3000);
               } else {
-                removeBrick(brick.id);
+                useLegoStore.getState().removeBricks(idsToDelete);
+                if (isPartOfSelection) {
+                  useLegoStore.getState().setMultiSelectedBrickIds([]);
+                }
               }
             }
           } else if (mode === "Move") {

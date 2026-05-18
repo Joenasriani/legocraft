@@ -42,7 +42,13 @@ export const LegoBrick: React.FC<LegoBrickProps> = ({
     useLegoStore.getState().setIsInteractingWithBrick(true);
     if (mode === "Delete") {
       e.stopPropagation();
-      removeBrick(id);
+      const multiSelected = useLegoStore.getState().multiSelectedBrickIds;
+      if (multiSelected.includes(id)) {
+        useLegoStore.getState().removeBricks(multiSelected);
+        useLegoStore.getState().setMultiSelectedBrickIds([]);
+      } else {
+        removeBrick(id);
+      }
     } else if (mode === "Move") {
       e.stopPropagation();
       setIsGrabbed(true);
