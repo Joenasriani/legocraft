@@ -10,6 +10,16 @@ export default defineConfig({
   },
   build: {
     reportCompressedSize: false,
-    chunkSizeWarningLimit: 3000,
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'three-core': ['three'],
+          'three-addons': ['three-stdlib', 'three-mesh-bvh', '@react-three/drei'],
+          'xr-vendor': ['@react-three/xr'],
+          'ui-vendor': ['react', 'react-dom', 'zustand', 'motion', 'lucide-react'],
+        },
+      },
+    },
   },
 });
