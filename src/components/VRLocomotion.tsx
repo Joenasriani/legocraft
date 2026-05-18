@@ -85,7 +85,7 @@ export function VRLocomotion() {
     }
 
     // 2. Snap Turning (Right Stick)
-    // Snap turning should probably work even in "Stationary" mode unless we want total lockdown.
+    // Snap turning is enabled in all modes to allow orientation adjustment.
     if (rightInput && rightInput.gamepad) {
       const axes = rightInput.gamepad.axes;
       const hasThumbstick = axes.length >= 4;

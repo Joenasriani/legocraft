@@ -20,8 +20,8 @@
 
 ## Control Map
 ### VR (Quest)
-- **Left Thumbstick**: Smooth Locomotion (XZ Plane)
-- **Right Thumbstick**: Snap Turning (45° steps)
+- **Left Thumbstick**: Smooth Locomotion (XZ Plane) - *Disabled in Stationary Mode*
+- **Right Thumbstick**: Snap Turning (45° steps) - *Enabled in all modes*
 - **X Button**: Toggle Build Menu
 - **Y Button**: Open Palette (only if build menu is closed)
 - **Right Trigger (RT)**: Place brick / Activate menu item
