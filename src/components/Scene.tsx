@@ -26,12 +26,12 @@ import {
   getBrickAABB,
   doAABBsOverlap,
   hasBrickAbove,
+  SHAPE_DEFS,
+  hasBrickStuds,
+  getBrickHeightUnit,
 } from "../Store";
 
-import {
-  MODULE_SIZE,
-  BRICK_HEIGHT,
-} from "../constants";
+import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT } from "../constants";
 
 import { VRRadialMenu } from "./VRRadialMenu";
 import { VRPalette } from "./VRPalette";
@@ -78,7 +78,10 @@ function Locomotion() {
 
     if (isDebug) {
       const now = Date.now();
-      if (!(window as any)._lastLocoLog || now - (window as any)._lastLocoLog > 1000) {
+      if (
+        !(window as any)._lastLocoLog ||
+        now - (window as any)._lastLocoLog > 1000
+      ) {
         (window as any)._lastLocoLog = now;
         console.log("[Loco] Axes:", {
           left: leftInput?.gamepad?.axes,
@@ -90,14 +93,14 @@ function Locomotion() {
     // Left Stick: Move
     if (leftInput && leftInput.gamepad) {
       const axes = leftInput.gamepad.axes;
-      
+
       // Quest mapping can vary between browsers/profiles.
       // Usually it is [2, 3] for thumbstick, but can be [0, 1].
       // We pick the pair that has any active input.
       const hasThumbstick = axes.length >= 4;
       let x = 0;
       let y = 0;
-      
+
       if (hasThumbstick) {
         x = axes[2];
         y = axes[3];
@@ -115,19 +118,21 @@ function Locomotion() {
         // Headset-yaw relative movement
         const headsetDir = new THREE.Vector3();
         camera.getWorldDirection(headsetDir);
-        
+
         // If looking straight up/down, use the camera's up vector projection instead
         // or just fallback to current "forward" if projection is too small.
         if (Math.abs(headsetDir.x) < 0.001 && Math.abs(headsetDir.z) < 0.001) {
           camera.getWorldDirection(headsetDir); // re-get to be sure
           // use another source of "forward" like the headset Up projected
-          const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion);
+          const up = new THREE.Vector3(0, 1, 0).applyQuaternion(
+            camera.quaternion,
+          );
           headsetDir.copy(up);
         }
-        
-        headsetDir.y = 0; 
+
+        headsetDir.y = 0;
         headsetDir.normalize();
-        
+
         // If we still have zero (unlikely now), default to -Z
         if (headsetDir.lengthSq() < 0.001) headsetDir.set(0, 0, -1);
 
@@ -148,7 +153,11 @@ function Locomotion() {
     if (rightInput && rightInput.gamepad) {
       const axes = rightInput.gamepad.axes;
       const hasThumbstick = axes.length >= 4;
-      const rx = hasThumbstick ? (Math.abs(axes[2]) > 0.01 ? axes[2] : axes[0]) : (axes[0] ?? 0);
+      const rx = hasThumbstick
+        ? Math.abs(axes[2]) > 0.01
+          ? axes[2]
+          : axes[0]
+        : (axes[0] ?? 0);
       const now = performance.now();
 
       // Implement comfort snap turn (30 degrees)
@@ -506,7 +515,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         controlsRef.current.enabled = false;
       } else {
         controlsRef.current.enabled =
-          !isBrickInteractionRef.current && !isInteracting && !isDraggingBrick && !marqueeStart;
+          !isBrickInteractionRef.current &&
+          !isInteracting &&
+          !isDraggingBrick &&
+          !marqueeStart;
       }
       if (
         controlsRef.current.target.y < 0 &&
@@ -854,18 +866,29 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     let highestY = -BRICK_HEIGHT;
+    let requiresClearance = false;
     const ignoredIds =
       mode === "Move" ? movingGroupOriginalBricks.map((b) => b.id) : [];
 
     for (const tb of testBricks) {
       const tbAABB = getBrickAABB(tb);
+      const tbNeedsClearance = SHAPE_DEFS[tb.type]?.needsStudClearance ?? false;
+
       for (const b of bricks) {
         if (ignoredIds.includes(b.id)) continue;
         const bAABB = getBrickAABB(b);
         if (doAABBsOverlap(tbAABB, bAABB, 0.001)) {
-          const requiredBaseY = b.position[1] + BRICK_HEIGHT - tb.position[1];
+          const bHasStuds = hasBrickStuds(b.type);
+          const requiredBaseY =
+            b.position[1] +
+            getBrickHeightUnit(b.type) * BRICK_HEIGHT -
+            tb.position[1];
           if (requiredBaseY > highestY) {
             highestY = requiredBaseY;
+            requiresClearance = bHasStuds && tbNeedsClearance;
+          } else if (Math.abs(requiredBaseY - highestY) < 0.001) {
+            requiresClearance =
+              requiresClearance || (bHasStuds && tbNeedsClearance);
           }
         }
       }
@@ -875,6 +898,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       0,
       Math.round(highestY / BRICK_HEIGHT) * BRICK_HEIGHT,
     );
+
+    if (requiresClearance) {
+      baseSnappedY += STUD_HEIGHT;
+    }
 
     return [baseSnappedX, baseSnappedY, baseSnappedZ];
   };
@@ -1503,25 +1530,33 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         isOrbitGesture = true;
       }
     } else {
-      if (e.button === 1 || e.button === 2 || e.nativeEvent?.type === "contextmenu") {
+      if (
+        e.button === 1 ||
+        e.button === 2 ||
+        e.nativeEvent?.type === "contextmenu"
+      ) {
         isOrbitGesture = true;
       } else if (e.button === 0 && isCameraLocked) {
-        const isMarquee = mode === "Move" && e.object?.name === "Grid" && !isTouch;
+        const isMarquee =
+          mode === "Move" && e.object?.name === "Grid" && !isTouch;
         if (!isMarquee) isOrbitGesture = true;
       }
     }
 
     if (isOrbitGesture && controlsRef.current) {
-      const targetPoint = (isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current) 
-        ? orbitPivotCandidateRef.current 
-        : hitPoint;
+      const targetPoint =
+        isTouch && touchesCount >= 2 && orbitPivotCandidateRef.current
+          ? orbitPivotCandidateRef.current
+          : hitPoint;
       if (targetPoint) {
         controlsRef.current.target.copy(targetPoint);
       }
     }
 
-    const isBrickHit = e.intersections?.some((hitData: any) => 
-      hitData.object.name.includes("BrickBody") || hitData.object.name.includes("BrickStud")
+    const isBrickHit = e.intersections?.some(
+      (hitData: any) =>
+        hitData.object.name.includes("BrickBody") ||
+        hitData.object.name.includes("BrickStud"),
     );
     if (isBrickHit) {
       isBrickInteractionRef.current = true;

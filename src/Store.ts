@@ -7,20 +7,72 @@ import {
   HALF_MODULE,
 } from "./constants";
 
-export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5" |
-  "1x1_round_cylinder" | "2x2_round_cylinder" | "1x1_cone" | "2x2_cone" | "3x3_cone" | "2x2_dome" | "4x4_dome" | "1x2_slope" | "2x2_slope" |
-  "quarter_cylinder" | "half_cylinder" | "wedge" | "2x2_corner_triangle" |
-  "inverted_slope" | "quarter_dome" | "corner_slope" | "curved_corner" | "arch" | "half_dome";
+export type BrickType =
+  | "1x1"
+  | "1x2"
+  | "1x3"
+  | "2x2"
+  | "2x3"
+  | "2x4"
+  | "3x3"
+  | "3x4"
+  | "4x4"
+  | "4x5"
+  | "5x5"
+  | "1x1_round_cylinder"
+  | "2x2_round_cylinder"
+  | "1x1_cone"
+  | "2x2_cone"
+  | "3x3_cone"
+  | "2x2_dome"
+  | "4x4_dome"
+  | "1x2_slope"
+  | "2x2_slope"
+  | "quarter_cylinder"
+  | "half_cylinder"
+  | "wedge"
+  | "2x2_corner_triangle"
+  | "inverted_slope"
+  | "quarter_dome"
+  | "corner_slope"
+  | "curved_corner"
+  | "arch"
+  | "half_dome";
 export const BRICK_TYPES: BrickType[] = [
-  "1x1", "1x2", "1x3", "2x2", "2x3", "2x4",
-  "3x3", "3x4", "4x4", "4x5", "5x5",
+  "1x1",
+  "1x2",
+  "1x3",
+  "2x2",
+  "2x3",
+  "2x4",
+  "3x3",
+  "3x4",
+  "4x4",
+  "4x5",
+  "5x5",
 ];
 
 export const ALL_VALID_BRICK_TYPES: BrickType[] = [
   ...BRICK_TYPES,
-  "1x1_round_cylinder", "2x2_round_cylinder", "1x1_cone", "2x2_cone", "3x3_cone", "2x2_dome", "4x4_dome", "1x2_slope", "2x2_slope",
-  "quarter_cylinder", "half_cylinder", "wedge", "2x2_corner_triangle",
-  "inverted_slope", "quarter_dome", "corner_slope", "curved_corner", "arch", "half_dome"
+  "1x1_round_cylinder",
+  "2x2_round_cylinder",
+  "1x1_cone",
+  "2x2_cone",
+  "3x3_cone",
+  "2x2_dome",
+  "4x4_dome",
+  "1x2_slope",
+  "2x2_slope",
+  "quarter_cylinder",
+  "half_cylinder",
+  "wedge",
+  "2x2_corner_triangle",
+  "inverted_slope",
+  "quarter_dome",
+  "corner_slope",
+  "curved_corner",
+  "arch",
+  "half_dome",
 ];
 
 export const PLACEMENT_EPSILON = 0.002;
@@ -50,7 +102,11 @@ export const areBricksConnected = (b1: BrickData, b2: BrickData): boolean => {
 
   const h1 = getBrickHeightUnit(b1.type) * BRICK_HEIGHT;
   const h2 = getBrickHeightUnit(b2.type) * BRICK_HEIGHT;
-  const maxDy = Math.max(h1, h2);
+
+  const needsClearance =
+    SHAPE_DEFS[b1.type]?.needsStudClearance ||
+    SHAPE_DEFS[b2.type]?.needsStudClearance;
+  const maxDy = Math.max(h1, h2) + (needsClearance ? STUD_HEIGHT : 0);
 
   if (dy > maxDy + PLACEMENT_EPSILON) return false;
 
@@ -125,24 +181,166 @@ export interface ShapeDef {
   hasStuds: boolean;
   allowedRotations: number[];
   enabled: boolean;
+  needsStudClearance?: boolean;
 }
 
 export const SHAPE_DEFS: Record<string, ShapeDef> = {
-  "1x1_round_cylinder": { id: "1x1_round_cylinder", name: "1x1 Round", w: 1, d: 1, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
-  "2x2_round_cylinder": { id: "2x2_round_cylinder", name: "2x2 Round", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
-  "1x1_cone": { id: "1x1_cone", name: "1x1 Cone", w: 1, d: 1, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
-  "2x2_cone": { id: "2x2_cone", name: "2x2 Cone", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
-  "3x3_cone": { id: "3x3_cone", name: "3x3 Cone", w: 3, d: 3, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
-  "2x2_dome": { id: "2x2_dome", name: "2x2 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
-  "4x4_dome": { id: "4x4_dome", name: "4x4 Dome", w: 4, d: 4, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
-  "1x2_slope": { id: "1x2_slope", name: "1x2 Slope", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "2x2_slope": { id: "2x2_slope", name: "2x2 Slope", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "quarter_cylinder": { id: "quarter_cylinder", name: "1/4 Cylinder", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "half_cylinder": { id: "half_cylinder", name: "1/2 Cylinder", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "wedge": { id: "wedge", name: "Wedge", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "2x2_corner_triangle": { id: "2x2_corner_triangle", name: "2x2 Triangle", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "inverted_slope": { id: "inverted_slope", name: "Inv Slope", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "quarter_dome": { id: "quarter_dome", name: "1/4 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "1x1_round_cylinder": {
+    id: "1x1_round_cylinder",
+    name: "1x1 Round",
+    w: 1,
+    d: 1,
+    h: 1,
+    hasStuds: true,
+    allowedRotations: [0],
+    enabled: true,
+  },
+  "2x2_round_cylinder": {
+    id: "2x2_round_cylinder",
+    name: "2x2 Round",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: true,
+    allowedRotations: [0],
+    enabled: true,
+  },
+  "1x1_cone": {
+    id: "1x1_cone",
+    name: "1x1 Cone",
+    w: 1,
+    d: 1,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0],
+    enabled: true,
+    needsStudClearance: true,
+  },
+  "2x2_cone": {
+    id: "2x2_cone",
+    name: "2x2 Cone",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0],
+    enabled: true,
+    needsStudClearance: true,
+  },
+  "3x3_cone": {
+    id: "3x3_cone",
+    name: "3x3 Cone",
+    w: 3,
+    d: 3,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0],
+    enabled: true,
+    needsStudClearance: true,
+  },
+  "2x2_dome": {
+    id: "2x2_dome",
+    name: "2x2 Dome",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0],
+    enabled: true,
+    needsStudClearance: true,
+  },
+  "4x4_dome": {
+    id: "4x4_dome",
+    name: "4x4 Dome",
+    w: 4,
+    d: 4,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0],
+    enabled: true,
+    needsStudClearance: true,
+  },
+  "1x2_slope": {
+    id: "1x2_slope",
+    name: "1x2 Slope",
+    w: 1,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  "2x2_slope": {
+    id: "2x2_slope",
+    name: "2x2 Slope",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  quarter_cylinder: {
+    id: "quarter_cylinder",
+    name: "1/4 Cylinder",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  half_cylinder: {
+    id: "half_cylinder",
+    name: "1/2 Cylinder",
+    w: 1,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  wedge: {
+    id: "wedge",
+    name: "Wedge",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  "2x2_corner_triangle": {
+    id: "2x2_corner_triangle",
+    name: "2x2 Triangle",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  inverted_slope: {
+    id: "inverted_slope",
+    name: "Inv Slope",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: true,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+  },
+  quarter_dome: {
+    id: "quarter_dome",
+    name: "1/4 Dome",
+    w: 2,
+    d: 2,
+    h: 1,
+    hasStuds: false,
+    allowedRotations: [0, 90, 180, 270],
+    enabled: true,
+    needsStudClearance: true,
+  },
 };
 
 export const getBrickDimensions = (type: BrickType) => {
@@ -151,20 +349,34 @@ export const getBrickDimensions = (type: BrickType) => {
     return { w: ds.w, d: ds.d };
   }
   switch (type) {
-    case "1x1": return { w: 1, d: 1 };
-    case "1x2": return { w: 1, d: 2 };
-    case "1x3": return { w: 1, d: 3 };
-    case "2x2": return { w: 2, d: 2 };
-    case "2x3": return { w: 2, d: 3 };
-    case "2x4": return { w: 2, d: 4 };
-    case "3x3": return { w: 3, d: 3 };
-    case "3x4": return { w: 3, d: 4 };
-    case "4x4": return { w: 4, d: 4 };
-    case "4x5": return { w: 4, d: 5 };
-    case "5x5": return { w: 5, d: 5 };
-    case "arch": return { w: 1, d: 4 };
-    case "half_dome": return { w: 2, d: 4 };
-    default: return { w: 2, d: 2 };
+    case "1x1":
+      return { w: 1, d: 1 };
+    case "1x2":
+      return { w: 1, d: 2 };
+    case "1x3":
+      return { w: 1, d: 3 };
+    case "2x2":
+      return { w: 2, d: 2 };
+    case "2x3":
+      return { w: 2, d: 3 };
+    case "2x4":
+      return { w: 2, d: 4 };
+    case "3x3":
+      return { w: 3, d: 3 };
+    case "3x4":
+      return { w: 3, d: 4 };
+    case "4x4":
+      return { w: 4, d: 4 };
+    case "4x5":
+      return { w: 4, d: 5 };
+    case "5x5":
+      return { w: 5, d: 5 };
+    case "arch":
+      return { w: 1, d: 4 };
+    case "half_dome":
+      return { w: 2, d: 4 };
+    default:
+      return { w: 2, d: 2 };
   }
 };
 
@@ -270,7 +482,12 @@ export const checkPlacementValid = (
   const isOverlap = bricks.some((b) => {
     if (b.id === ghostData.id || (ignoreBrickId && b.id === ignoreBrickId))
       return false;
-    if (Math.abs(b.position[1] - ghostData.position[1]) > epsilon) return false;
+    const h1 = getBrickHeightUnit(b.type) * BRICK_HEIGHT;
+    const h2 = getBrickHeightUnit(ghostData.type) * BRICK_HEIGHT;
+    const yOverlap =
+      b.position[1] < ghostData.position[1] + h2 - epsilon &&
+      ghostData.position[1] < b.position[1] + h1 - epsilon;
+    if (!yOverlap) return false;
     const bAABB = getBrickAABB(b);
     return doAABBsOverlap(ghostAABB, bAABB);
   });
@@ -306,12 +523,16 @@ export const hasBrickAbove = (
   const targetTopY = brick.position[1] + dynamicHeight;
 
   // Find bricks exactly one layer above the selected brick
-  const bricksDirectlyAbove = bricks.filter(
-    (b) =>
-      b.id !== brick.id &&
-      !ignoreIds.includes(b.id) &&
-      Math.abs(b.position[1] - targetTopY) < epsilon,
-  );
+  const bricksDirectlyAbove = bricks.filter((b) => {
+    if (b.id === brick.id || ignoreIds.includes(b.id)) return false;
+    const bNeedsClearance = SHAPE_DEFS[b.type]?.needsStudClearance ?? false;
+    const brickHasStuds = SHAPE_DEFS[brick.type]
+      ? SHAPE_DEFS[brick.type].hasStuds
+      : true;
+    const expectedY =
+      targetTopY + (bNeedsClearance && brickHasStuds ? 0.04 : 0); // 0.04 is STUD_HEIGHT
+    return Math.abs(b.position[1] - expectedY) < epsilon;
+  });
 
   const targetAABB = getBrickAABB(brick);
 
@@ -340,20 +561,26 @@ export const checkStructureValid = (
     const pbAABB = getBrickAABB(pb);
 
     // Check overlap with existing bricks
-    const hasWorldOverlap = bricks.some(
-      (b) =>
-        Math.abs(b.position[1] - pb.position[1]) < epsilon &&
-        doAABBsOverlap(pbAABB, getBrickAABB(b)),
-    );
+    const hasWorldOverlap = bricks.some((b) => {
+      const h1 = getBrickHeightUnit(b.type) * BRICK_HEIGHT;
+      const h2 = getBrickHeightUnit(pb.type) * BRICK_HEIGHT;
+      const yOverlap =
+        b.position[1] < pb.position[1] + h2 - epsilon &&
+        pb.position[1] < b.position[1] + h1 - epsilon;
+      return yOverlap && doAABBsOverlap(pbAABB, getBrickAABB(b));
+    });
     if (hasWorldOverlap) return { valid: false, reason: "overlap" };
 
     // Check overlap with other preset bricks
-    const hasInternalOverlap = presetBricks.some(
-      (otherPb) =>
-        otherPb.id !== pb.id &&
-        Math.abs(otherPb.position[1] - pb.position[1]) < epsilon &&
-        doAABBsOverlap(pbAABB, getBrickAABB(otherPb)),
-    );
+    const hasInternalOverlap = presetBricks.some((otherPb) => {
+      if (otherPb.id === pb.id) return false;
+      const h1 = getBrickHeightUnit(otherPb.type) * BRICK_HEIGHT;
+      const h2 = getBrickHeightUnit(pb.type) * BRICK_HEIGHT;
+      const yOverlap =
+        otherPb.position[1] < pb.position[1] + h2 - epsilon &&
+        pb.position[1] < otherPb.position[1] + h1 - epsilon;
+      return yOverlap && doAABBsOverlap(pbAABB, getBrickAABB(otherPb));
+    });
     if (hasInternalOverlap) {
       return { valid: false, reason: "overlap" };
     }
@@ -432,8 +659,22 @@ interface LegoStore {
   setVrDebugText: (text: string) => void;
   showXRPerf: boolean;
   setShowXRPerf: (show: boolean) => void;
-  xrPanel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error";
-  setXRPanel: (panel: "none" | "waitingControllers" | "onboarding" | "buildMenu" | "palette" | "error") => void;
+  xrPanel:
+    | "none"
+    | "waitingControllers"
+    | "onboarding"
+    | "buildMenu"
+    | "palette"
+    | "error";
+  setXRPanel: (
+    panel:
+      | "none"
+      | "waitingControllers"
+      | "onboarding"
+      | "buildMenu"
+      | "palette"
+      | "error",
+  ) => void;
   closeXRPanel: () => void;
 
   // Event Triggers
@@ -560,9 +801,11 @@ const generateLifeSizedCabin = (): BrickData[] => {
     cabin.push(createBrick("2x4", brown, 1, y, 2, 0)); // left
     cabin.push(createBrick("2x4", brown, 4, y, 1, 90)); // back
     cabin.push(createBrick("2x4", brown, 7, y, 2, 0)); // right
-    if (y > 1) { // header
+    if (y > 1) {
+      // header
       cabin.push(createBrick("2x4", brown, 4, y, 3, 90));
-    } else { // door sides
+    } else {
+      // door sides
       cabin.push(createBrick("2x2", brown, 5, y, 3, 0));
     }
   }
@@ -573,7 +816,7 @@ const generateLifeSizedCabin = (): BrickData[] => {
   cabin.push(createBrick("2x4", roof, 4, 3, 3, 90));
   // Roof top y=4
   cabin.push(createBrick("2x4", roof, 4, 4, 2, 90));
-  
+
   return cabin;
 };
 
@@ -594,13 +837,13 @@ const generateRoundWaterWell = (): BrickData[] => {
   // Water
   well.push(createBrick("2x2", blue, 3, 0, 3, 0));
   well.push(createBrick("2x2", blue, 3, 1, 3, 0));
-  
+
   // Pillars
   well.push(createBrick("2x2", brown, 1, 2, 3, 0));
   well.push(createBrick("2x2", brown, 1, 3, 3, 0));
   well.push(createBrick("2x2", brown, 5, 2, 3, 0));
   well.push(createBrick("2x2", brown, 5, 3, 3, 0));
-  
+
   // Roof bridging the pillars
   well.push(createBrick("2x4", brown, 3, 4, 3, 90));
   return well;
@@ -1136,7 +1379,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       activePreset: null,
       justSelectedBrick: false,
     });
-    
+
     // Clear any stale VR targets for bricks
     try {
       const { vrTargetManager } = require("./lib/vrTargets");
