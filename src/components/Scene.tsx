@@ -199,7 +199,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         // Removed the fake 3000ms readiness timeout. Wait until conditions are actually met.
         if (hasFloor && hasTrackedController) {
           try {
-            await teleportPlayer({ x: 0, y: 0, z: -1.0 });
             setVrReady(true);
             const store = useLegoStore.getState();
             if (store.xrPanel === "waitingControllers") {
@@ -449,14 +448,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return false;
   };
 
-  const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
-
-  useEffect(() => {
-    if (vrRecenterTrigger === 0) return;
-    // local-floor includes eye height automatically, so Y should be 0.
-    teleportPlayer({ x: 0, y: 0, z: -1.0 });
-  }, [vrRecenterTrigger]);
-
   useFrame((state) => {
     const isInteracting = useLegoStore.getState().isInteractingWithBrick;
     if (controlsRef.current) {
@@ -564,58 +555,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [ghostPosTrigger, ghostPosData]);
 
   const sceneGroupRef = useRef<THREE.Group>(null);
-
-  async function teleportPlayer(offsetPosition: {
-    x: number;
-    y: number;
-    z: number;
-  }) {
-    if (!gl.xr.isPresenting) return;
-    const session = gl.xr.getSession();
-    if (!session) return;
-    try {
-      if (typeof XRRigidTransform === "undefined") return;
-
-      let refSpace: XRReferenceSpace | null = null;
-      let refSpaceType = "";
-      const spaceTypes: XRReferenceSpaceType[] = [
-        "local-floor",
-        "local",
-        "viewer",
-      ];
-
-      for (const spaceType of spaceTypes) {
-        try {
-          refSpace = await session.requestReferenceSpace(spaceType);
-          refSpaceType = spaceType;
-          break; // success
-        } catch (e) {
-          if ((import.meta as any).env.DEV)
-            console.log(`[VR] requestReferenceSpace('${spaceType}') failed`);
-        }
-      }
-
-      if (!refSpace) throw new Error("No usable reference space found");
-      if ((import.meta as any).env.DEV)
-        console.log(`[VR] Selected reference space: ${refSpaceType}`);
-
-      const transform = new XRRigidTransform(offsetPosition, {
-        x: 0,
-        y: 0,
-        z: 0,
-        w: 1,
-      });
-      gl.xr.setReferenceSpace(refSpace.getOffsetReferenceSpace(transform));
-      // Teleport success
-    } catch (err) {
-      console.warn("Teleport failed", err);
-      throw err;
-    }
-  }
-
-  const toggleScale = () => {
-    // Disabled until Micro mode has interaction
-  };
 
   const rotateGhostTrigger = useLegoStore((state) => state.rotateGhostTrigger);
 
@@ -1931,8 +1870,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       setIsVR(true);
       interactionStartCandidateRef.current = null;
       latestPlacementCandidateRef.current = null;
-      // Provide an initial teleport offset so user isn't immediately inside the grid
-      teleportPlayer({ x: 0, y: 0, z: -1.0 });
     };
     const handleSessionEnd = () => {
       setIsVR(false);

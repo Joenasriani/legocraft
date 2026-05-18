@@ -1,6 +1,6 @@
 # Brick XR Builder - Production Documentation
 
-**Status: Stationary WebXR Builder Prototype**
+**Status: Locomotion-Enabled WebXR Builder Prototype**
 *This application is currently in a prototype phase and does not make claims regarding production-readiness, verified refresh rates, or guaranteed smoothness on XR hardware.*
 
 ## Supported Devices
@@ -20,14 +20,14 @@
 
 ## Control Map
 ### VR (Quest)
-- **Default**: Stationary Mode (Teleport/Move not enabled)
+- **Left Thumbstick**: Smooth Locomotion (XZ Plane)
+- **Right Thumbstick**: Snap Turning (45° steps)
 - **X Button**: Toggle Build Menu
 - **Y Button**: Open Palette (only if build menu is closed)
 - **Right Trigger (RT)**: Place brick / Activate menu item
 - **Right Grip (RG)**: Pick / Move
 - **A Button**: Rotate ghost brick only
 - **B Button**: Close current XR panel or cancel active move
-- **Right Thumbstick**: Disabled (Snap-turn is disabled in this stabilization build)
 
 ### Desktop
 - **Left Click**: Select / Place

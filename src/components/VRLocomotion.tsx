@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { XROrigin } from "@react-three/xr";
 import * as THREE from "three";
@@ -12,6 +12,14 @@ export function VRLocomotion() {
   const locomotionMode = useLegoStore((s) => s.locomotionMode);
   const movementSpeed = useLegoStore((s) => s.movementSpeed);
   const snapTurnAngle = useLegoStore((s) => s.snapTurnAngle);
+  const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
+
+  useEffect(() => {
+    if (vrRecenterTrigger > 0 && originRef.current) {
+      originRef.current.position.set(0, 0, 1.0);
+      originRef.current.quaternion.set(0, 0, 0, 1);
+    }
+  }, [vrRecenterTrigger]);
 
   useFrame((_, delta) => {
     const session = gl.xr.getSession();
