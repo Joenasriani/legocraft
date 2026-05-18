@@ -1066,7 +1066,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         targetKind = "brick-stud";
       }
 
-      if (!isVR && targetKind !== "floor") {
+      if (
+        !isVR &&
+        targetKind !== "floor" &&
+        targetKind !== "brick-body" &&
+        targetKind !== "brick-stud"
+      ) {
         continue;
       }
 

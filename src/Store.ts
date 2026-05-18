@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { audioService } from "./services/audioService";
+import { vrTargetManager } from "./lib/vrTargets";
 import {
   MODULE_SIZE,
   BRICK_HEIGHT,
@@ -1430,7 +1431,6 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     // Clear any stale VR targets for bricks
     try {
-      const { vrTargetManager } = require("./lib/vrTargets");
       vrTargetManager.clearBrickTargets();
     } catch (e) {
       console.warn("Could not clear VR targets", e);
