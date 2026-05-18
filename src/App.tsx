@@ -522,6 +522,8 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
         </svg>
       );
     case "1x1_cone":
+    case "2x2_cone":
+    case "3x3_cone":
       return (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <ellipse cx="12" cy="6" rx="2" ry="1" />
@@ -529,6 +531,7 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
         </svg>
       );
     case "2x2_dome":
+    case "4x4_dome":
       return (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <path d="M4 16 C4 8 20 8 20 16" />
@@ -541,19 +544,6 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <path d="M5 18L19 18L19 16L5 6Z" fill={color} fillOpacity="0.2" />
            <path d="M5 18L19 18L19 16L5 6Z" />
-         </svg>
-      );
-    case "curved_corner":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M6 18 V6 A 12 12 0 0 1 18 18 Z" fill={color} fillOpacity="0.2"/>
-           <path d="M6 18 V6 A 12 12 0 0 1 18 18 Z" />
-         </svg>
-      );
-    case "arch":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 18V10C4 5 20 5 20 10v8M8 18v-8C8 8.5 16 8.5 16 10v8" />
          </svg>
       );
     case "quarter_cylinder":
@@ -584,7 +574,7 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
            <path d="M5 6 L19 6 L19 8 L5 18 Z" />
          </svg>
       );
-    case "corner_slope":
+    case "2x2_corner_triangle":
       return (
          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <polygon points="12,4 4,20 20,20" fill={color} fillOpacity="0.2" />
@@ -596,13 +586,6 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" fill={color} fillOpacity="0.2"/>
            <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" />
-         </svg>
-      );
-    case "half_dome":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 16 A 8 8 0 0 1 20 16 Z" fill={color} fillOpacity="0.2"/>
-           <path d="M4 16 A 8 8 0 0 1 20 16 V18 H4 Z" />
          </svg>
       );
     default:
@@ -1905,76 +1888,78 @@ export default function App() {
                 <div className="w-px h-6 bg-glass-border shrink-0" />
 
                 <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
-                  <div className="relative flex gap-1.5 sm:gap-2 items-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (showBrickMenu) {
-                          setShowBrickMenu(false);
-                        } else {
-                          setShowBrickMenu(true);
-                          setShowShapesMenu(false);
-                          setShowPresetMenu(false);
-                          setShowSaveMenu(false);
-                          if (mode !== "Build") setMode("Build");
-                        }
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title="Bricks"
-                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showBrickMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
-                    >
-                      <BuildIcon size={18} />
-                      <span className="hidden sm:inline text-[13px] font-semibold">
-                        Bricks
-                      </span>
-                    </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (showBrickMenu) {
+                        setShowBrickMenu(false);
+                      } else {
+                        setShowBrickMenu(true);
+                        setShowShapesMenu(false);
+                        setShowPresetMenu(false);
+                        setShowSaveMenu(false);
+                        if (mode !== "Build") setMode("Build");
+                      }
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title="Bricks"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showBrickMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
+                  >
+                    <BuildIcon size={18} />
+                    <span className="hidden sm:inline text-[13px] font-semibold">
+                      Bricks
+                    </span>
+                  </button>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (showShapesMenu) {
-                          setShowShapesMenu(false);
-                        } else {
-                          setShowShapesMenu(true);
-                          setShowBrickMenu(false);
-                          setShowPresetMenu(false);
-                          setShowSaveMenu(false);
-                          if (mode !== "Build") setMode("Build");
-                        }
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title="Shapes"
-                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showShapesMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
-                    >
-                      <ShapesIcon size={18} />
-                      <span className="hidden sm:inline text-[13px] font-semibold">
-                        Shapes
-                      </span>
-                    </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (showShapesMenu) {
+                        setShowShapesMenu(false);
+                      } else {
+                        setShowShapesMenu(true);
+                        setShowBrickMenu(false);
+                        setShowPresetMenu(false);
+                        setShowSaveMenu(false);
+                        if (mode !== "Build") setMode("Build");
+                      }
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title="Shapes"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showShapesMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
+                  >
+                    <ShapesIcon size={18} />
+                    <span className="hidden sm:inline text-[13px] font-semibold">
+                      Shapes
+                    </span>
+                  </button>
 
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (showPresetMenu) {
-                          setShowPresetMenu(false);
-                        } else {
-                          setShowPresetMenu(true);
-                          setShowBrickMenu(false);
-                          setShowShapesMenu(false);
-                          setShowSaveMenu(false);
-                        }
-                      }}
-                      onPointerDown={(e) => e.stopPropagation()}
-                      title="Toggle Presets Menu"
-                      className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showPresetMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
-                    >
-                      <PresetsIcon size={18} />
-                      <span className="hidden sm:inline text-[13px] font-semibold">
-                        Presets
-                      </span>
-                    </button>
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (showPresetMenu) {
+                        setShowPresetMenu(false);
+                      } else {
+                        setShowPresetMenu(true);
+                        setShowBrickMenu(false);
+                        setShowShapesMenu(false);
+                        setShowSaveMenu(false);
+                      }
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    title="Toggle Presets Menu"
+                    className={`w-11 h-11 sm:w-auto sm:px-4 sm:h-11 flex items-center justify-center gap-2 shrink-0 border rounded-xl transition-colors ${showPresetMenu ? "bg-white/20 border-white/40 text-white" : "bg-white/5 border-glass-border hover:bg-white/10 text-white"}`}
+                  >
+                    <PresetsIcon size={18} />
+                    <span className="hidden sm:inline text-[13px] font-semibold">
+                      Presets
+                    </span>
+                  </button>
+                </div>
 
+                <div className="w-px h-6 bg-glass-border shrink-0" />
+
+                <div className="flex gap-1.5 sm:gap-2 shrink-0 items-center">
                   <button
                     onClick={() => {
                       if (bricks.length === 0) {

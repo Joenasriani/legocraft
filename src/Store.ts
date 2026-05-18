@@ -8,9 +8,9 @@ import {
 } from "./constants";
 
 export type BrickType = "1x1" | "1x2" | "1x3" | "2x2" | "2x3" | "2x4" | "3x3" | "3x4" | "4x4" | "4x5" | "5x5" |
-  "1x1_round_cylinder" | "2x2_round_cylinder" | "1x1_cone" | "2x2_dome" | "1x2_slope" | "2x2_slope" |
-  "curved_corner" | "arch" | "quarter_cylinder" | "half_cylinder" | "wedge" | "corner_slope" |
-  "inverted_slope" | "quarter_dome" | "half_dome";
+  "1x1_round_cylinder" | "2x2_round_cylinder" | "1x1_cone" | "2x2_cone" | "3x3_cone" | "2x2_dome" | "4x4_dome" | "1x2_slope" | "2x2_slope" |
+  "quarter_cylinder" | "half_cylinder" | "wedge" | "2x2_corner_triangle" |
+  "inverted_slope" | "quarter_dome";
 export const BRICK_TYPES: BrickType[] = [
   "1x1", "1x2", "1x3", "2x2", "2x3", "2x4",
   "3x3", "3x4", "4x4", "4x5", "5x5",
@@ -18,9 +18,9 @@ export const BRICK_TYPES: BrickType[] = [
 
 export const ALL_VALID_BRICK_TYPES: BrickType[] = [
   ...BRICK_TYPES,
-  "1x1_round_cylinder", "2x2_round_cylinder", "1x1_cone", "2x2_dome", "1x2_slope", "2x2_slope",
-  "curved_corner", "arch", "quarter_cylinder", "half_cylinder", "wedge", "corner_slope",
-  "inverted_slope", "quarter_dome", "half_dome"
+  "1x1_round_cylinder", "2x2_round_cylinder", "1x1_cone", "2x2_cone", "3x3_cone", "2x2_dome", "4x4_dome", "1x2_slope", "2x2_slope",
+  "quarter_cylinder", "half_cylinder", "wedge", "2x2_corner_triangle",
+  "inverted_slope", "quarter_dome"
 ];
 
 export const PLACEMENT_EPSILON = 0.002;
@@ -130,19 +130,19 @@ export interface ShapeDef {
 export const SHAPE_DEFS: Record<string, ShapeDef> = {
   "1x1_round_cylinder": { id: "1x1_round_cylinder", name: "1x1 Round", w: 1, d: 1, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
   "2x2_round_cylinder": { id: "2x2_round_cylinder", name: "2x2 Round", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
-  "1x1_cone": { id: "1x1_cone", name: "1x1 Cone", w: 1, d: 1, h: 1, hasStuds: true, allowedRotations: [0], enabled: true },
+  "1x1_cone": { id: "1x1_cone", name: "1x1 Cone", w: 1, d: 1, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
+  "2x2_cone": { id: "2x2_cone", name: "2x2 Cone", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
+  "3x3_cone": { id: "3x3_cone", name: "3x3 Cone", w: 3, d: 3, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
   "2x2_dome": { id: "2x2_dome", name: "2x2 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
+  "4x4_dome": { id: "4x4_dome", name: "4x4 Dome", w: 4, d: 4, h: 1, hasStuds: false, allowedRotations: [0], enabled: true },
   "1x2_slope": { id: "1x2_slope", name: "1x2 Slope", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
   "2x2_slope": { id: "2x2_slope", name: "2x2 Slope", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "curved_corner": { id: "curved_corner", name: "Curved Corner", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "arch": { id: "arch", name: "Arch", w: 1, d: 4, h: 1, hasStuds: true, allowedRotations: [0, 90, 180, 270], enabled: true },
   "quarter_cylinder": { id: "quarter_cylinder", name: "1/4 Cylinder", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
   "half_cylinder": { id: "half_cylinder", name: "1/2 Cylinder", w: 1, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
   "wedge": { id: "wedge", name: "Wedge", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "corner_slope": { id: "corner_slope", name: "Corner Slope", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
+  "2x2_corner_triangle": { id: "2x2_corner_triangle", name: "2x2 Triangle", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
   "inverted_slope": { id: "inverted_slope", name: "Inv Slope", w: 2, d: 2, h: 1, hasStuds: true, allowedRotations: [0, 90, 180, 270], enabled: true },
   "quarter_dome": { id: "quarter_dome", name: "1/4 Dome", w: 2, d: 2, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
-  "half_dome": { id: "half_dome", name: "1/2 Dome", w: 2, d: 4, h: 1, hasStuds: false, allowedRotations: [0, 90, 180, 270], enabled: true },
 };
 
 export const getBrickDimensions = (type: BrickType) => {
