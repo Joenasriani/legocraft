@@ -50,7 +50,7 @@ const VRMenuItem = ({
 
   React.useEffect(() => {
     if (meshRef.current) {
-      vrTargetManager.register(meshRef.current);
+      vrTargetManager.register(meshRef.current, "menu");
       meshRef.current.userData.isVRMenuItem = true;
       meshRef.current.userData.label = seg.label;
       meshRef.current.userData.onTrigger = () => handleAction(seg.action);

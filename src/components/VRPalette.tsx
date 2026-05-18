@@ -42,7 +42,7 @@ const ColorButton = ({
 
   React.useEffect(() => {
     if (meshRef.current) {
-      vrTargetManager.register(meshRef.current);
+      vrTargetManager.register(meshRef.current, "ui");
       meshRef.current.userData.isVRMenuItem = true;
       meshRef.current.userData.label = hoverLabel;
       meshRef.current.userData.onTrigger = onClick;
@@ -122,7 +122,7 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
   React.useEffect(() => {
     if (meshRef.current) {
-      vrTargetManager.register(meshRef.current);
+      vrTargetManager.register(meshRef.current, "ui");
       meshRef.current.userData.isVRMenuItem = true;
       meshRef.current.userData.label = disabled ? `${hoverLabel} (Unsupported)` : hoverLabel;
       meshRef.current.userData.onTrigger = disabled ? () => {} : onClick;

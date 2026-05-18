@@ -1,40 +1,51 @@
 import * as THREE from "three";
 
-class VRTargetManager {
-  private targets: THREE.Object3D[] = [];
+export type VRTargetCategory = "brick" | "floor" | "ui" | "menu" | "misc";
 
-  register(obj: THREE.Object3D | null) {
-    if (!obj || this.targets.includes(obj)) return;
-    this.targets.push(obj);
+class VRTargetManager {
+  private targets: Map<THREE.Object3D, VRTargetCategory> = new Map();
+
+  register(obj: THREE.Object3D | null, category: VRTargetCategory = "misc") {
+    if (!obj) return;
+    this.targets.set(obj, category);
+    
     if ((import.meta as any).env.DEV) {
-      if (obj.name === "VRFloorCollider") {
-        console.log("[VR] VRFloorCollider registered");
+      if (category === "floor") {
+        console.log("[VR] Floor target registered");
       }
     }
   }
 
   unregister(obj: THREE.Object3D | null) {
     if (!obj) return;
-    this.targets = this.targets.filter((t) => t !== obj);
+    this.targets.delete(obj);
   }
 
   clearBrickTargets() {
-    this.targets = this.targets.filter(
-      (t) => t.name === "VRFloorCollider"
-    );
+    for (const [obj, category] of this.targets.entries()) {
+      if (category === "brick") {
+        this.targets.delete(obj);
+      }
+    }
   }
 
   getValidTargets(): THREE.Object3D[] {
-    // Filter every frame to ensure we only raycast objects that are actually in the scene graph.
-    // This avoids caching bugs where objects are temporarily detached during React renders.
-    return this.targets.filter((obj) => {
+    const list: THREE.Object3D[] = [];
+    for (const obj of this.targets.keys()) {
       let curr: THREE.Object3D | null = obj;
+      let inScene = false;
       while (curr) {
-        if (curr.type === "Scene") return true;
+        if (curr.type === "Scene") {
+          inScene = true;
+          break;
+        }
         curr = curr.parent;
       }
-      return false;
-    });
+      if (inScene) {
+        list.push(obj);
+      }
+    }
+    return list;
   }
 }
 

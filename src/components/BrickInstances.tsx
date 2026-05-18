@@ -35,8 +35,8 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
   useEffect(() => {
     if (!isGhost) {
-      vrTargetManager.register(bodyMeshRef.current);
-      vrTargetManager.register(studMeshRef.current);
+      vrTargetManager.register(bodyMeshRef.current, "brick");
+      vrTargetManager.register(studMeshRef.current, "brick");
       return () => {
         vrTargetManager.unregister(bodyMeshRef.current);
         vrTargetManager.unregister(studMeshRef.current);

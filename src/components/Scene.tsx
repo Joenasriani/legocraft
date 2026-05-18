@@ -2094,8 +2094,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const vrFloorRef = useRef<THREE.Mesh>(null);
 
   useEffect(() => {
-    vrTargetManager.register(gridRef.current);
-    vrTargetManager.register(vrFloorRef.current);
+    vrTargetManager.register(gridRef.current, "misc");
+    vrTargetManager.register(vrFloorRef.current, "floor");
     return () => {
       vrTargetManager.unregister(gridRef.current);
       vrTargetManager.unregister(vrFloorRef.current);
