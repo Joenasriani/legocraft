@@ -95,6 +95,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const [isScreenshotting, setIsScreenshotting] = useState(false);
   const [xrSessionActive, setXrSessionActive] = useState(false);
   const [vrReady, setVrReady] = useState(true);
+  const [hasPlacementCandidate, setHasPlacementCandidate] = useState(false);
   const [clipboard, setClipboard] = useState<BrickData[]>([]);
   // 14. Remove <Canvas preserveDrawingBuffer={true}> in App.tsx. This causes massive memory/performance drags in WebGL.
   // We'll also disable shadow map completely in XR to save on draw calls.
@@ -768,6 +769,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     normal: THREE.Vector3,
     targetKind: string = "none",
   ) => {
+    if (point.y < -500) {
+      setHasPlacementCandidate(false);
+      return;
+    }
+
     const position = computePlacementTarget(point, normal, targetKind);
     const state = useLegoStore.getState();
     const isDragging = state.isDraggingBrick;
@@ -776,9 +782,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     if (isDragging || isBuilding || isPlacingPreset) {
       setGhostPosition(position);
+      setHasPlacementCandidate(true);
     } else if (state.mode === "Move" && movingBrickId) {
       const mb = state.bricks.find((b) => b.id === movingBrickId);
-      if (mb) setGhostPosition(mb.position);
+      if (mb) {
+        setGhostPosition(mb.position);
+        setHasPlacementCandidate(true);
+      }
     }
   };
 
@@ -906,7 +916,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const updateGhostFromEvent = (e: any) => {
     const hit = getCanonicalHit(e);
-    if (!hit) return false;
+    if (!hit) {
+      setHasPlacementCandidate(false);
+      return false;
+    }
     const position = computePlacementTarget(
       hit.point,
       hit.normal,
@@ -921,9 +934,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     if (isDragging || isBuilding || isPlacingPreset) {
       setGhostPosition(position);
+      setHasPlacementCandidate(true);
     } else if (state.mode === "Move" && movingBrick) {
       // Keep ghost at anchor if not dragging yet
       setGhostPosition(movingBrick.position);
+      setHasPlacementCandidate(true);
     }
     return true;
   };
@@ -1981,6 +1996,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         onPointerOut={() => {
           interactionStartCandidateRef.current = null;
           latestPlacementCandidateRef.current = null;
+          setHasPlacementCandidate(false);
         }}
         onContextMenu={handleContextMenu}
       >
@@ -2002,7 +2018,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         {!isScreenshotting &&
           mode === "Build" &&
           !activePreset &&
-          (placementStatus.valid || (ghostPosition[0] !== 0 || ghostPosition[2] !== 0)) && (
+          hasPlacementCandidate && (
             <group>
               <BrickInstances
                 type={selectedType}
