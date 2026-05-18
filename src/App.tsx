@@ -699,7 +699,7 @@ const SaveExportMenuOverlay = ({
 }: {
   show: boolean;
   onClose: () => void;
-  saveMenuRef: React.RefObject<HTMLDivElement>;
+  saveMenuRef: React.RefObject<HTMLDivElement | null>;
   onSaveProject: () => void;
   onExportGLB: () => void;
   onScreenshot: () => void;

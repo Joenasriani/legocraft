@@ -23,7 +23,7 @@ export const HumanViewLayer = ({
   handleVRCommit,
 }: {
   currentVRScale: number;
-  sceneGroupRef: React.RefObject<THREE.Group>;
+  sceneGroupRef: React.RefObject<THREE.Group | null>;
   updateGhostPosition: (
     p: THREE.Vector3,
     n: THREE.Vector3,

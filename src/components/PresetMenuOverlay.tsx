@@ -5,7 +5,7 @@ import { useLegoStore } from "../Store";
 interface PresetMenuOverlayProps {
   show: boolean;
   onClose: () => void;
-  presetMenuRef: React.RefObject<HTMLDivElement>;
+  presetMenuRef: React.RefObject<HTMLDivElement | null>;
   presets: any[];
 }
 
