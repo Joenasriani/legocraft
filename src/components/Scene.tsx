@@ -47,6 +47,8 @@ import { VRStats } from "./VRStats";
 import { VROnboarding } from "./VROnboarding";
 import { VRWaitingPanel } from "./VRWaitingPanel";
 
+import { VRLocomotion } from "./VRLocomotion";
+
 const isQuest =
   typeof navigator !== "undefined" &&
   /Quest|OculusBrowser/i.test(navigator.userAgent);
@@ -56,143 +58,6 @@ export type VRScaleMode = "human";
 const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
 };
-
-function Locomotion() {
-  const originRef = useRef<THREE.Group>(null);
-  const { camera, gl } = useThree();
-  const lastSnapTime = useRef(0);
-  const isDebug = useMemo(
-    () =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("debugXR") === "1",
-    [],
-  );
-
-  useFrame((_, delta) => {
-    const locomotionMode = useLegoStore.getState().locomotionMode;
-    if (locomotionMode !== "Smooth") return;
-
-    const session = gl.xr.getSession();
-    if (!session || !originRef.current) return;
-
-    const inputSources = Array.from(session.inputSources);
-    const leftInput = inputSources.find((s) => s.handedness === "left");
-    const rightInput = inputSources.find((s) => s.handedness === "right");
-
-    if (isDebug) {
-      const now = Date.now();
-      if (
-        !(window as any)._lastLocoLog ||
-        now - (window as any)._lastLocoLog > 1000
-      ) {
-        (window as any)._lastLocoLog = now;
-        console.log("[Loco] Axes:", {
-          left: leftInput?.gamepad?.axes,
-          right: rightInput?.gamepad?.axes,
-        });
-      }
-    }
-
-    // Left Stick: Move
-    if (leftInput && leftInput.gamepad) {
-      const axes = leftInput.gamepad.axes;
-
-      // Quest mapping can vary between browsers/profiles.
-      // Usually it is [2, 3] for thumbstick, but can be [0, 1].
-      // We pick the pair that has any active input.
-      const hasThumbstick = axes.length >= 4;
-      let x = 0;
-      let y = 0;
-
-      if (hasThumbstick) {
-        x = axes[2];
-        y = axes[3];
-        // If thumbstick is idle but secondary (legacy) axes are active, use those
-        if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) {
-          x = axes[0];
-          y = axes[1];
-        }
-      } else {
-        x = axes[0] ?? 0;
-        y = axes[1] ?? 0;
-      }
-
-      if (Math.abs(x) > 0.05 || Math.abs(y) > 0.05) {
-        // Headset-yaw relative movement
-        const headsetDir = new THREE.Vector3();
-        camera.getWorldDirection(headsetDir);
-
-        // If looking straight up/down, use the camera's up vector projection instead
-        // or just fallback to current "forward" if projection is too small.
-        if (Math.abs(headsetDir.x) < 0.001 && Math.abs(headsetDir.z) < 0.001) {
-          camera.getWorldDirection(headsetDir); // re-get to be sure
-          // use another source of "forward" like the headset Up projected
-          const up = new THREE.Vector3(0, 1, 0).applyQuaternion(
-            camera.quaternion,
-          );
-          headsetDir.copy(up);
-        }
-
-        headsetDir.y = 0;
-        headsetDir.normalize();
-
-        // If we still have zero (unlikely now), default to -Z
-        if (headsetDir.lengthSq() < 0.001) headsetDir.set(0, 0, -1);
-
-        const headsetRight = new THREE.Vector3();
-        headsetRight.crossVectors(headsetDir, new THREE.Vector3(0, 1, 0));
-
-        const speed = 2.0;
-        const moveVec = new THREE.Vector3();
-        // Forward is -Y on the stick in WebXR gamepad mapping
-        moveVec.addScaledVector(headsetDir, -y * speed * delta);
-        moveVec.addScaledVector(headsetRight, x * speed * delta);
-
-        originRef.current.position.add(moveVec);
-      }
-    }
-
-    // Right Stick: Snap Turn
-    if (rightInput && rightInput.gamepad) {
-      const axes = rightInput.gamepad.axes;
-      const hasThumbstick = axes.length >= 4;
-      const rx = hasThumbstick
-        ? Math.abs(axes[2]) > 0.01
-          ? axes[2]
-          : axes[0]
-        : (axes[0] ?? 0);
-      const now = performance.now();
-
-      // Implement comfort snap turn (30 degrees)
-      if (Math.abs(rx) > 0.6 && now - lastSnapTime.current > 300) {
-        const snapAngle = rx > 0 ? -Math.PI / 6 : Math.PI / 6;
-
-        // Current camera world position
-        const camPos = new THREE.Vector3();
-        camera.getWorldPosition(camPos);
-
-        // Rotation axis is global Y
-        const rotationAxis = new THREE.Vector3(0, 1, 0);
-
-        // Rotate the origin around the camera's XZ position
-        const pivot = camPos.clone();
-        pivot.y = originRef.current.position.y;
-
-        const relativePos = originRef.current.position.clone().sub(pivot);
-        relativePos.applyAxisAngle(rotationAxis, snapAngle);
-
-        originRef.current.position.copy(pivot).add(relativePos);
-        originRef.current.rotateOnWorldAxis(rotationAxis, snapAngle);
-
-        lastSnapTime.current = now;
-      } else if (Math.abs(rx) < 0.1) {
-        // Optional: reduce cooldown if stick returned to center
-      }
-    }
-  });
-
-  return <XROrigin ref={originRef} position={[0, 0, 1.0]} />;
-}
 
 const VRDebugVisibilityLayer = () => {
   const isDebug =
@@ -2530,7 +2395,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 export const Scene = ({ xrStore }: { xrStore?: any }) => {
   return xrStore ? (
     <XR store={xrStore}>
-      <Locomotion />
+      <VRLocomotion />
       <SceneContents xrStore={xrStore} />
     </XR>
   ) : (

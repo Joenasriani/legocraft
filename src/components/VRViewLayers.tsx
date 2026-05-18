@@ -46,9 +46,6 @@ export const HumanViewLayer = ({
   const setIsDraggingBrick = useLegoStore((s) => s.setIsDraggingBrick);
   const setJustSelectedBrick = useLegoStore((s) => s.setJustSelectedBrick);
   const selectionMode = useLegoStore((s) => s.selectionMode);
-  const locomotionMode = useLegoStore((s) => s.locomotionMode);
-  const movementSpeed = useLegoStore((s) => s.movementSpeed);
-  const snapTurnAngle = useLegoStore((s) => s.snapTurnAngle);
 
   const wasTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
@@ -269,7 +266,6 @@ export const HumanViewLayer = ({
       wasBPressed.current = bPressed;
     }
 
-    // Handle Locomotion (Thumbsticks) disabled for stabilization
     let controllerPos = new THREE.Vector3();
     let controllerFwd = new THREE.Vector3(0, 0, -1);
     let controllerQuat = new THREE.Quaternion();
