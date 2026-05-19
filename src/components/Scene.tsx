@@ -66,11 +66,12 @@ const VR_SCALE_VALUES: Record<VRScaleMode, number> = {
   human: 1.0,
 };
 
+const isDebugXR =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("debugXR") === "1";
+
 const VRDebugVisibilityLayer = () => {
-  const isDebug =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("debugXR") === "1";
-  if (!isDebug) return null;
+  if (!isDebugXR) return null;
   return (
     <group position={[0, 0, 0]}>
       <mesh position={[0, 1, -2]}>
@@ -180,7 +181,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       try {
         gl.compile(scene, camera);
       } catch (e) {
-        console.warn("[BrickXR] VR shader pre-compile warning:", e);
+        if ((import.meta as any).env.DEV) {
+          console.warn("[BrickXR] VR shader pre-compile warning:", e);
+        }
       }
 
       let rafId: number;
@@ -323,9 +326,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
 
       if (exportedCount !== allBricks.length) {
-        console.warn(
-          `Exported count (${exportedCount}) does not match placed array (${allBricks.length})`,
-        );
+        if ((import.meta as any).env.DEV) {
+          console.warn(
+            `Exported count (${exportedCount}) does not match placed array (${allBricks.length})`,
+          );
+        }
       }
 
       import("three/examples/jsm/exporters/GLTFExporter.js").then(
@@ -495,7 +500,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         link.href = dataUrl;
         link.click();
       } catch (err) {
-        console.warn("[BrickXR] Screenshot capture failed:", err);
+        if ((import.meta as any).env.DEV) {
+          console.warn("[BrickXR] Screenshot capture failed:", err);
+        }
         useLegoStore
           .getState()
           .setToastMessage(
@@ -956,7 +963,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const lastMouseMoveRef = useRef<number>(0);
 
   const handlePointerMove = (e: any) => {
-    if (isMultiTouch) return;
+    if (isMultiTouchRef.current) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
       return;
     }
@@ -1362,6 +1369,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // Multi-touch camera handling
     if (isTouch && touchesCount >= 2) {
       setIsMultiTouch(true);
+      isMultiTouchRef.current = true;
       wasMultiTouchRef.current = true;
       // Disable placement logic for this interaction
       interactionStartCandidateRef.current = null;
@@ -1369,6 +1377,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       setHasPlacementCandidate(false);
       pointerDownPos.current = null;
       activePointerIdRef.current = null;
+      isBrickInteractionRef.current = false;
+      useLegoStore.getState().setIsInteractingWithBrick(false);
       return;
     }
 
@@ -1380,6 +1390,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (touchesCount <= 1) {
       activePointerIdRef.current = e.pointerId;
       wasMultiTouchRef.current = false;
+      isMultiTouchRef.current = false;
+      setIsMultiTouch(false);
     }
 
     const hit = getCanonicalHit(e);
@@ -1387,7 +1399,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // Immediately set ghost position on touch down for responsiveness
     // ONLY if not in multi-touch mode
     const currentMovingBrickId = useLegoStore.getState().movingBrickId;
-    if (hit && !isMultiTouch && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
+    if (hit && !isMultiTouchRef.current && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
       const position = computePlacementTarget(
         hit.point,
         hit.normal,
@@ -1405,21 +1417,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         hitData.object.name.includes("BrickBody") ||
         hitData.object.name.includes("BrickStud"),
     );
-    if (isBrickHit && touchesCount <= 1) {
+    if (isBrickHit && touchesCount <= 1 && !isMultiTouchRef.current) {
       isBrickInteractionRef.current = true;
       useLegoStore.getState().setIsInteractingWithBrick(true);
-    } else if (touchesCount >= 2) {
-      isBrickInteractionRef.current = false;
-      useLegoStore.getState().setIsInteractingWithBrick(false);
-    }
-
-    // Check multi-touch
-    if (touchesCount >= 2) {
-      isMultiTouchRef.current = true;
-      pointerDownPos.current = null;
-      return;
-    } else if (touchesCount === 1) {
-      isMultiTouchRef.current = false;
     }
 
     if (mode === "Move" && movingBrick) {
@@ -1668,6 +1668,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       // If a non-active pointer is lifted, just update multi-touch state
       if (isTouch && touchesCount < 2) {
         setIsMultiTouch(false);
+        isMultiTouchRef.current = false;
       }
       return;
     }
@@ -1675,6 +1676,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     if (isTouch && touchesCount < 2) {
       setIsMultiTouch(false);
+      isMultiTouchRef.current = false;
     }
 
     if (wasMultiTouchRef.current) {
@@ -1779,7 +1781,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         shouldCommit = false;
       }
 
-      if ((import.meta as any).env.DEV) {
+      if (isDebugXR) {
         const rect = gl.domElement.getBoundingClientRect();
         const coords = getPointerCoords(e) || { x: 0, y: 0 };
         const ndc = clientToCanvasNDC(coords.x, coords.y, rect);
@@ -1807,7 +1809,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         setIsDraggingBrick(false);
       }
     } else {
-      if ((import.meta as any).env.DEV)
+      if (isDebugXR)
         console.log("[HIT] null - no viable target found");
     }
     interactionStartCandidateRef.current = null;
@@ -2061,6 +2063,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             return;
           }
           activePointerIdRef.current = null;
+          isMultiTouchRef.current = false;
+          setIsMultiTouch(false);
           interactionStartCandidateRef.current = null;
           latestPlacementCandidateRef.current = null;
           setHasPlacementCandidate(false);

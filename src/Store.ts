@@ -1437,7 +1437,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     try {
       vrTargetManager.clearBrickTargets();
     } catch (e) {
-      console.warn("Could not clear VR targets", e);
+      if ((import.meta as any).env.DEV) {
+        console.warn("Could not clear VR targets", e);
+      }
     }
 
     scheduleSave([], true);
@@ -1461,8 +1463,11 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const validPresetBricks = presetSource.filter((b) => {
       const valid = isValidBrickData(b);
-      if (!valid)
-        console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+      if (!valid) {
+        if ((import.meta as any).env.DEV) {
+          console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+        }
+      }
       return valid;
     });
 
@@ -1494,7 +1499,9 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       PLACEMENT_EPSILON,
     );
     if (!check.valid) {
-      console.warn("Preset placement blocked:", check.reason);
+      if ((import.meta as any).env.DEV) {
+        console.warn("Preset placement blocked:", check.reason);
+      }
       audioService.play("error");
       return;
     }

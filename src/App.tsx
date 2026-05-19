@@ -803,10 +803,12 @@ const SaveExportMenuOverlay = ({
 
 export default function App() {
   useEffect(() => {
-    console.log(
-      "[Brick XR Builder] Build verification - App started at " +
-        new Date().toISOString(),
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        "[Brick XR Builder] Build verification - App started at " +
+          new Date().toISOString(),
+      );
+    }
   }, []);
 
   const {
@@ -907,7 +909,12 @@ export default function App() {
           setVrStatus(supported ? "ready" : "unsupported");
         })
         .catch((err) => {
-          console.warn("isSessionSupported rejected, likely iframe policy:", err);
+          if (import.meta.env.DEV) {
+            console.warn(
+              "isSessionSupported rejected, likely iframe policy:",
+              err,
+            );
+          }
           setVrStatus("unsupported");
         });
     } else {

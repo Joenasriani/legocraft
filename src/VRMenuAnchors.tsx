@@ -62,12 +62,12 @@ export const VRLeftHandAnchor = ({ children }: { children: React.ReactNode }) =>
       const currentPos = groupRef.current.position;
       
       const distance = currentPos.distanceTo(target.position);
-      if (distance > 2.0) {
+      if (distance > 5.0) {
         currentPos.copy(target.position);
         groupRef.current.quaternion.copy(target.quaternion);
-      } else if (distance > 0.1) {
-        currentPos.lerp(target.position, delta * 4.0);
-        groupRef.current.quaternion.slerp(target.quaternion, delta * 4.0);
+      } else {
+        currentPos.lerp(target.position, delta * 6.0);
+        groupRef.current.quaternion.slerp(target.quaternion, delta * 6.0);
       }
     }
   });

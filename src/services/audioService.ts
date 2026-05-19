@@ -16,7 +16,9 @@ class AudioService {
       this.masterGain.connect(this.ctx.destination);
       this.initialized = true;
     } catch (e) {
-      console.warn("AudioContext initialization failed", e);
+      if ((import.meta as any).env.DEV) {
+        console.warn("AudioContext initialization failed", e);
+      }
     }
   }
 

@@ -129,12 +129,20 @@ export const HumanViewLayer = ({
     const success = handleVRCommit(p, n, tk);
     if (success) {
       if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-      audioService.play("place");
+      // "Move" mode uses updateBricks which has no sound, so we play it here.
+      // addBrick and commitPreset already play "place" internally.
+      if (mode === "Move") {
+        audioService.play("place");
+      }
       movePreviewActiveRef.current = false;
       return true;
     } else {
       if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
-      audioService.play("error");
+      // commitPreset already plays "error" if it fails.
+      // For Build mode, we play it here since the Store doesn't check validity in addBrick.
+      if (!useLegoStore.getState().activePreset) {
+        audioService.play("error");
+      }
       return false;
     }
   };
@@ -154,11 +162,9 @@ export const HumanViewLayer = ({
         store.setToastMessage("Cannot delete: selection is blocked by other bricks on top.");
         setTimeout(() => store.setToastMessage(null), 3000);
         if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
-        audioService.play("error");
       } else {
         store.removeBricks(gIds);
         if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-        audioService.play("remove");
       }
     } else if (store.selectionMode === "Multi") {
       const multiIds = store.multiSelectedBrickIds;
@@ -181,25 +187,21 @@ export const HumanViewLayer = ({
         );
         setTimeout(() => store.setToastMessage(null), 3000);
         if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
-        audioService.play("error");
       } else {
         store.removeBricks(idsToDelete);
         if (isPart) {
           store.setMultiSelectedBrickIds([]);
         }
         if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-        audioService.play("remove");
       }
     } else {
       if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
         store.setToastMessage("Cannot delete: brick has another brick above it.");
         setTimeout(() => store.setToastMessage(null), 3000);
         if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
-        audioService.play("error");
       } else {
         store.removeBrick(brick.id);
         if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-        audioService.play("remove");
       }
     }
   };
@@ -226,6 +228,7 @@ export const HumanViewLayer = ({
         setTimeout(() => store.setToastMessage(null), 3000);
         if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
         audioService.play("error");
+        return;
       }
     } else if (store.selectionMode === "Multi") {
       const stateBefore = useLegoStore.getState();
@@ -258,6 +261,7 @@ export const HumanViewLayer = ({
           setTimeout(() => store.setToastMessage(null), 3000);
           if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
           audioService.play("error");
+          return;
         }
       } else if (stateBefore.movingBrickId === brick.id) {
         const newAnchorId = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
@@ -279,6 +283,7 @@ export const HumanViewLayer = ({
         setTimeout(() => store.setToastMessage(null), 3000);
         if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
         audioService.play("error");
+        return;
       }
     }
 
