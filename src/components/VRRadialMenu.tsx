@@ -74,9 +74,9 @@ export const VRRadialMenu = ({
 
   const radius = vrScale === "human" ? 0.22 : 2.2;
   const boxDepth = vrScale === "human" ? 0.015 : 0.1;
-  const fontSize = vrScale === "human" ? 0.035 : 0.5;
-  const boxWidth = ((radius * Math.PI) / 3) * 1.5;
-  const boxHeight = vrScale === "human" ? 0.08 : 1.0;
+  const fontSize = vrScale === "human" ? 0.045 : 0.5;
+  const boxWidth = ((radius * Math.PI) / 3) * 1.6;
+  const boxHeight = vrScale === "human" ? 0.09 : 1.0;
 
   const showXRPerf = useLegoStore((s) => s.showXRPerf);
   const setShowXRPerf = useLegoStore((s) => s.setShowXRPerf);

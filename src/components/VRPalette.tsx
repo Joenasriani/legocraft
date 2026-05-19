@@ -152,12 +152,12 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
       {label && svgElement && (
         <Text
-          position={[0, -0.06, 0.008]}
-          fontSize={0.018}
+          position={[0, -0.065, 0.008]}
+          fontSize={0.022}
           color={isActive ? "#000000" : "white"}
           anchorX="center"
           anchorY="middle"
-          maxWidth={width * 0.9}
+          maxWidth={width * 0.95}
           textAlign="center"
           font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZJhiI2B.woff"
         >
@@ -199,7 +199,7 @@ export const VRPalette = () => {
 
       {/* --- LEFT: COLORS --- */}
       <group position={[-PANEL_WIDTH/2 + LEFT_WIDTH/2 + 0.01, 0.08, 0]}>
-        <Text position={[0, 0.05, 0.01]} fontSize={0.018} color="#93c5fd" fontWeight="bold">
+        <Text position={[0, 0.055, 0.01]} fontSize={0.024} color="#93c5fd" fontWeight="bold">
           COLORS
         </Text>
         {LEGO_COLORS.map((color, i) => {
@@ -240,10 +240,10 @@ export const VRPalette = () => {
         ].map((tab, i) => {
           const isActive = activeTab === tab.id;
           return (
-            <group key={tab.id} position={[-0.14 + i * 0.14, 0.04, 0.01]}>
+            <group key={tab.id} position={[-0.15 + i * 0.15, 0.04, 0.01]}>
               <VRCardButton
-                width={0.12}
-                height={0.04}
+                width={0.13}
+                height={0.045}
                 label={tab.label}
                 isActive={isActive}
                 hoverLabel={`${tab.label} Tab`}

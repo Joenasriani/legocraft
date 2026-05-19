@@ -19,15 +19,16 @@ export const VRWaitingPanel = () => {
   }, [closeXRPanel]);
 
   return (
-    <group>
+    <group scale={0.8}>
       <mesh position={[0, 0, -0.05]}>
-        <planeGeometry args={[2.5, 0.8]} />
+        <planeGeometry args={[2.5, 1.0]} />
         <meshBasicMaterial color="#111111" opacity={0.8} transparent depthWrite={false} />
       </mesh>
       <Text
         color="white"
-        fontSize={0.15}
-        maxWidth={2.2}
+        fontSize={0.16}
+        lineHeight={1.4}
+        maxWidth={2.3}
         textAlign="center"
         anchorX="center"
         anchorY="middle"

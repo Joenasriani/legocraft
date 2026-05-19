@@ -29,7 +29,7 @@ export const VROnboarding = () => {
   }, [closeXRPanel]);
 
   return (
-    <group scale={0.6}>
+    <group scale={0.7}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.4, 2.2]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.9} depthWrite={false} />
@@ -37,7 +37,7 @@ export const VROnboarding = () => {
       <Text
         position={[0, 0.9, 0]}
         color="#a855f7"
-        fontSize={0.16}
+        fontSize={0.18}
         fontWeight="bold"
         anchorX="center"
         anchorY="middle"
@@ -48,7 +48,7 @@ export const VROnboarding = () => {
       <Text
         position={[0, -0.7, 0]}
         color="#fbbf24"
-        fontSize={0.06}
+        fontSize={0.08}
         anchorX="center"
         anchorY="middle"
         maxWidth={2.0}
@@ -60,7 +60,7 @@ export const VROnboarding = () => {
       <Text
         position={[0, -0.9, 0]}
         color="#aaaaaa"
-        fontSize={0.05}
+        fontSize={0.06}
         anchorX="center"
         anchorY="middle"
         maxWidth={2.0}
@@ -69,24 +69,24 @@ export const VROnboarding = () => {
         Press B to close or wait.
       </Text>
       
-      <group position={[-0.8, 0.55, 0]}>
+      <group position={[-0.9, 0.55, 0]}>
         {instructions.map((item, i) => {
-          const y = -i * 0.15;
+          const y = -i * 0.16;
           return (
             <group key={item.key} position={[0, y, 0]}>
               <Text
                 position={[0, 0, 0]}
                 color="#aaaaaa"
-                fontSize={0.08}
+                fontSize={0.09}
                 anchorX="left"
                 anchorY="middle"
               >
                 {item.key}:
               </Text>
               <Text
-                position={[0.6, 0, 0]}
+                position={[0.7, 0, 0]}
                 color="white"
-                fontSize={0.08}
+                fontSize={0.09}
                 anchorX="left"
                 anchorY="middle"
               >
