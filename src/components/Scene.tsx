@@ -1335,6 +1335,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   }, [marqueeStart, camera, gl]);
 
   const handleContextMenu = (e: any) => {
+    e.nativeEvent?.preventDefault?.();
     e.stopPropagation();
     if (useLegoStore.getState().activePreset) {
       useLegoStore.getState().loadPreset(null);

@@ -56,6 +56,9 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     useLegoStore.getState().setIsInteractingWithBrick(true);
 
     const isSqueeze = e.button === 2 || e.nativeEvent?.type === "contextmenu";
+    if (isSqueeze) {
+      e.nativeEvent?.preventDefault?.();
+    }
     if (mode === "Delete" || mode === "Move" || isSqueeze) {
       if (mode === "Delete" || isSqueeze) {
         e.stopPropagation();
