@@ -580,14 +580,15 @@ export const HumanViewLayer = ({
         }
 
         if (squeezePressed && !wasSqueezePressed.current) {
-          if (mode === "Build") {
-            useLegoStore.getState().setMode("Move");
-          }
-          const currentMode = useLegoStore.getState().mode;
-          if (currentMode === "Delete" || currentMode === "Move") {
-            const instId = hit.instanceId;
-            const ud = hit.object.userData;
-            if (instId !== undefined && ud && ud.bricks) {
+          const instId = hit.instanceId;
+          const ud = hit.object.userData;
+          if (instId !== undefined && ud && ud.bricks) {
+            // Only switch to Move mode if we actually hit a brick
+            if (mode === "Build") {
+              store.setMode("Move");
+            }
+            const currentMode = useLegoStore.getState().mode;
+            if (currentMode === "Delete" || currentMode === "Move") {
               let brickIndex = instId;
               if (ud.isStud) {
                 brickIndex = Math.floor(instId / (ud.w * ud.d));
