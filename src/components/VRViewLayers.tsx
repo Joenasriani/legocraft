@@ -8,7 +8,7 @@ import { audioService } from "../services/audioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
-import { isQuestControllerReady } from "../lib/vrHelpers";
+import { isQuestControllerReady, getVRTargetRay } from "../lib/vrHelpers";
 
 import { useXRStore } from "@react-three/xr";
 
@@ -120,10 +120,14 @@ export const HumanViewLayer = ({
 
   const debugTextRef = useRef<any>(null);
 
-  useFrame((state, delta, xrFrame) => {
+  useFrame((state, delta, xrFrameArg) => {
     const xrState = xrStore.getState();
     const session = xrState.session;
     if (!session || !sceneGroupRef.current) return;
+
+    // Standardize frame and reference space retrieval
+    const xrFrame = xrFrameArg || gl.xr.getFrame();
+    const referenceSpace = (xrState as any).originReferenceSpace || gl.xr.getReferenceSpace();
 
     let leftController: THREE.Object3D | null = null;
     let rightController: THREE.Object3D | null = null;
@@ -283,24 +287,20 @@ export const HumanViewLayer = ({
       wasBPressed.current = bPressed;
     }
 
-    // Resolve RIGHT controller pose and direction
+    // Resolve RIGHT controller pose and direction using canonical targetRaySpace
     let controllerPos = new THREE.Vector3();
     let controllerFwd = new THREE.Vector3(0, 0, -1);
     let controllerQuat = new THREE.Quaternion();
     let hasRightPose = false;
 
-    if (rightController) {
-      // Canonical resolver: Use the world matrix of the XR Controller object.
-      // In @react-three/xr, this object represents the targetRaySpace.
-      // We ensure the matrix is up to date since we are using it in useFrame.
-      rightController.updateMatrixWorld(true);
-      controllerPos.setFromMatrixPosition(rightController.matrixWorld);
-      controllerQuat.setFromRotationMatrix(rightController.matrixWorld);
-      controllerFwd
-        .set(0, 0, -1)
-        .transformDirection(rightController.matrixWorld)
-        .normalize();
-      hasRightPose = true;
+    if (rightInput && referenceSpace && xrFrame) {
+      const rayPose = getVRTargetRay(rightInput, xrFrame, referenceSpace);
+      if (rayPose) {
+        controllerPos.copy(rayPose.position);
+        controllerQuat.copy(rayPose.quaternion);
+        controllerFwd.copy(rayPose.direction);
+        hasRightPose = true;
+      }
     }
 
     if (hasRightPose && rightInput && rightInput.gamepad) {
@@ -983,6 +983,16 @@ export const HumanViewLayer = ({
     } else {
       if (laserRef.current) laserRef.current.visible = false;
       if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
+      // Clear interactions when tracking lost
+      updateGhostPosition(
+        new THREE.Vector3(0, -1000, 0),
+        new THREE.Vector3(0, 1, 0),
+        "none",
+      );
+      latestValidPlacement.current = null;
+      latestHit.current = null;
+      setHasPlacementCandidate(false);
+      useLegoStore.getState().setVRMenuHoverContent("");
     }
   });
 
