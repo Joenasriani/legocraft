@@ -266,32 +266,23 @@ export const HumanViewLayer = ({
       wasBPressed.current = bPressed;
     }
 
+    // Resolve RIGHT controller pose and direction
     let controllerPos = new THREE.Vector3();
     let controllerFwd = new THREE.Vector3(0, 0, -1);
     let controllerQuat = new THREE.Quaternion();
     let hasRightPose = false;
 
-    if (rightInput && rightInput.targetRaySpace && xrFrame) {
-      const refSpace = xrState.originReferenceSpace;
-      if (refSpace) {
-        const pose = xrFrame.getPose(rightInput.targetRaySpace, refSpace);
-        if (pose) {
-          controllerPos.copy(pose.transform.position as any);
-          controllerQuat.copy(pose.transform.orientation as any);
-          controllerFwd
-            .set(0, 0, -1)
-            .applyQuaternion(controllerQuat)
-            .normalize();
-          hasRightPose = true;
-        }
-      }
-    } else if (rightController) {
+    if (rightController) {
+      // Canonical resolver: Use the world matrix of the XR Controller object.
+      // In @react-three/xr, this object represents the targetRaySpace.
+      // We ensure the matrix is up to date since we are using it in useFrame.
+      rightController.updateMatrixWorld(true);
       controllerPos.setFromMatrixPosition(rightController.matrixWorld);
+      controllerQuat.setFromRotationMatrix(rightController.matrixWorld);
       controllerFwd
         .set(0, 0, -1)
         .transformDirection(rightController.matrixWorld)
         .normalize();
-      controllerQuat.setFromRotationMatrix(rightController.matrixWorld);
       hasRightPose = true;
     }
 
@@ -320,19 +311,19 @@ export const HumanViewLayer = ({
         }
       }
 
-      if ((import.meta as any).env.DEV) {
+      if (isDebugXR) {
         const now = Date.now();
         if (
-          !(window as any)._lastVRLaserLog ||
-          now - (window as any)._lastVRLaserLog > 1000
+          !(window as any)._lastVRLaserLogDebug ||
+          now - (window as any)._lastVRLaserLogDebug > 1000
         ) {
-          (window as any)._lastVRLaserLog = now;
-          console.log("[VR] Ray diagnostics", {
-            origin: pos.toArray().map((v) => v.toFixed(3)),
-            direction: fwd.toArray().map((v) => v.toFixed(3)),
-            gridRegistered: targets.some((t) => t.name === "Grid"),
-            hitTarget: hit?.object?.name || null,
-            hitPoint: hit?.point?.toArray().map((v) => v.toFixed(3)) || null,
+          (window as any)._lastVRLaserLogDebug = now;
+          console.log("[VR] ?debugXR=1", {
+            resolvedRightController: rightController?.name || "none",
+            laserOriginWorld: pos.toArray().map((v) => v.toFixed(3)),
+            controllerWorldPos: pos.toArray().map((v) => v.toFixed(3)),
+            rayDirection: fwd.toArray().map((v) => v.toFixed(3)),
+            hitTarget: hit?.object?.name || "none",
           });
         }
       }
