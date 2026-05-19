@@ -244,31 +244,14 @@ export const HumanViewLayer = ({
         if (currentPanel !== "none") {
           store.setXRPanel("none");
           handled = true;
-        } else if (store.mode === "Move" && store.movingBrickId) {
-          const targetBrickId = store.movingBrickId;
-          const targetBrick = store.bricks.find((b) => b.id === targetBrickId);
-          
-          if (targetBrick) {
-            if (store.selectionMode === "Group") {
-              const g = getGroupBricks(targetBrick, store.bricks);
-              store.removeBricks(g.map((bz) => bz.id));
-            } else if (store.selectionMode === "Multi") {
-              store.removeBricks(store.multiSelectedBrickIds);
-            } else {
-              store.removeBrick(targetBrickId);
-            }
-          }
-          
-          store.setMovingBrickId(null);
-          store.setIsDraggingBrick(false);
+        } else if (store.movingBrickId || store.multiSelectedBrickIds.length > 0 || store.activePreset) {
+          // Cancel active move, selection, or preset placement and return to neutral Build state
           store.setMode("Build");
           updateGhostPosition(
             new THREE.Vector3(0, -1000, 0),
             new THREE.Vector3(0, 1, 0),
             "none",
           );
-          triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-          audioService.play("remove");
           handled = true;
         } else if (store.mode !== "Build") {
           store.setMode("Build");
@@ -278,6 +261,7 @@ export const HumanViewLayer = ({
         if (handled) {
           squeezeMoveBlockedRef.current = false;
           movePreviewActiveRef.current = false;
+          triggerHaptics(rightInput, HapticType.UI_CLICK);
         }
       }
 
