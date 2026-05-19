@@ -956,6 +956,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const lastMouseMoveRef = useRef<number>(0);
 
   const handlePointerMove = (e: any) => {
+    if (isMultiTouch) return;
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
       return;
     }
@@ -1342,14 +1343,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const isMultiTouchRef = useRef(false);
 
   const activePointerIdRef = useRef<number | null>(null);
+  const [isMultiTouch, setIsMultiTouch] = useState(false);
+  const wasMultiTouchRef = useRef(false);
 
   const handlePointerDown = (e: any) => {
-    // Only accept new pointers if we are not already tracking one, or if it's the primary touch
-    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
-      return;
-    }
-    activePointerIdRef.current = e.pointerId;
-
+    // Only accept new pointers if we are not already tracking one (for placement),
+    // OR if it's a touch event (where we might need to handle multi-touch).
     const isTouch =
       e.pointerType === "touch" ||
       e.nativeEvent?.pointerType === "touch" ||
@@ -1358,13 +1357,37 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     const touchesCount = e.nativeEvent?.touches
       ? e.nativeEvent.touches.length
-      : 0;
+      : (isTouch ? 1 : 0);
+
+    // Multi-touch camera handling
+    if (isTouch && touchesCount >= 2) {
+      setIsMultiTouch(true);
+      wasMultiTouchRef.current = true;
+      // Disable placement logic for this interaction
+      interactionStartCandidateRef.current = null;
+      latestPlacementCandidateRef.current = null;
+      setHasPlacementCandidate(false);
+      pointerDownPos.current = null;
+      activePointerIdRef.current = null;
+      return;
+    }
+
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      return;
+    }
+    
+    // Only track pointer for placement if it's the first touch or not a touch interaction
+    if (touchesCount <= 1) {
+      activePointerIdRef.current = e.pointerId;
+      wasMultiTouchRef.current = false;
+    }
 
     const hit = getCanonicalHit(e);
     
     // Immediately set ghost position on touch down for responsiveness
+    // ONLY if not in multi-touch mode
     const currentMovingBrickId = useLegoStore.getState().movingBrickId;
-    if (hit && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
+    if (hit && !isMultiTouch && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
       const position = computePlacementTarget(
         hit.point,
         hit.normal,
@@ -1631,10 +1654,38 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   executeCommitRef.current = executeCommit;
 
   const handlePointerUp = (e: any) => {
+    const isTouch =
+      e.pointerType === "touch" ||
+      e.nativeEvent?.pointerType === "touch" ||
+      e.nativeEvent?.type?.includes("touch") ||
+      false;
+
+    const touchesCount = e.nativeEvent?.touches
+      ? e.nativeEvent.touches.length
+      : 0;
+
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      // If a non-active pointer is lifted, just update multi-touch state
+      if (isTouch && touchesCount < 2) {
+        setIsMultiTouch(false);
+      }
       return;
     }
     activePointerIdRef.current = null;
+
+    if (isTouch && touchesCount < 2) {
+      setIsMultiTouch(false);
+    }
+
+    if (wasMultiTouchRef.current) {
+      if (touchesCount === 0) {
+        wasMultiTouchRef.current = false;
+      }
+      interactionStartCandidateRef.current = null;
+      latestPlacementCandidateRef.current = null;
+      pointerDownPos.current = null;
+      return;
+    }
 
     isBrickInteractionRef.current = false;
     useLegoStore.getState().setIsInteractingWithBrick(false);
@@ -2189,9 +2240,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         maxDistance={100}
         enableDamping={true}
         dampingFactor={0.1}
-        enabled={!isCameraLocked && !isVR && !isDraggingBrick && !marqueeStart}
+        enabled={(!isCameraLocked || isMultiTouch) && !isVR && !isDraggingBrick && !marqueeStart}
         mouseButtons={mouseButtons as any}
-        touches={touches as any}
+        touches={ (mode === "Build" || activePreset !== null) ? { ONE: undefined, TWO: THREE.TOUCH.ROTATE } : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN } }
       />
 
       {marqueeStart && marqueeCurrent && (
