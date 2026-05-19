@@ -672,22 +672,41 @@ const isQuest =
 const isQuest3 =
   typeof navigator !== "undefined" && navigator.userAgent.includes("Quest 3");
 
-const xrStore = createXRStore({
-  emulate: false,
-  frameRate: isQuest3 ? "high" : isQuest ? "mid" : "high",
-  frameBufferScaling: isQuest3 ? "high" : isQuest ? "low" : "high",
-  layers: false,
-  anchors: false,
-  meshDetection: false,
-  planeDetection: false,
-  hitTest: false,
-  domOverlay: false,
-  hand: false, // Hand tracking disabled (unimplemented)
-  screenInput: false,
-  transientPointer: false,
-  controller: { rayPointer: false, teleportPointer: false, grabPointer: false }, // Disables library pointers but enables standard controller models because we use our custom VRViewLayers
-  customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: ["bounded-floor"] },
-});
+const xrStoreOptions = import.meta.env.DEV
+  ? {
+      emulate: true,
+      frameRate: isQuest3 ? "high" : isQuest ? "mid" : "high",
+      frameBufferScaling: isQuest3 ? "high" : isQuest ? "low" : "high",
+      layers: false,
+      anchors: false,
+      meshDetection: false,
+      planeDetection: false,
+      hitTest: false,
+      domOverlay: false,
+      hand: false,
+      screenInput: false,
+      transientPointer: false,
+      controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
+      customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: ["bounded-floor"] },
+    }
+  : {
+      emulate: false,
+      frameRate: isQuest3 ? "high" : isQuest ? "mid" : "high",
+      frameBufferScaling: isQuest3 ? "high" : isQuest ? "low" : "high",
+      layers: false,
+      anchors: false,
+      meshDetection: false,
+      planeDetection: false,
+      hitTest: false,
+      domOverlay: false,
+      hand: false,
+      screenInput: false,
+      transientPointer: false,
+      controller: { rayPointer: false, teleportPointer: false, grabPointer: false },
+      customSessionInit: { requiredFeatures: ["local-floor"], optionalFeatures: ["bounded-floor"] },
+    };
+
+const xrStore = createXRStore(xrStoreOptions as any);
 
 const SaveExportMenuOverlay = ({
   show,

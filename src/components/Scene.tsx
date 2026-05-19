@@ -956,6 +956,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const lastMouseMoveRef = useRef<number>(0);
 
   const handlePointerMove = (e: any) => {
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      return;
+    }
+
     const now = Date.now();
     if (now - lastMouseMoveRef.current < 16) return;
     lastMouseMoveRef.current = now;
@@ -965,8 +969,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     const isMoving = mode === "Move" && currentMovingBrickId !== null;
     const isPlacingPreset = activePreset !== null;
 
-    // On screen, always update ghost if we are in an active tool mode,
-    // even if not strictly "building" at this microsecond, to ensure responsiveness.
     if (!isBuilding && !isMoving && !isPlacingPreset) return;
 
     if (pointerDownPos.current) {
@@ -1020,7 +1022,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                   () => useLegoStore.getState().setToastMessage(null),
                   3000,
                 );
-                // Reset pointerDownPos so we don't keep trying to start dragging
                 pointerDownPos.current = null;
                 return;
               }
@@ -1029,9 +1030,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             setIsDraggingBrick(true);
             useLegoStore.getState().setJustSelectedBrick(false);
           }
+        } else if (pointerDownPos.current.isTouch) {
+          // TOUCH OPTIMIZATION: Even within the threshold, we update the ghost visually
+          // to avoid fixed-point "snapping" jump when the threshold is crossed.
+          // The commit logic will still use interactionStartCandidateRef if it turns out to be a click.
+          updateGhostFromEvent(e);
+          return;
         } else {
-          // Still within the click/tap threshold, do not visually update the ghost yet
-          // because if they release now, it will safely commit at interactionStartCandidateRef.
           return;
         }
       }
@@ -1336,7 +1341,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const isMultiTouchRef = useRef(false);
 
+  const activePointerIdRef = useRef<number | null>(null);
+
   const handlePointerDown = (e: any) => {
+    // Only accept new pointers if we are not already tracking one, or if it's the primary touch
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      return;
+    }
+    activePointerIdRef.current = e.pointerId;
+
     const isTouch =
       e.pointerType === "touch" ||
       e.nativeEvent?.pointerType === "touch" ||
@@ -1348,7 +1361,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       : 0;
 
     const hit = getCanonicalHit(e);
-    const hitPoint = hit ? hit.point.clone() : null;
+    
+    // Immediately set ghost position on touch down for responsiveness
+    const currentMovingBrickId = useLegoStore.getState().movingBrickId;
+    if (hit && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
+      const position = computePlacementTarget(
+        hit.point,
+        hit.normal,
+        hit.targetKind,
+      );
+      const candidate = { hit, position };
+      interactionStartCandidateRef.current = candidate;
+      latestPlacementCandidateRef.current = candidate;
+      setGhostPosition(position);
+      setHasPlacementCandidate(true);
+    }
 
     const isBrickHit = e.intersections?.some(
       (hitData: any) =>
@@ -1400,28 +1427,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
 
     pointerDownPos.current = { x: coords.x, y: coords.y, isTouch };
-
-    const isBuilding = mode === "Build";
-    const currentMovingBrickId = useLegoStore.getState().movingBrickId;
-    const isMoving = mode === "Move" && currentMovingBrickId !== null;
-    const isDragging = useLegoStore.getState().isDraggingBrick;
-    const isPlacingPreset = activePreset !== null;
-
-    // In Move mode, don't snap to pointer on down unless we are already dragging
-    if (isBuilding || isPlacingPreset || (isMoving && isDragging)) {
-      if (hit) {
-        e.stopPropagation();
-        const position = computePlacementTarget(
-          hit.point,
-          hit.normal,
-          hit.targetKind,
-        );
-        const candidate = { hit, position };
-        interactionStartCandidateRef.current = candidate;
-        latestPlacementCandidateRef.current = candidate;
-        setGhostPosition(position);
-      }
-    }
   };
 
   const executeCommit = (candidate: PlacementCandidate) => {
@@ -1626,6 +1631,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   executeCommitRef.current = executeCommit;
 
   const handlePointerUp = (e: any) => {
+    if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+      return;
+    }
+    activePointerIdRef.current = null;
+
     isBrickInteractionRef.current = false;
     useLegoStore.getState().setIsInteractingWithBrick(false);
 
@@ -1995,7 +2005,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         onPointerMove={handlePointerMove}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerOut={() => {
+        onPointerOut={(e) => {
+          if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
+            return;
+          }
+          activePointerIdRef.current = null;
           interactionStartCandidateRef.current = null;
           latestPlacementCandidateRef.current = null;
           setHasPlacementCandidate(false);
