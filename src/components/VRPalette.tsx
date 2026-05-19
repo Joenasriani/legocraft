@@ -170,55 +170,9 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
 export const VRPalette = () => {
   const { gl } = useThree();
-  const groupRef = useRef<THREE.Group>(null);
-  const xrStore = useXRStore();
   const [activeTab, setActiveTab] = useState<"bricks" | "shapes" | "presets">("bricks");
   
   const visible = useLegoStore((s) => s.xrPanel === "palette");
-
-  useFrame((state, delta) => {
-    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-
-    const xrState = xrStore.getState() as any;
-    const inputSources = Array.from(xrState.inputSourceStates || []) as any[];
-    const leftState = inputSources.find((s) => s.inputSource.handedness === "left" && !s.inputSource.hand);
-    const leftController = leftState?.object;
-
-    if (leftController) {
-      // Anchor near left controller (slightly above and to the right of hand)
-      const worldPos = new THREE.Vector3().setFromMatrixPosition(leftController.matrixWorld);
-      const worldQuat = new THREE.Quaternion().setFromRotationMatrix(leftController.matrixWorld);
-      
-      const cam = gl.xr.getCamera();
-      const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
-      
-      const targetPos = worldPos.clone().add(new THREE.Vector3(0.05, 0.2, 0.05).applyQuaternion(worldQuat));
-      
-      // Face headset
-      const lookAtQuat = new THREE.Quaternion();
-      const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
-      lookAtQuat.setFromRotationMatrix(m);
-      
-      groupRef.current.position.lerp(targetPos, delta * 8);
-      groupRef.current.quaternion.slerp(lookAtQuat, delta * 8);
-    } else {
-      // Head-follow fallback with deadzone so it doesn't drift away
-      const cam = gl.xr.getCamera();
-      const target = getSafePanelTransform(cam);
-      const currentPos = groupRef.current.position;
-      
-      const distance = currentPos.distanceTo(target.position);
-      if (distance > 1.5) {
-        // Sudden snap if way off
-        currentPos.copy(target.position);
-        groupRef.current.quaternion.copy(target.quaternion);
-      } else if (distance > 0.3) {
-        // Smooth follow if drifting
-        currentPos.lerp(target.position, delta * 2.0);
-        groupRef.current.quaternion.slerp(target.quaternion, delta * 2.0);
-      }
-    }
-  });
 
   const activeColor = useLegoStore((s) => s.selectedColor);
   const setActiveColor = useLegoStore((s) => s.setSelectedColor);
@@ -236,7 +190,7 @@ export const VRPalette = () => {
   const RIGHT_WIDTH = 0.43;
 
   return (
-    <group ref={groupRef} position={[0, 100, 0]}>
+    <group>
       {/* Background Panel */}
       <mesh position={[0, -0.05, -0.01]}>
         <boxGeometry args={[PANEL_WIDTH, PANEL_HEIGHT, 0.005]} />

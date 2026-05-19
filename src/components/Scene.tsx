@@ -53,6 +53,8 @@ import { VROnboarding } from "./VROnboarding";
 import { VRWaitingPanel } from "./VRWaitingPanel";
 
 import { VRLocomotion } from "./VRLocomotion";
+import { VRHeadAnchor, VRLeftHandAnchor } from "./VRMenuAnchors";
+import { VRModeIndicator } from "./VRModeIndicator";
 
 const isQuest =
   typeof navigator !== "undefined" &&
@@ -1959,22 +1961,21 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       )}
 
       <Suspense fallback={null}>
-        {xrSessionActive && showXRPerf && <VRStats />}
-        {xrSessionActive &&
-          (() => {
-            switch (xrPanel) {
-              case "waitingControllers":
-                return <VRWaitingPanel />;
-              case "onboarding":
-                return <VROnboarding />;
-              case "buildMenu":
-                return <VRRadialMenu vrScale={vrScale} />;
-              case "palette":
-                return <VRPalette />;
-              default:
-                return null;
-            }
-          })()}
+        {xrSessionActive && (
+          <>
+            <VRHeadAnchor>
+              {showXRPerf && <VRStats />}
+              {xrPanel === "waitingControllers" && <VRWaitingPanel />}
+              {xrPanel === "onboarding" && <VROnboarding />}
+              <VRModeIndicator />
+            </VRHeadAnchor>
+            
+            <VRLeftHandAnchor>
+              {xrPanel === "buildMenu" && <VRRadialMenu vrScale={vrScale} />}
+              {xrPanel === "palette" && <VRPalette />}
+            </VRLeftHandAnchor>
+          </>
+        )}
 
         {xrSessionActive && <VRDebugVisibilityLayer />}
 

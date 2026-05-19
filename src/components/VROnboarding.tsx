@@ -6,25 +6,6 @@ import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
-  const { gl } = useThree();
-  const groupRef = useRef<THREE.Group>(null);
-
-  useFrame((_, delta) => {
-    if (!gl.xr.isPresenting || !groupRef.current) return;
-    const cam = gl.xr.getCamera();
-    const target = getSafePanelTransform(cam);
-    
-    // Jump if extremely far away (e.g. first frame)
-    if (groupRef.current.position.distanceTo(target.position) > 10) {
-      groupRef.current.position.copy(target.position);
-      groupRef.current.quaternion.copy(target.quaternion);
-    } else {
-      // Smoothly follow
-      groupRef.current.position.lerp(target.position, delta * 5.0);
-      groupRef.current.quaternion.slerp(target.quaternion, delta * 5.0);
-    }
-  });
-
   const instructions = [
     { key: "Right Trigger", action: "Place / Confirm" },
     { key: "Right Grip", action: "Pick Up / Drag" },
@@ -48,7 +29,7 @@ export const VROnboarding = () => {
   }, [closeXRPanel]);
 
   return (
-    <group ref={groupRef} position={[0, 100, 0]} scale={0.6}>
+    <group scale={0.6}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[2.4, 2.2]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.9} depthWrite={false} />

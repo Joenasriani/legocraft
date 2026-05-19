@@ -60,8 +60,6 @@ export const VRRadialMenu = ({
   vrScale: "human" | "micro";
 }) => {
   const { gl } = useThree();
-  const groupRef = useRef<THREE.Group>(null);
-  const xrStore = useXRStore();
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
 
@@ -73,47 +71,6 @@ export const VRRadialMenu = ({
       setClearArmed(false);
     }
   }, [visible]);
-
-  useFrame((state, delta) => {
-    if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-
-    const xrState = xrStore.getState() as any;
-    const inputSources = Array.from(xrState.inputSourceStates || []) as any[];
-    const leftState = inputSources.find((s) => s.inputSource.handedness === "left" && !s.inputSource.hand);
-    const leftController = leftState?.object;
-
-    if (leftController) {
-      // Anchor near left controller (hand center)
-      const worldPos = new THREE.Vector3().setFromMatrixPosition(leftController.matrixWorld);
-      const worldQuat = new THREE.Quaternion().setFromRotationMatrix(leftController.matrixWorld);
-      
-      const cam = gl.xr.getCamera();
-      const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
-      
-      // Near hand, slightly up
-      const targetPos = worldPos.clone().add(new THREE.Vector3(0, 0.15, 0).applyQuaternion(worldQuat));
-      
-      const lookAtQuat = new THREE.Quaternion();
-      const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
-      lookAtQuat.setFromRotationMatrix(m);
-      
-      groupRef.current.position.lerp(targetPos, delta * 12);
-      groupRef.current.quaternion.slerp(lookAtQuat, delta * 12);
-    } else {
-      const cam = gl.xr.getCamera();
-      const target = getSafePanelTransform(cam);
-      const currentPos = groupRef.current.position;
-      
-      const distance = currentPos.distanceTo(target.position);
-      if (distance > 2.0) {
-        currentPos.copy(target.position);
-        groupRef.current.quaternion.copy(target.quaternion);
-      } else if (distance > 0.1) {
-        currentPos.lerp(target.position, delta * 4.0);
-        groupRef.current.quaternion.slerp(target.quaternion, delta * 4.0);
-      }
-    }
-  });
 
   const radius = vrScale === "human" ? 0.22 : 2.2;
   const boxDepth = vrScale === "human" ? 0.015 : 0.1;
@@ -187,7 +144,7 @@ export const VRRadialMenu = ({
   if (!visible) return null;
 
   return (
-    <group ref={groupRef} position={[0, 100, 0]}>
+    <group>
       {SEGMENTS.map((seg, i) => {
           const x = Math.cos(seg.theta) * radius;
           const y = Math.sin(seg.theta) * radius;
