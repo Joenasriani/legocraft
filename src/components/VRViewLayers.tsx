@@ -115,6 +115,179 @@ export const HumanViewLayer = ({
     tk: string;
   } | null>(null);
 
+  const clearGhost = () => {
+    updateGhostPosition(
+      new THREE.Vector3(0, -1000, 0),
+      new THREE.Vector3(0, 1, 0),
+      "none",
+    );
+    latestValidPlacement.current = null;
+    setHasPlacementCandidate(false);
+  };
+
+  const requestCommit = (p: THREE.Vector3, n: THREE.Vector3, tk: string, rightInput: XRInputSource | null) => {
+    const success = handleVRCommit(p, n, tk);
+    if (success) {
+      if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_PLACE);
+      audioService.play("place");
+      movePreviewActiveRef.current = false;
+      return true;
+    } else {
+      if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+      audioService.play("error");
+      return false;
+    }
+  };
+
+  const performVRDelete = (brick: any, rightInput: XRInputSource | null) => {
+    const store = useLegoStore.getState();
+    const allBricks = store.bricks;
+
+    if (store.selectionMode === "Group") {
+      const g = getGroupBricks(brick, allBricks);
+      const gIds = g.map((bz: any) => bz.id);
+      const isBlocked = g.some((bz: any) =>
+        hasBrickAbove(bz, allBricks, MODULE_SIZE, BRICK_HEIGHT, gIds),
+      );
+
+      if (isBlocked) {
+        store.setToastMessage("Cannot delete: selection is blocked by other bricks on top.");
+        setTimeout(() => store.setToastMessage(null), 3000);
+        if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+        audioService.play("error");
+      } else {
+        store.removeBricks(gIds);
+        if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+        audioService.play("remove");
+      }
+    } else if (store.selectionMode === "Multi") {
+      const multiIds = store.multiSelectedBrickIds;
+      const isPart = multiIds.includes(brick.id);
+      const idsToDelete = isPart ? multiIds : [brick.id];
+
+      const isBlocked = idsToDelete.some((id) => {
+        const br = allBricks.find((bk) => bk.id === id);
+        return (
+          br &&
+          hasBrickAbove(br, allBricks, MODULE_SIZE, BRICK_HEIGHT, idsToDelete)
+        );
+      });
+
+      if (isBlocked) {
+        store.setToastMessage(
+          idsToDelete.length > 1
+            ? "Cannot delete selection: blocked by other bricks."
+            : "Cannot delete: brick has another brick above it.",
+        );
+        setTimeout(() => store.setToastMessage(null), 3000);
+        if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+        audioService.play("error");
+      } else {
+        store.removeBricks(idsToDelete);
+        if (isPart) {
+          store.setMultiSelectedBrickIds([]);
+        }
+        if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+        audioService.play("remove");
+      }
+    } else {
+      if (hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT)) {
+        store.setToastMessage("Cannot delete: brick has another brick above it.");
+        setTimeout(() => store.setToastMessage(null), 3000);
+        if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+        audioService.play("error");
+      } else {
+        store.removeBrick(brick.id);
+        if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_DELETE);
+        audioService.play("remove");
+      }
+    }
+  };
+
+  const performVRSelection = (brick: any, rightInput: XRInputSource | null, controllerPos: THREE.Vector3) => {
+    const store = useLegoStore.getState();
+    const allBricks = store.bricks;
+
+    if (store.selectionMode === "Group") {
+      const g = getGroupBricks(brick, allBricks);
+      const gIds = g.map((bz: any) => bz.id);
+      const isBlocked = g.some((bz: any) =>
+        hasBrickAbove(bz, allBricks, MODULE_SIZE, BRICK_HEIGHT, gIds),
+      );
+
+      store.setMovingBrickId(brick.id);
+      store.setIsDraggingBrick(false);
+      squeezeMoveBlockedRef.current = isBlocked;
+      movePreviewActiveRef.current = false;
+      squeezeStartPosRef.current = controllerPos.clone();
+
+      if (isBlocked) {
+        store.setToastMessage("Cannot move: selection is blocked by other bricks on top.");
+        setTimeout(() => store.setToastMessage(null), 3000);
+        if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+        audioService.play("error");
+      }
+    } else if (store.selectionMode === "Multi") {
+      const stateBefore = useLegoStore.getState();
+      stateBefore.toggleMultiSelectBrickId(brick.id);
+      const stateAfter = useLegoStore.getState();
+      const isNowSelected = stateAfter.multiSelectedBrickIds.includes(brick.id);
+
+      if (isNowSelected) {
+        store.setMovingBrickId(brick.id);
+        const isBlocked = stateAfter.multiSelectedBrickIds.some((id) => {
+          const br = stateAfter.bricks.find((bk) => bk.id === id);
+          return (
+            br &&
+            hasBrickAbove(
+              br,
+              stateAfter.bricks,
+              MODULE_SIZE,
+              BRICK_HEIGHT,
+              stateAfter.multiSelectedBrickIds,
+            )
+          );
+        });
+        store.setIsDraggingBrick(false);
+        squeezeMoveBlockedRef.current = isBlocked;
+        movePreviewActiveRef.current = false;
+        squeezeStartPosRef.current = controllerPos.clone();
+
+        if (isBlocked) {
+          store.setToastMessage("Cannot move: selection is blocked by other bricks on top.");
+          setTimeout(() => store.setToastMessage(null), 3000);
+          if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+          audioService.play("error");
+        }
+      } else if (stateBefore.movingBrickId === brick.id) {
+        const newAnchorId = stateAfter.multiSelectedBrickIds[stateAfter.multiSelectedBrickIds.length - 1];
+        store.setMovingBrickId(newAnchorId || null);
+        squeezeMoveBlockedRef.current = false;
+        movePreviewActiveRef.current = false;
+        store.setIsDraggingBrick(false);
+      }
+    } else {
+      const isBlocked = hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT);
+      store.setMovingBrickId(brick.id);
+      store.setIsDraggingBrick(false);
+      squeezeMoveBlockedRef.current = isBlocked;
+      movePreviewActiveRef.current = false;
+      squeezeStartPosRef.current = controllerPos.clone();
+
+      if (isBlocked) {
+        store.setToastMessage("Cannot move: selection is blocked by other bricks on top.");
+        setTimeout(() => store.setToastMessage(null), 3000);
+        if (rightInput) triggerHaptics(rightInput, HapticType.ERROR);
+        audioService.play("error");
+      }
+    }
+
+    store.setJustSelectedBrick(true);
+    if (rightInput) triggerHaptics(rightInput, HapticType.BRICK_SELECT);
+    audioService.play("select");
+    store.triggerSetGhostRotation(brick.rotation);
+  };
+
   const debugTextRef = useRef<any>(null);
 
   useFrame((state, delta, xrFrameArg) => {
@@ -247,11 +420,7 @@ export const HumanViewLayer = ({
         } else if (store.movingBrickId || store.multiSelectedBrickIds.length > 0 || store.activePreset) {
           // Cancel active move, selection, or preset placement and return to neutral Build state
           store.setMode("Build");
-          updateGhostPosition(
-            new THREE.Vector3(0, -1000, 0),
-            new THREE.Vector3(0, 1, 0),
-            "none",
-          );
+          clearGhost();
           handled = true;
         } else if (store.mode !== "Build") {
           store.setMode("Build");
@@ -365,18 +534,10 @@ export const HumanViewLayer = ({
 
         if (isMenuItem && onTriggerFn) {
           latestValidPlacement.current = null;
-          updateGhostPosition(
-            new THREE.Vector3(0, -1000, 0),
-            new THREE.Vector3(0, 1, 0),
-            "none",
-          );
+          clearGhost();
         } else if (useLegoStore.getState().xrPanel !== "none") {
           latestValidPlacement.current = null;
-          updateGhostPosition(
-            new THREE.Vector3(0, -1000, 0),
-            new THREE.Vector3(0, 1, 0),
-            "none",
-          );
+          clearGhost();
         } else {
           // Normal brick interaction
           const pointLocal = hit.point.clone();
@@ -450,57 +611,7 @@ export const HumanViewLayer = ({
                 : instId;
               const b = ud.bricks[brickIndex];
               if (b) {
-                if (selectionMode === "Group") {
-                  const allb = useLegoStore.getState().bricks;
-                  const g = getGroupBricks(b, allb);
-                  removeBricks(g.map((bz: any) => bz.id));
-                } else if (selectionMode === "Multi") {
-                  const multiIds = useLegoStore.getState().multiSelectedBrickIds;
-                  const isPart = multiIds.includes(b.id);
-                  const idsToDelete = isPart ? multiIds : [b.id];
-
-                  const allb = useLegoStore.getState().bricks;
-                  const isBlocked = idsToDelete.some((id) => {
-                    const br = allb.find((bk) => bk.id === id);
-                    return (
-                      br &&
-                      hasBrickAbove(
-                        br,
-                        allb,
-                        MODULE_SIZE,
-                        BRICK_HEIGHT,
-                        idsToDelete,
-                      )
-                    );
-                  });
-
-                  if (isBlocked) {
-                    useLegoStore
-                      .getState()
-                      .setToastMessage(
-                        idsToDelete.length > 1
-                          ? "Cannot delete selection: blocked by other bricks."
-                          : "Cannot delete: brick has another brick above it.",
-                      );
-                    setTimeout(
-                      () => useLegoStore.getState().setToastMessage(null),
-                      3000,
-                    );
-                    triggerHaptics(rightInput, HapticType.ERROR);
-                    audioService.play("error");
-                  } else {
-                    useLegoStore.getState().removeBricks(idsToDelete);
-                    if (isPart) {
-                      useLegoStore.getState().setMultiSelectedBrickIds([]);
-                    }
-                    triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                    audioService.play("remove");
-                  }
-                } else {
-                  removeBrick(b.id);
-                  triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                  audioService.play("remove");
-                }
+                performVRDelete(b, rightInput);
               }
             }
           } else {
@@ -516,33 +627,19 @@ export const HumanViewLayer = ({
               mode === "Build" && latestValidPlacement.current;
 
             if (canCommitMove || canCommitBuild) {
-              const success = handleVRCommit(
+              requestCommit(
                 latestValidPlacement.current!.p,
                 latestValidPlacement.current!.n,
                 latestValidPlacement.current!.tk,
+                rightInput,
               );
-              if (success) {
-                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.play("place");
-                movePreviewActiveRef.current = false;
-              } else {
-                triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.play("error");
-              }
             } else if (canCommitRotationOnly) {
-              const success = handleVRCommit(
+              requestCommit(
                 new THREE.Vector3(),
                 new THREE.Vector3(0, 1, 0),
                 "none",
+                rightInput,
               );
-              if (success) {
-                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.play("place");
-                movePreviewActiveRef.current = false;
-              } else {
-                triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.play("error");
-              }
             } else if (mode === "Move" && !state.movingBrickId) {
               useLegoStore
                 .getState()
@@ -596,233 +693,9 @@ export const HumanViewLayer = ({
               const b = ud.bricks[brickIndex];
               if (b) {
                 if (currentMode === "Delete") {
-                  if (selectionMode === "Group") {
-                    const allb = useLegoStore.getState().bricks;
-                    const g = getGroupBricks(b, allb);
-                    const gIds = g.map((bz: any) => bz.id);
-                    if (
-                      g.some((bz: any) =>
-                        hasBrickAbove(
-                          bz,
-                          allb,
-                          MODULE_SIZE,
-                          BRICK_HEIGHT,
-                          gIds,
-                        ),
-                      )
-                    ) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage(
-                          "Cannot delete: selection is blocked by other bricks on top.",
-                        );
-                      setTimeout(
-                        () => useLegoStore.getState().setToastMessage(null),
-                        3000,
-                      );
-                      triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.play("error");
-                    } else {
-                      removeBricks(gIds);
-                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                      audioService.play("remove");
-                    }
-                  } else if (selectionMode === "Multi") {
-                    const multiIds =
-                      useLegoStore.getState().multiSelectedBrickIds;
-                    const isPart = multiIds.includes(b.id);
-                    const idsToDelete = isPart ? multiIds : [b.id];
-
-                    const allb = useLegoStore.getState().bricks;
-                    const isBlocked = idsToDelete.some((id) => {
-                      const br = allb.find((bk) => bk.id === id);
-                      return (
-                        br &&
-                        hasBrickAbove(
-                          br,
-                          allb,
-                          MODULE_SIZE,
-                          BRICK_HEIGHT,
-                          idsToDelete,
-                        )
-                      );
-                    });
-
-                    if (isBlocked) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage(
-                          idsToDelete.length > 1
-                            ? "Cannot delete selection: blocked by other bricks."
-                            : "Cannot delete: brick has another brick above it.",
-                        );
-                      setTimeout(
-                        () => useLegoStore.getState().setToastMessage(null),
-                        3000,
-                      );
-                      triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.play("error");
-                    } else {
-                      useLegoStore.getState().removeBricks(idsToDelete);
-                      if (isPart) {
-                        useLegoStore.getState().setMultiSelectedBrickIds([]);
-                      }
-                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                      audioService.play("remove");
-                    }
-                  } else {
-                    if (
-                      hasBrickAbove(
-                        b,
-                        useLegoStore.getState().bricks,
-                        MODULE_SIZE,
-                        BRICK_HEIGHT,
-                      )
-                    ) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage(
-                          "Cannot delete: brick has another brick above it.",
-                        );
-                      setTimeout(
-                        () => useLegoStore.getState().setToastMessage(null),
-                        3000,
-                      );
-                      triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.play("error");
-                    } else {
-                      removeBrick(b.id);
-                      triggerHaptics(rightInput, HapticType.BRICK_DELETE);
-                      audioService.play("remove");
-                    }
-                  }
+                  performVRDelete(b, rightInput);
                 } else if (currentMode === "Move" && !movingBrickId) {
-                  if (selectionMode === "Group") {
-                    setMovingBrickId(b.id);
-                    const allb = useLegoStore.getState().bricks;
-                    const g = getGroupBricks(b, allb);
-                    const gIds = g.map((bz: any) => bz.id);
-                    const isBlocked = g.some((bz: any) =>
-                      hasBrickAbove(bz, allb, MODULE_SIZE, BRICK_HEIGHT, gIds),
-                    );
-
-                    setIsDraggingBrick(false);
-                    squeezeMoveBlockedRef.current = isBlocked;
-                    movePreviewActiveRef.current = false;
-                    squeezeStartPosRef.current = pos.clone();
-
-                    if (isBlocked) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage(
-                          "Cannot move: selection is blocked by other bricks on top.",
-                        );
-                      setTimeout(
-                        () => useLegoStore.getState().setToastMessage(null),
-                        3000,
-                      );
-                      triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.play("error");
-                    }
-
-                    setJustSelectedBrick(true);
-                    triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.play("select");
-                    useLegoStore.getState().triggerSetGhostRotation(b.rotation);
-                  } else if (selectionMode === "Multi") {
-                    const stateBefore = useLegoStore.getState();
-                    stateBefore.toggleMultiSelectBrickId(b.id);
-                    const stateAfter = useLegoStore.getState();
-                    const isNowSelected =
-                      stateAfter.multiSelectedBrickIds.includes(b.id);
-
-                    if (isNowSelected) {
-                      setMovingBrickId(b.id);
-                      const isBlocked = stateAfter.multiSelectedBrickIds.some(
-                        (id) => {
-                          const br = stateAfter.bricks.find(
-                            (bk) => bk.id === id,
-                          );
-                          return (
-                            br &&
-                            hasBrickAbove(
-                              br,
-                              stateAfter.bricks,
-                              MODULE_SIZE,
-                              BRICK_HEIGHT,
-                              stateAfter.multiSelectedBrickIds,
-                            )
-                          );
-                        },
-                      );
-                      setIsDraggingBrick(false);
-                      squeezeMoveBlockedRef.current = isBlocked;
-                      movePreviewActiveRef.current = false;
-                      squeezeStartPosRef.current = pos.clone();
-
-                      if (isBlocked) {
-                        useLegoStore
-                          .getState()
-                          .setToastMessage(
-                            "Cannot move: selection is blocked by other bricks on top.",
-                          );
-                        setTimeout(
-                          () => useLegoStore.getState().setToastMessage(null),
-                          3000,
-                        );
-                        triggerHaptics(rightInput, HapticType.ERROR);
-                        audioService.play("error");
-                      }
-                    } else if (stateBefore.movingBrickId === b.id) {
-                      const newAnchorId =
-                        stateAfter.multiSelectedBrickIds[
-                          stateAfter.multiSelectedBrickIds.length - 1
-                        ];
-                      setMovingBrickId(newAnchorId || null);
-                      squeezeMoveBlockedRef.current = false;
-                      movePreviewActiveRef.current = false;
-                      if (newAnchorId) {
-                        setIsDraggingBrick(false);
-                      } else {
-                        setIsDraggingBrick(false);
-                      }
-                    }
-                    setJustSelectedBrick(true);
-                    triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.play("select");
-                    useLegoStore.getState().triggerSetGhostRotation(b.rotation);
-                  } else {
-                    setMovingBrickId(b.id);
-                    const blocks = useLegoStore.getState().bricks;
-                    const isBlocked = hasBrickAbove(
-                      b,
-                      blocks,
-                      MODULE_SIZE,
-                      BRICK_HEIGHT,
-                    );
-                    setIsDraggingBrick(false);
-                    squeezeMoveBlockedRef.current = isBlocked;
-                    movePreviewActiveRef.current = false;
-                    squeezeStartPosRef.current = pos.clone();
-
-                    if (isBlocked) {
-                      useLegoStore
-                        .getState()
-                        .setToastMessage(
-                          "Cannot move: selection is blocked by other bricks on top.",
-                        );
-                      setTimeout(
-                        () => useLegoStore.getState().setToastMessage(null),
-                        3000,
-                      );
-                      triggerHaptics(rightInput, HapticType.ERROR);
-                      audioService.play("error");
-                    }
-                    setJustSelectedBrick(true);
-                    triggerHaptics(rightInput, HapticType.BRICK_SELECT);
-                    audioService.play("select");
-                    useLegoStore.getState().triggerSetGhostRotation(b.rotation);
-                  }
+                  performVRSelection(b, rightInput, pos);
                 }
               }
             }
@@ -838,13 +711,7 @@ export const HumanViewLayer = ({
           movePreviewActiveRef.current &&
           !squeezePressed;
         if (!isFrozenPreview) {
-          updateGhostPosition(
-            new THREE.Vector3(0, -1000, 0),
-            new THREE.Vector3(0, 1, 0),
-            "none",
-          );
-          latestValidPlacement.current = null;
-          setHasPlacementCandidate(false);
+          clearGhost();
         }
         latestHit.current = null;
 
@@ -863,33 +730,19 @@ export const HumanViewLayer = ({
               mode === "Move" && state.movingBrickId && !state.isDraggingBrick;
 
             if (canCommitFrozenMove) {
-              const success = handleVRCommit(
+              requestCommit(
                 latestValidPlacement.current!.p,
                 latestValidPlacement.current!.n,
                 latestValidPlacement.current!.tk,
+                rightInput,
               );
-              if (success) {
-                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.play("place");
-                movePreviewActiveRef.current = false;
-              } else {
-                triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.play("error");
-              }
             } else if (canCommitRotationOnly) {
-              const success = handleVRCommit(
+              requestCommit(
                 new THREE.Vector3(),
                 new THREE.Vector3(0, 1, 0),
                 "none",
+                rightInput,
               );
-              if (success) {
-                triggerHaptics(rightInput, HapticType.BRICK_PLACE);
-                audioService.play("place");
-                movePreviewActiveRef.current = false;
-              } else {
-                triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.play("error");
-              }
             }
           }
         }
@@ -968,14 +821,8 @@ export const HumanViewLayer = ({
       if (laserRef.current) laserRef.current.visible = false;
       if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
       // Clear interactions when tracking lost
-      updateGhostPosition(
-        new THREE.Vector3(0, -1000, 0),
-        new THREE.Vector3(0, 1, 0),
-        "none",
-      );
-      latestValidPlacement.current = null;
+      clearGhost();
       latestHit.current = null;
-      setHasPlacementCandidate(false);
       useLegoStore.getState().setVRMenuHoverContent("");
     }
   });

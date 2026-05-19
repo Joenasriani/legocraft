@@ -66,7 +66,7 @@ export const VRStats = () => {
   const panelHeight = 0.4 + (warnings.length > 0 ? warnings.length * 0.04 : 0);
 
   return (
-    <group position={[-0.8, 1.2, -1.0]} rotation={[0, 0, 0]} scale={0.7}>
+    <group position={[-0.7, 0.6, 0]} rotation={[0, 0, 0]} scale={0.7}>
       <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[0.5, panelHeight]} />
         <meshBasicMaterial color="#111111" transparent opacity={0.7} />
