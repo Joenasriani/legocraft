@@ -109,9 +109,6 @@ export const HumanViewLayer = ({
   } | null>(null);
 
   const latestHit = useRef<any>(null);
-  const latestMenuItem = useRef<any>(null);
-  const latestInput = useRef<any>(null);
-
   const latestValidPlacement = useRef<{
     p: THREE.Vector3;
     n: THREE.Vector3;
@@ -288,6 +285,7 @@ export const HumanViewLayer = ({
     }
 
     // Resolve RIGHT controller pose and direction using canonical targetRaySpace
+    // This is the single canonical source for all right-hand ray interactions
     let controllerPos = new THREE.Vector3();
     let controllerFwd = new THREE.Vector3(0, 0, -1);
     let controllerQuat = new THREE.Quaternion();
@@ -308,6 +306,7 @@ export const HumanViewLayer = ({
       const fwd = controllerFwd;
       
       // Update laser visual immediately if we have a pose
+      // Laser matches the canonical ray exactly
       if (laserRef.current) {
         laserRef.current.visible = true;
         laserRef.current.position.copy(pos);
