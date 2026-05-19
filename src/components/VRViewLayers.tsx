@@ -21,6 +21,7 @@ export const HumanViewLayer = ({
   sceneGroupRef,
   updateGhostPosition,
   handleVRCommit,
+  setHasPlacementCandidate,
 }: {
   currentVRScale: number;
   sceneGroupRef: React.RefObject<THREE.Group | null>;
@@ -30,6 +31,7 @@ export const HumanViewLayer = ({
     tk?: string,
   ) => void;
   handleVRCommit: (p: THREE.Vector3, n: THREE.Vector3, tk: string) => boolean;
+  setHasPlacementCandidate: (val: boolean) => void;
 }) => {
   const xrStore = useXRStore();
   const { gl, scene } = useThree();
@@ -379,7 +381,13 @@ export const HumanViewLayer = ({
           );
         } else {
           // Normal brick interaction
-          const unscaledP3 = hit.point.clone().divideScalar(currentVRScale);
+          const pointLocal = hit.point.clone();
+          if (sceneGroupRef.current) {
+            sceneGroupRef.current.worldToLocal(pointLocal);
+          } else {
+            pointLocal.divideScalar(currentVRScale);
+          }
+
           const normal = hit.face?.normal
             ? hit.face.normal
                 .clone()
@@ -398,7 +406,8 @@ export const HumanViewLayer = ({
           let targetKind = "none";
           if (
             hit.object.name === "FloorPlacementCollider" ||
-            hit.object.name === "VRFloorCollider"
+            hit.object.name === "VRFloorCollider" ||
+            hit.object.name === "Grid"
           )
             targetKind = "floor";
           else if (Math.abs(normal.y) > 0.7) targetKind = "brick-top";
@@ -415,14 +424,15 @@ export const HumanViewLayer = ({
           } else {
             latestValidPlacement.current = isValidPlacement
               ? {
-                  p: unscaledP3,
+                  p: pointLocal,
                   n: normal,
                   tk: targetKind,
                 }
               : null;
             // Always update ghost position if we hit a valid physical target, 
             // so the user sees feedback even if placement is rejected.
-            updateGhostPosition(unscaledP3, normal, targetKind);
+            updateGhostPosition(pointLocal, normal, targetKind);
+            setHasPlacementCandidate(true);
           }
         } // End of placement calc
 
@@ -835,6 +845,7 @@ export const HumanViewLayer = ({
             "none",
           );
           latestValidPlacement.current = null;
+          setHasPlacementCandidate(false);
         }
         latestHit.current = null;
 

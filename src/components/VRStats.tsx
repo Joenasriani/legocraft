@@ -1,6 +1,7 @@
-import { useState, useRef, useMemo, useEffect } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { Text } from "@react-three/drei";
 import { useLegoStore } from "../Store";
 
 export const VRStats = () => {
@@ -61,74 +62,40 @@ export const VRStats = () => {
     return alerts;
   }, [stats]);
 
-  const text = useMemo(() => {
-    let base = [
-      `FPS: ${stats.fps}`,
-      `Frame Time: ${stats.frameTime}ms`,
-      `Draw Calls: ${stats.drawCalls}`,
-      `Triangles: ${stats.triangles.toLocaleString()}`,
-      `Bricks: ${stats.bricks}`,
-      `Session: ${formatDuration(stats.sessionDuration)}`,
-    ].join("\n");
-
-    if (warnings.length > 0) {
-      base += "\n\n" + warnings.map((w) => `⚠️ ${w}`).join("\n");
-    }
-    return base;
-  }, [stats, warnings]);
-
-  const canvasRef = useRef<HTMLCanvasElement>(document.createElement("canvas"));
-  const textureRef = useRef<THREE.CanvasTexture | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    canvas.width = 512;
-    canvas.height = 512;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "white";
-      ctx.font = "bold 32px sans-serif";
-
-      const lines = text.split("\n");
-      lines.forEach((line, i) => {
-        if (line.includes("⚠️")) {
-          ctx.fillStyle = "#ef4444";
-        } else {
-          ctx.fillStyle = "white";
-        }
-        ctx.fillText(line, 20, 50 + i * 45);
-      });
-    }
-    if (textureRef.current) {
-      textureRef.current.needsUpdate = true;
-    }
-  }, [text]);
-
   const panelHeight = 0.4 + (warnings.length > 0 ? warnings.length * 0.04 : 0);
-
-  // Initialize texture eagerly so it's not null on first render
-  const texture = useMemo(() => {
-    if (!textureRef.current) {
-      textureRef.current = new THREE.CanvasTexture(canvasRef.current);
-    }
-    return textureRef.current;
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (textureRef.current) textureRef.current.dispose();
-    };
-  }, []);
 
   return (
     <group position={[-0.8, 1.2, -1]} rotation={[0, 0.4, 0]}>
-      <mesh>
+      <mesh position={[0, 0, -0.01]}>
         <planeGeometry args={[0.5, panelHeight]} />
-        <meshBasicMaterial map={textureRef.current} transparent />
+        <meshBasicMaterial color="#111111" transparent opacity={0.7} />
       </mesh>
+      
+      <Text
+        position={[-0.23, panelHeight / 2 - 0.05, 0]}
+        color="white"
+        fontSize={0.03}
+        anchorX="left"
+        anchorY="top"
+        lineHeight={1.4}
+        font="https://fonts.gstatic.com/s/jetbrainsmono/v18/t6q208pq9Wuv_pXfK.woff"
+      >
+        {`FPS: ${stats.fps}\nFrame Time: ${stats.frameTime}ms\nDraw Calls: ${stats.drawCalls}\nTriangles: ${stats.triangles.toLocaleString()}\nBricks: ${stats.bricks}\nSession: ${formatDuration(stats.sessionDuration)}`}
+      </Text>
+
+      {warnings.length > 0 && (
+        <Text
+          position={[-0.23, -panelHeight / 2 + 0.05 + (warnings.length * 0.04), 0]}
+          color="#ef4444"
+          fontSize={0.025}
+          anchorX="left"
+          anchorY="top"
+          lineHeight={1.4}
+          font="https://fonts.gstatic.com/s/jetbrainsmono/v18/t6q208pq9Wuv_pXfK.woff"
+        >
+          {warnings.map((w) => `⚠️ ${w}`).join("\n")}
+        </Text>
+      )}
     </group>
   );
 };

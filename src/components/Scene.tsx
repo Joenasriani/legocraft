@@ -1984,6 +1984,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             sceneGroupRef={sceneGroupRef}
             updateGhostPosition={updateGhostPosition}
             handleVRCommit={handleVRCommit}
+            setHasPlacementCandidate={setHasPlacementCandidate}
           />
         )}
       </Suspense>
@@ -2058,7 +2059,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             <>
               {/* The ghost preview that follows the mouse */}
               {mode === "Move" &&
-                isDraggingBrick &&
                 Object.entries(groupedGhostGroupBricks).map(([key, group]) => {
                   const [type, color] = key.split("::");
                   return (

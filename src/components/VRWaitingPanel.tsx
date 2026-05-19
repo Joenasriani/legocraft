@@ -36,8 +36,8 @@ export const VRWaitingPanel = () => {
       groupRef.current.quaternion.copy(target.quaternion);
     } else {
       // Smoothly follow
-      groupRef.current.position.lerp(target.position, delta * 3.0);
-      groupRef.current.quaternion.slerp(target.quaternion, delta * 3.0);
+      groupRef.current.position.lerp(target.position, delta * 5.0);
+      groupRef.current.quaternion.slerp(target.quaternion, delta * 5.0);
     }
   });
 

@@ -1,11 +1,13 @@
 import React, { useRef, useState, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
+import { Text } from "@react-three/drei";
 import { useLegoStore } from "../Store";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
 import { getSafePanelTransform } from "../lib/vrHelpers";
+import { useXRStore } from "@react-three/xr";
 
 const VRMenuItem = ({
   seg,
@@ -17,36 +19,6 @@ const VRMenuItem = ({
   handleAction,
 }: any) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const textureRef = useRef<THREE.CanvasTexture | null>(null);
-
-  const labelTexture = useMemo(() => {
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 128;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = `bold 64px sans-serif`;
-
-      // We'll update the texture when hovered changes by re-running this if we want,
-      // but for simplicity let's just make it white and use material color.
-      // Actually material color multiplies with texture.
-      // Let's make the texture have the text in white on transparent.
-      ctx.fillStyle = "white";
-      ctx.fillText(seg.label, canvas.width / 2, canvas.height / 2);
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    textureRef.current = tex;
-    return tex;
-  }, [seg.label]);
-
-  React.useEffect(() => {
-    return () => {
-      if (textureRef.current) textureRef.current.dispose();
-    };
-  }, []);
 
   React.useEffect(() => {
     if (meshRef.current) {
@@ -68,14 +40,16 @@ const VRMenuItem = ({
         <boxGeometry args={[boxWidth, boxHeight, depth]} />
         <meshStandardMaterial color={isHovered ? "#ffffff" : seg.color} />
       </mesh>
-      <mesh position={[0, 0, depth / 2 + 0.002]}>
-        <planeGeometry args={[boxWidth * 0.9, boxHeight * 0.9]} />
-        <meshBasicMaterial
-          map={labelTexture}
-          transparent={true}
-          color={isHovered ? seg.color : "white"}
-        />
-      </mesh>
+      <Text
+        position={[0, 0, depth / 2 + 0.005]}
+        fontSize={fontSize || 0.04}
+        color={isHovered ? seg.color : "white"}
+        anchorX="center"
+        anchorY="middle"
+        font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZJhiI2B.woff"
+      >
+        {seg.label}
+      </Text>
     </group>
   );
 };
@@ -87,31 +61,58 @@ export const VRRadialMenu = ({
 }) => {
   const { gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
+  const xrStore = useXRStore();
   const setMode = useLegoStore((s) => s.setMode);
   const visible = useLegoStore((s) => s.xrPanel === "buildMenu");
 
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
   const [clearArmed, setClearArmed] = useState(false);
 
-  const hasPlacedRef = useRef(false);
-
   React.useEffect(() => {
     if (!visible) {
       setClearArmed(false);
-      hasPlacedRef.current = false;
     }
   }, [visible]);
 
-  useFrame(() => {
+  useFrame((state, delta) => {
     if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-    if (hasPlacedRef.current) return;
 
-    const cam = gl.xr.getCamera();
-    const target = getSafePanelTransform(cam);
-    
-    groupRef.current.position.copy(target.position);
-    groupRef.current.quaternion.copy(target.quaternion);
-    hasPlacedRef.current = true;
+    const xrState = xrStore.getState() as any;
+    const inputSources = Array.from(xrState.inputSourceStates || []) as any[];
+    const leftState = inputSources.find((s) => s.inputSource.handedness === "left" && !s.inputSource.hand);
+    const leftController = leftState?.object;
+
+    if (leftController) {
+      // Anchor near left controller (hand center)
+      const worldPos = new THREE.Vector3().setFromMatrixPosition(leftController.matrixWorld);
+      const worldQuat = new THREE.Quaternion().setFromRotationMatrix(leftController.matrixWorld);
+      
+      const cam = gl.xr.getCamera();
+      const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+      
+      // Near hand, slightly up
+      const targetPos = worldPos.clone().add(new THREE.Vector3(0, 0.15, 0).applyQuaternion(worldQuat));
+      
+      const lookAtQuat = new THREE.Quaternion();
+      const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
+      lookAtQuat.setFromRotationMatrix(m);
+      
+      groupRef.current.position.lerp(targetPos, delta * 12);
+      groupRef.current.quaternion.slerp(lookAtQuat, delta * 12);
+    } else {
+      const cam = gl.xr.getCamera();
+      const target = getSafePanelTransform(cam);
+      const currentPos = groupRef.current.position;
+      
+      const distance = currentPos.distanceTo(target.position);
+      if (distance > 2.0) {
+        currentPos.copy(target.position);
+        groupRef.current.quaternion.copy(target.quaternion);
+      } else if (distance > 0.1) {
+        currentPos.lerp(target.position, delta * 4.0);
+        groupRef.current.quaternion.slerp(target.quaternion, delta * 4.0);
+      }
+    }
   });
 
   const radius = vrScale === "human" ? 0.22 : 2.2;

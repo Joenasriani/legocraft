@@ -8,25 +8,9 @@ import { vrTargetManager } from "../lib/vrTargets";
 import { getSafePanelTransform } from "../lib/vrHelpers";
 import { SHAPE_OPTIONS, PRESET_OPTIONS, ShapeIcon } from "../App";
 import { renderToString } from "react-dom/server";
+import { useXRStore } from "@react-three/xr";
 
-// Create text-only texture (useful for colors)
-const createTextTexture = (text: string, color: string, bgColor: string) => {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
-  const ctx = canvas.getContext("2d");
-  if (ctx) {
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = color;
-    ctx.font = "bold 32px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-  }
-  return new THREE.CanvasTexture(canvas);
-};
-
+// Color buttons
 const ColorButton = ({
   position,
   width,
@@ -73,6 +57,7 @@ const ColorButton = ({
 };
 
 const VRCardButton = ({ position, width, height, isActive, disabled, onClick, hoverLabel, label, svgElement }: any) => {
+  const { gl } = useThree();
   const meshRef = useRef<THREE.Mesh>(null);
   const [tex, setTex] = useState<THREE.CanvasTexture | null>(null);
   const hoveredLabel = useLegoStore((state) => state.vrMenuHoverContent);
@@ -80,8 +65,9 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
   React.useEffect(() => {
     const canvas = document.createElement("canvas");
-    canvas.width = 256;
-    canvas.height = 256;
+    // Increased resolution for icons
+    canvas.width = 512;
+    canvas.height = 512;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -94,31 +80,35 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
       const img = new Image();
       img.onload = () => {
-        ctx.clearRect(0, 0, 256, 256);
+        ctx.clearRect(0, 0, 512, 512);
         ctx.globalAlpha = disabled ? 0.4 : 1.0;
-        ctx.drawImage(img, 64, 32, 128, 128);
-        ctx.fillStyle = "white";
-        ctx.font = "bold 28px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(label || "", 128, 200);
+        // Drawing larger for the increased canvas
+        ctx.drawImage(img, 64, 64, 384, 384);
         
         const t = new THREE.CanvasTexture(canvas);
+        t.anisotropy = gl.capabilities.getMaxAnisotropy();
+        t.minFilter = THREE.LinearMipmapLinearFilter;
         setTex(t);
       };
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
     } else {
-      ctx.clearRect(0, 0, 256, 256);
+      ctx.clearRect(0, 0, 512, 512);
       ctx.globalAlpha = disabled ? 0.4 : 1.0;
       ctx.fillStyle = "white";
-      ctx.font = "bold 64px sans-serif";
+      ctx.font = "bold 128px sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label || "", 128, 128);
+      ctx.fillText(label || "", 256, 256);
       const t = new THREE.CanvasTexture(canvas);
+      t.anisotropy = gl.capabilities.getMaxAnisotropy();
+      t.minFilter = THREE.LinearMipmapLinearFilter;
       setTex(t);
     }
-  }, [svgElement, label, disabled]);
+
+    return () => {
+      if (tex) tex.dispose();
+    };
+  }, [svgElement, label, disabled, gl]);
 
   React.useEffect(() => {
     if (meshRef.current) {
@@ -149,15 +139,30 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
       </mesh>
 
       {tex && (
-        <mesh position={[0, 0, 0.006]}>
-          <planeGeometry args={[width * 0.8, height * 0.8]} />
+        <mesh position={[0, svgElement ? 0.02 : 0, 0.006]}>
+          <planeGeometry args={[width * (svgElement ? 0.55 : 0.8), height * (svgElement ? 0.55 : 0.8)]} />
           <meshBasicMaterial
             map={tex}
             transparent
-            depthTest={false}
+            depthTest={true}
             color={isActive ? "#000000" : "#ffffff"}
           />
         </mesh>
+      )}
+
+      {label && svgElement && (
+        <Text
+          position={[0, -0.06, 0.008]}
+          fontSize={0.018}
+          color={isActive ? "#000000" : "white"}
+          anchorX="center"
+          anchorY="middle"
+          maxWidth={width * 0.9}
+          textAlign="center"
+          font="https://fonts.gstatic.com/s/inter/v12/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuGKYAZJhiI2B.woff"
+        >
+          {label}
+        </Text>
       )}
     </group>
   );
@@ -166,27 +171,53 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 export const VRPalette = () => {
   const { gl } = useThree();
   const groupRef = useRef<THREE.Group>(null);
+  const xrStore = useXRStore();
   const [activeTab, setActiveTab] = useState<"bricks" | "shapes" | "presets">("bricks");
   
   const visible = useLegoStore((s) => s.xrPanel === "palette");
-  const hasPlacedRef = useRef(false);
-
-  React.useEffect(() => {
-    if (!visible) {
-      hasPlacedRef.current = false;
-    }
-  }, [visible]);
 
   useFrame((state, delta) => {
     if (!visible || !gl.xr.isPresenting || !groupRef.current) return;
-    if (hasPlacedRef.current) return;
 
-    const cam = gl.xr.getCamera();
-    const target = getSafePanelTransform(cam);
-    
-    groupRef.current.position.copy(target.position);
-    groupRef.current.quaternion.copy(target.quaternion);
-    hasPlacedRef.current = true;
+    const xrState = xrStore.getState() as any;
+    const inputSources = Array.from(xrState.inputSourceStates || []) as any[];
+    const leftState = inputSources.find((s) => s.inputSource.handedness === "left" && !s.inputSource.hand);
+    const leftController = leftState?.object;
+
+    if (leftController) {
+      // Anchor near left controller (slightly above and to the right of hand)
+      const worldPos = new THREE.Vector3().setFromMatrixPosition(leftController.matrixWorld);
+      const worldQuat = new THREE.Quaternion().setFromRotationMatrix(leftController.matrixWorld);
+      
+      const cam = gl.xr.getCamera();
+      const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
+      
+      const targetPos = worldPos.clone().add(new THREE.Vector3(0.05, 0.2, 0.05).applyQuaternion(worldQuat));
+      
+      // Face headset
+      const lookAtQuat = new THREE.Quaternion();
+      const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
+      lookAtQuat.setFromRotationMatrix(m);
+      
+      groupRef.current.position.lerp(targetPos, delta * 8);
+      groupRef.current.quaternion.slerp(lookAtQuat, delta * 8);
+    } else {
+      // Head-follow fallback with deadzone so it doesn't drift away
+      const cam = gl.xr.getCamera();
+      const target = getSafePanelTransform(cam);
+      const currentPos = groupRef.current.position;
+      
+      const distance = currentPos.distanceTo(target.position);
+      if (distance > 1.5) {
+        // Sudden snap if way off
+        currentPos.copy(target.position);
+        groupRef.current.quaternion.copy(target.quaternion);
+      } else if (distance > 0.3) {
+        // Smooth follow if drifting
+        currentPos.lerp(target.position, delta * 2.0);
+        groupRef.current.quaternion.slerp(target.quaternion, delta * 2.0);
+      }
+    }
   });
 
   const activeColor = useLegoStore((s) => s.selectedColor);
