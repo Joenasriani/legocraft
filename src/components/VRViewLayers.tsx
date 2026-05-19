@@ -16,6 +16,34 @@ const isDebugXR =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("debugXR") === "1";
 
+interface ControllerActions {
+  trigger: boolean;
+  grip: boolean;
+  primary: boolean; // A or X
+  secondary: boolean; // B or Y
+  stick: boolean;
+}
+
+const getControllerActions = (input: XRInputSource | null): ControllerActions => {
+  if (!input || !input.gamepad) {
+    return {
+      trigger: false,
+      grip: false,
+      primary: false,
+      secondary: false,
+      stick: false,
+    };
+  }
+  const gp = input.gamepad;
+  return {
+    trigger: gp.buttons[0]?.pressed || false,
+    grip: gp.buttons[1]?.pressed || false,
+    primary: gp.buttons[4]?.pressed || false,
+    secondary: gp.buttons[5]?.pressed || false,
+    stick: gp.buttons[3]?.pressed || gp.buttons[10]?.pressed || false,
+  };
+};
+
 export const HumanViewLayer = ({
   currentVRScale,
   sceneGroupRef,
@@ -368,12 +396,14 @@ export const HumanViewLayer = ({
       }
     }
 
+    const leftActions = getControllerActions(leftInput);
+    const rightActions = getControllerActions(rightInput);
+
     // Process Left controller UI buttons
-    if (leftInput && leftInput.gamepad) {
-      const gp = leftInput.gamepad;
-      const xPressed = gp.buttons[4]?.pressed || false;
-      const yPressed = gp.buttons[5]?.pressed || false;
-      const leftGripPressed = gp.buttons[1]?.pressed || false;
+    if (leftInput) {
+      const xPressed = leftActions.primary;
+      const yPressed = leftActions.secondary;
+      const leftGripPressed = leftActions.grip;
 
       if (xPressed && !wasXPressed.current) {
         if (currentPanel === "none") {
@@ -405,17 +435,15 @@ export const HumanViewLayer = ({
     }
 
     // Process Right controller UI buttons
-    if (rightInput && rightInput.gamepad) {
-      const gp = rightInput.gamepad;
-      // B button is 5 on right controller, or 4 for some old Oculus mapping
-      const bPressed = gp.buttons[5]?.pressed || false;
-      const rightStickClick = gp.buttons[3]?.pressed || gp.buttons[10]?.pressed || false;
+    if (rightInput) {
+      const bPressed = rightActions.secondary;
+      const rightStickClick = rightActions.stick;
 
       if (rightStickClick && !wasRecenterPressed.current) {
         store.triggerVRRecenter();
         triggerHaptics(rightInput, HapticType.UI_CLICK);
       }
-      wasRecenterPressed.current = rightStickClick || (leftInput?.gamepad?.buttons[1]?.pressed || false);
+      wasRecenterPressed.current = rightStickClick || leftActions.grip;
 
       if (bPressed && !wasBPressed.current) {
         let handled = false;
@@ -503,12 +531,9 @@ export const HumanViewLayer = ({
       }
 
       let laserDistance = 2.0; // Short length when not hitting anything
-      const gp = rightInput.gamepad;
-      const triggerPressed = gp.buttons[0]?.pressed || false;
-      const squeezePressed = gp.buttons[1]?.pressed || false;
-      // right A = 4 (or 3 fallback for some profiles)
-      const aPressed =
-        gp.buttons[4]?.pressed || gp.buttons[3]?.pressed || false;
+      const triggerPressed = rightActions.trigger;
+      const squeezePressed = rightActions.grip;
+      const aPressed = rightActions.primary;
       const actionPressed = aPressed;
 
       let isMenuItem = false;
