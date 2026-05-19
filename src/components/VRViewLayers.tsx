@@ -52,6 +52,7 @@ export const HumanViewLayer = ({
   const wasTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
   const wasActionPressed = useRef(false);
+  const wasRecenterPressed = useRef(false);
   const squeezeStartPosRef = useRef<THREE.Vector3 | null>(null);
   const wasXPressed = useRef(false);
   const wasYPressed = useRef(false);
@@ -193,6 +194,7 @@ export const HumanViewLayer = ({
       const gp = leftInput.gamepad;
       const xPressed = gp.buttons[4]?.pressed || false;
       const yPressed = gp.buttons[5]?.pressed || false;
+      const leftGripPressed = gp.buttons[1]?.pressed || false;
 
       if (xPressed && !wasXPressed.current) {
         if (currentPanel === "none") {
@@ -213,8 +215,14 @@ export const HumanViewLayer = ({
         }
       }
 
+      if (leftGripPressed && !wasRecenterPressed.current) {
+        store.triggerVRRecenter();
+        triggerHaptics(leftInput, HapticType.UI_CLICK);
+      }
+
       wasXPressed.current = xPressed;
       wasYPressed.current = yPressed;
+      // We will update wasRecenterPressed later after checking Right Stick as well
     }
 
     // Process Right controller UI buttons
@@ -222,6 +230,13 @@ export const HumanViewLayer = ({
       const gp = rightInput.gamepad;
       // B button is 5 on right controller, or 4 for some old Oculus mapping
       const bPressed = gp.buttons[5]?.pressed || false;
+      const rightStickClick = gp.buttons[3]?.pressed || gp.buttons[10]?.pressed || false;
+
+      if (rightStickClick && !wasRecenterPressed.current) {
+        store.triggerVRRecenter();
+        triggerHaptics(rightInput, HapticType.UI_CLICK);
+      }
+      wasRecenterPressed.current = rightStickClick || (leftInput?.gamepad?.buttons[1]?.pressed || false);
 
       if (bPressed && !wasBPressed.current) {
         let handled = false;

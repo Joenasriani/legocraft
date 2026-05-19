@@ -27,15 +27,16 @@ export const VROnboarding = () => {
 
   const instructions = [
     { key: "Right Trigger", action: "Place / Confirm" },
-    { key: "Right Grip", action: "Pick Up / Move" },
+    { key: "Right Grip", action: "Pick Up / Drag" },
     { key: "A (Right)", action: "Rotate Brick" },
-    { key: "B (Right)", action: "Delete / Cancel" },
+    { key: "B (Right)", action: "Cancel / Delete" },
     { key: "Left Stick", action: "Move & Strafe" },
     { key: "Right Stick", action: "Snap Turn" },
-    { key: "X / Y (Left)", action: "Menus / Palette" },
+    { key: "X / Y (Left)", action: "Build Menu / Palette" },
+    { key: "Stick Click / L-Grip", action: "Recenter" },
   ];
 
-  const subtext = "Focus on the floor to move or turn. Use Left Stick to navigate.";
+  const subtext = "Use Left Stick to move and Right Stick to turn your orientation.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
