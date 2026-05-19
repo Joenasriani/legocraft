@@ -10,7 +10,7 @@ export const VROnboarding = () => {
     { key: "Right Trigger", action: "Place / Confirm" },
     { key: "Right Grip", action: "Pick Up / Drag" },
     { key: "A (Right)", action: "Rotate Brick" },
-    { key: "B (Right)", action: "Cancel / Delete" },
+    { key: "B (Right)", action: "Cancel / Back" },
     { key: "Left Stick", action: "Move & Strafe" },
     { key: "Right Stick", action: "Snap Turn" },
     { key: "X / Y (Left)", action: "Build Menu / Palette" },

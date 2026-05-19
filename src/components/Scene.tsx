@@ -53,7 +53,7 @@ import { VROnboarding } from "./VROnboarding";
 import { VRWaitingPanel } from "./VRWaitingPanel";
 
 import { VRLocomotion } from "./VRLocomotion";
-import { VRHeadAnchor, VRLeftHandAnchor } from "./VRMenuAnchors";
+import { VRHeadAnchor, VRLeftHandAnchor } from "../VRMenuAnchors";
 import { VRModeIndicator } from "./VRModeIndicator";
 
 const isQuest =

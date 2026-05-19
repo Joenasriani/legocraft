@@ -2,7 +2,7 @@ import React, { useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useXRStore } from "@react-three/xr";
-import { getSafePanelTransform } from "../lib/vrHelpers";
+import { getSafePanelTransform } from "./lib/vrHelpers";
 
 export const VRHeadAnchor = ({ children }: { children: React.ReactNode }) => {
   const { gl } = useThree();
@@ -50,7 +50,8 @@ export const VRLeftHandAnchor = ({ children }: { children: React.ReactNode }) =>
       
       const lookAtQuat = new THREE.Quaternion();
       const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
-      lookAtQuat.setFromRotationMatrix(m);
+      // Panel front (+Z) should face camera. lookAt points -Z at target, so rotate 180deg around Y.
+      lookAtQuat.setFromRotationMatrix(m).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)));
       
       groupRef.current.position.lerp(targetPos, delta * 12);
       groupRef.current.quaternion.slerp(lookAtQuat, delta * 12);
