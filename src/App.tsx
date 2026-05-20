@@ -592,6 +592,36 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
            <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" />
          </svg>
       );
+    case "arch":
+      return (
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
+           <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" fill={color} fillOpacity="0.2" />
+           <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" />
+         </svg>
+      );
+    case "half_dome":
+      return (
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
+           <path d="M4 16 C4 6 20 6 20 16 Z" fill={color} fillOpacity="0.2" />
+           <path d="M4 16 C4 6 20 6 20 16" />
+           <ellipse cx="12" cy="16" rx="8" ry="2" />
+         </svg>
+      );
+    case "corner_slope":
+      return (
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
+           <polygon points="4,18 20,18 20,6 4,14" fill={color} fillOpacity="0.2" />
+           <path d="M4 18 L20 18 L20 6 L4 14 Z M20 6 L4 18" />
+         </svg>
+      );
+    case "curved_corner":
+      return (
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
+           <path d="M4 20 H20 V4 A16 16 0 0 0 4 20 Z" fill={color} fillOpacity="0.2" />
+           <path d="M4 20 H20 V4 A16 16 0 0 0 4 20 Z" />
+           <path d="M12 20 A8 8 0 0 0 20 12" />
+         </svg>
+      );
     default:
       return <div className={`w-8 h-8 rounded-sm rotate-45 border-2 ${supported ? (active ? 'border-accent bg-accent/20' : 'border-white bg-white/10') : 'border-white/20 bg-white/5'}`} style={{ opacity }} />;
   }

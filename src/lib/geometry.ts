@@ -33,7 +33,7 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       geom.center();
       geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateY(Math.PI / 2);
-    } else if (type === "quarter_cylinder") {
+    } else if (type === "quarter_cylinder" || type === "curved_corner") {
       const shape = new THREE.Shape();
       const r = Math.min(width, depth) - 0.001;
       shape.moveTo(0, 0);
@@ -89,6 +89,67 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
       geom.rotateX(Math.PI / 2);
+    } else if (type === "arch") {
+      const halfD = depth / 2;
+      const halfH = BRICK_HEIGHT / 2;
+      const legWidth = Math.min(MODULE_SIZE, depth / 3);
+      const r_opening = halfD - legWidth;
+
+      const shape = new THREE.Shape();
+      shape.moveTo(-halfD + 0.001, -halfH);
+      shape.lineTo(-halfD + 0.001, halfH);
+      shape.lineTo(halfD - 0.001, halfH);
+      shape.lineTo(halfD - 0.001, -halfH);
+      shape.lineTo(r_opening, -halfH);
+      shape.absarc(0, -halfH, r_opening, 0, Math.PI, false);
+      shape.lineTo(-halfD + 0.001, -halfH);
+
+      const extrudeSettings = { depth: width - 0.002, bevelEnabled: false };
+      geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+      geom.rotateY(Math.PI / 2);
+    } else if (type === "half_dome") {
+      geom = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI, 0, Math.PI / 2);
+      geom.scale(width / 2, BRICK_HEIGHT, depth);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
+    } else if (type === "corner_slope") {
+      const halfW = width / 2;
+      const halfD = depth / 2;
+      const H_bot = -BRICK_HEIGHT / 2;
+      const H_top = BRICK_HEIGHT / 2;
+      const H_lip = H_bot + BRICK_HEIGHT * 0.3;
+
+      const geomVertices: number[] = [
+        // Bottom face
+        -halfW, H_bot, -halfD,  halfW, H_bot, -halfD,  halfW, H_bot,  halfD,
+        -halfW, H_bot, -halfD,  halfW, H_bot,  halfD, -halfW, H_bot,  halfD,
+
+        // Top face
+        -halfW, H_top, -halfD,  halfW, H_lip,  halfD,  halfW, H_lip, -halfD,
+        -halfW, H_top, -halfD, -halfW, H_lip,  halfD,  halfW, H_lip,  halfD,
+
+        // Back face
+        -halfW, H_bot, -halfD, -halfW, H_top, -halfD,  halfW, H_lip, -halfD,
+        -halfW, H_bot, -halfD,  halfW, H_lip, -halfD,  halfW, H_bot, -halfD,
+
+        // Front face
+        -halfW, H_bot,  halfD,  halfW, H_bot,  halfD,  halfW, H_lip,  halfD,
+        -halfW, H_bot,  halfD,  halfW, H_lip,  halfD, -halfW, H_lip,  halfD,
+
+        // Left face
+        -halfW, H_bot, -halfD, -halfW, H_bot,  halfD, -halfW, H_lip,  halfD,
+        -halfW, H_bot, -halfD, -halfW, H_lip,  halfD, -halfW, H_top, -halfD,
+
+        // Right face
+        halfW, H_bot, -halfD,  halfW, H_lip, -halfD,  halfW, H_lip,  halfD,
+        halfW, H_bot, -halfD,  halfW, H_lip,  halfD,  halfW, H_bot,  halfD
+      ];
+
+      geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.Float32BufferAttribute(geomVertices, 3));
+      geom.computeVertexNormals();
     } else {
       geom = new THREE.BoxGeometry(width - 0.002, BRICK_HEIGHT, depth - 0.002);
     }
