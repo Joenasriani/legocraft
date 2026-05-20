@@ -69,8 +69,9 @@ export interface RayPose {
 
 /**
  * Gets the canonical target ray pose from an XRInputSource.
- * Uses xrFrame.getPose to ensure it's precisely matched to the WebXR targetRaySpace.
- * Falls back to the controller Object3D if the WebXR pose is not available.
+ * Prioritizes the controller Object3D's world transform to ensure laser and reticle 
+ * alignment remains perfect under locomotion, scaling, and snap turns.
+ * Falls back to xrFrame.getPose in tracking space if the Object3D is not provided.
  */
 export function getVRTargetRay(
   inputSource: XRInputSource,
@@ -78,6 +79,20 @@ export function getVRTargetRay(
   referenceSpace: XRReferenceSpace,
   controller?: THREE.Object3D | null,
 ): RayPose | null {
+  // Always prioritize the controller Object3D's world transform to guarantee alignment under locomotion and snap turns
+  if (controller) {
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+
+    controller.updateMatrixWorld(true);
+    controller.getWorldPosition(position);
+    controller.getWorldQuaternion(quaternion);
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+
+    return { position, direction, quaternion };
+  }
+
+  // Fallback to referenceSpace tracking pose if no controller Object3D is passed
   const pose = xrFrame.getPose(inputSource.targetRaySpace, referenceSpace);
   if (pose) {
     const position = new THREE.Vector3(
@@ -91,19 +106,6 @@ export function getVRTargetRay(
       pose.transform.orientation.z,
       pose.transform.orientation.w,
     );
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
-
-    return { position, direction, quaternion };
-  }
-
-  // Fallback to the controller Object3D's world transform if pose is null
-  if (controller) {
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-
-    controller.updateMatrixWorld(true);
-    controller.getWorldPosition(position);
-    controller.getWorldQuaternion(quaternion);
     const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
 
     return { position, direction, quaternion };
