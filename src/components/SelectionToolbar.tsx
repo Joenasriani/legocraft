@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
 import { Copy, ClipboardPaste, Trash2 } from "lucide-react";
-import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDimensions } from "../Store";
+import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDimensions, checkStructureValid } from "../Store";
 import { BRICK_HEIGHT, MODULE_SIZE } from "../constants";
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -46,32 +46,75 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
   };
 
   const handlePaste = () => {
-    const { addBricks, setSelectionMode, setMovingBrickId, setMultiSelectedBrickIds } = useLegoStore.getState();
+    const { addBricks, setSelectionMode, setMovingBrickId, setMultiSelectedBrickIds, setToastMessage, bricks } = useLegoStore.getState();
     if (clipboardBricks.length === 0) return;
     
-    
-    const newBricks = clipboardBricks.map((b) => ({
-      ...b,
-      id: crypto.randomUUID(),
-      position: [
-        b.position[0] + getBrickDimensions("1x1").w * MODULE_SIZE,
-        b.position[1],
-        b.position[2] + getBrickDimensions("1x1").d * MODULE_SIZE,
-      ] as [number, number, number],
-    }));
+    // Compute bounding box footprint of clipboard bricks to determine non-overlapping offset
+    let minX = Infinity, maxX = -Infinity;
+    let minZ = Infinity, maxZ = -Infinity;
+    for (const b of clipboardBricks) {
+      const aabb = getBrickAABB(b);
+      if (aabb.minX < minX) minX = aabb.minX;
+      if (aabb.maxX > maxX) maxX = aabb.maxX;
+      if (aabb.minZ < minZ) minZ = aabb.minZ;
+      if (aabb.maxZ > maxZ) maxZ = aabb.maxZ;
+    }
+    const pasteW = Math.max(maxX - minX, MODULE_SIZE);
+    const pasteD = Math.max(maxZ - minZ, MODULE_SIZE);
+    // Round/snap offsets to nearest MODULE_SIZE
+    const offsetX = Math.ceil((pasteW - 0.001) / MODULE_SIZE) * MODULE_SIZE;
+    const offsetZ = Math.ceil((pasteD - 0.001) / MODULE_SIZE) * MODULE_SIZE;
 
-    addBricks(newBricks);
+    let pastedBricksFound = false;
+    let finalNewBricks: BrickData[] = [];
+
+    for (let factor = 1; factor <= 10; factor++) {
+      const testNewBricks = clipboardBricks.map((b) => ({
+        ...b,
+        id: crypto.randomUUID(),
+        position: [
+          b.position[0] + offsetX * factor,
+          b.position[1],
+          b.position[2] + offsetZ * factor,
+        ] as [number, number, number],
+      }));
+
+      const validationResult = checkStructureValid(bricks, testNewBricks, MODULE_SIZE, BRICK_HEIGHT);
+      if (validationResult.valid) {
+        finalNewBricks = testNewBricks;
+        pastedBricksFound = true;
+        break;
+      }
+    }
+
+    if (!pastedBricksFound) {
+      const testNewBricks = clipboardBricks.map((b) => ({
+        ...b,
+        id: crypto.randomUUID(),
+        position: [
+          b.position[0] + offsetX,
+          b.position[1],
+          b.position[2] + offsetZ,
+        ] as [number, number, number],
+      }));
+      const validationResult = checkStructureValid(bricks, testNewBricks, MODULE_SIZE, BRICK_HEIGHT);
+      setToastMessage(`Cannot paste: ${validationResult.reason || "placement collides or overlaps"}`);
+      audioService.play("error");
+      return;
+    }
+
+    addBricks(finalNewBricks);
     
-    if (newBricks.length === 1) {
+    if (finalNewBricks.length === 1) {
       setSelectionMode("Solo");
-      setMovingBrickId(newBricks[0].id);
+      setMovingBrickId(finalNewBricks[0].id);
       setMultiSelectedBrickIds([]);
     } else {
       setSelectionMode("Multi");
-      setMultiSelectedBrickIds(newBricks.map((b) => b.id));
+      setMultiSelectedBrickIds(finalNewBricks.map((b) => b.id));
       setMovingBrickId(null);
     }
-    useLegoStore.getState().setToastMessage("Pasted!");
+    setToastMessage("Pasted!");
   };
 
   const handleDelete = () => {

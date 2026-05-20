@@ -853,6 +853,81 @@ const safeLocalStorage = {
   }
 };
 
+class WebGLErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  public state = {
+    hasError: false,
+    error: null as Error | null,
+  };
+
+  public static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    if (import.meta.env.DEV) {
+      console.error("WebGL / Canvas initialization error caught:", error, errorInfo);
+    }
+  }
+
+  public render() {
+    if (this.state.hasError) {
+      const isWebGLCtx = this.state.error?.message?.toLowerCase().includes("webgl") ||
+                         this.state.error?.message?.toLowerCase().includes("context") ||
+                         this.state.error?.message?.toLowerCase().includes("renderer") ||
+                         this.state.error?.message?.toLowerCase().includes("create context") ||
+                         !window.WebGLRenderingContext;
+
+      return (
+        <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-slate-950 text-white z-50 text-center font-sans select-none">
+          <div className="max-w-md p-8 rounded-3xl border border-white/10 bg-white/5 shadow-2xl backdrop-blur-md">
+            <div className="w-16 h-16 mx-auto mb-6 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-amber-400">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-8 h-8">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            
+            <h2 className="text-xl font-bold tracking-tight mb-2">
+              {isWebGLCtx ? "WebGL Initializing Issue" : "Visualization Error"}
+            </h2>
+            
+            <p className="text-sm text-slate-300 mb-6 leading-relaxed">
+              {isWebGLCtx 
+                ? "Your browser or graphics driver temporarily blocked WebGL creation. This often happens due to background tab inactivity, memory pressure, or iframe security context in some environments."
+                : "An unexpected rendering error occurred inside the 3D canvas viewport."}
+            </p>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full py-3 px-6 rounded-2xl bg-sky-500 hover:bg-sky-400 active:bg-sky-600 font-semibold text-sm transition-colors cursor-pointer text-white"
+              >
+                Reload Experience
+              </button>
+              <a
+                href={window.location.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-6 rounded-2xl border border-white/10 hover:bg-white/5 font-semibold text-sm transition-colors block text-center text-white"
+              >
+                Open in a New Tab
+              </a>
+            </div>
+            
+            <details className="mt-6 text-left border-t border-white/10 pt-4 cursor-pointer">
+              <summary className="text-xs text-slate-400 hover:text-slate-300 transition-colors">Technical Details</summary>
+              <pre className="mt-2 text-[10px] text-red-400 font-mono bg-black/40 p-3 rounded-lg overflow-auto max-h-40">
+                {this.state.error?.stack || this.state.error?.message || "WebGL initialization context failure"}
+              </pre>
+            </details>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -1421,24 +1496,36 @@ export default function App() {
         className="absolute inset-0 z-0"
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Canvas
-          shadows
-          camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
-          style={{ touchAction: "none" }}
-          gl={{ antialias: true, alpha: false }}
-        >
-          <Suspense
-            fallback={
-              <Html center>
-                <div className="bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm font-mono text-sm border border-purple-500/30 whitespace-nowrap">
-                  Loading Experience...
-                </div>
-              </Html>
-            }
+        <WebGLErrorBoundary>
+          <Canvas
+            shadows
+            camera={{ position: [2.8, 2.2, 3.2], fov: 50 }}
+            style={{ touchAction: "none" }}
+            gl={{ antialias: true, alpha: false }}
+            onCreated={({ gl }) => {
+              const canvas = gl.domElement;
+              const handleContextLost = (event: Event) => {
+                event.preventDefault();
+                console.warn("[BrickXR] WebGL context lost caught directly on canvas Element!");
+                useLegoStore.getState().setToastMessage("WebGL Context Lost! Try reloading the page.");
+                audioService.play("error");
+              };
+              canvas.addEventListener("webglcontextlost", handleContextLost, false);
+            }}
           >
-            <Scene xrStore={xrStore} />
-          </Suspense>
-        </Canvas>
+            <Suspense
+              fallback={
+                <Html center>
+                  <div className="bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur-sm font-mono text-sm border border-purple-500/30 whitespace-nowrap">
+                    Loading Experience...
+                  </div>
+                </Html>
+              }
+            >
+              <Scene xrStore={xrStore} />
+            </Suspense>
+          </Canvas>
+        </WebGLErrorBoundary>
       </div>
 
       {/* UI Overlay */}
