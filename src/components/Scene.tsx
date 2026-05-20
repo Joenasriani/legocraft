@@ -98,7 +98,20 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const [isScreenshotting, setIsScreenshotting] = useState(false);
   const [xrSessionActive, setXrSessionActive] = useState(false);
   const [vrReady, setVrReady] = useState(true);
-  const [hasPlacementCandidate, setHasPlacementCandidate] = useState(false);
+  const [hasPlacementCandidate, setHasPlacementCandidateState] = useState(false);
+  const hasPlacementCandidateRef = useRef(false);
+  const setHasPlacementCandidate = (val: boolean) => {
+    setHasPlacementCandidateState(val);
+    hasPlacementCandidateRef.current = val;
+  };
+  const [ghostPosition, setGhostPositionState] = useState<[number, number, number]>([
+    0, 20, 0,
+  ]);
+  const ghostPositionRef = useRef<[number, number, number]>([0, 20, 0]);
+  const setGhostPosition = (val: [number, number, number]) => {
+    setGhostPositionState(val);
+    ghostPositionRef.current = val;
+  };
   const [clipboard, setClipboard] = useState<BrickData[]>([]);
   // 14. Remove <Canvas preserveDrawingBuffer={true}> in App.tsx. This causes massive memory/performance drags in WebGL.
   // We'll also disable shadow map completely in XR to save on draw calls.
@@ -551,9 +564,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return [cx, minY, cz];
   }, [movingGroupOriginalBricks]);
 
-  const [ghostPosition, setGhostPosition] = useState<[number, number, number]>([
-    0, 0, 0,
-  ]);
   const [ghostRotation, setGhostRotation] = useState<number>(0);
 
   const ghostPosTrigger = useLegoStore((s) => s.ghostPosTrigger);
@@ -1809,6 +1819,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                 ),
               }
             : null);
+
+    if (isTouch) {
+      if (!isClick || !hasPlacementCandidateRef.current || !candidate) {
+        interactionStartCandidateRef.current = null;
+        latestPlacementCandidateRef.current = null;
+        setHasPlacementCandidate(false);
+        return;
+      }
+
+      // Enforce that we only place EXACTLY where the user saw the ghost
+      candidate.position = [...ghostPositionRef.current] as [number, number, number];
+    }
 
     const hit = candidate?.hit;
 
