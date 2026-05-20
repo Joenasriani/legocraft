@@ -469,6 +469,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return false;
   };
 
+  const takeScreenshotRef = useRef(false);
+
   useFrame((state) => {
     const isInteracting = useLegoStore.getState().isInteractingWithBrick;
     if (controlsRef.current) {
@@ -496,18 +498,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         state.camera.position.y = 0.1;
       }
     }
-  });
 
-  const screenshotTrigger = useLegoStore((s) => s.screenshotTrigger);
-
-  useEffect(() => {
-    if (screenshotTrigger === 0) return;
-    setIsScreenshotting(true);
-    setTimeout(() => {
+    if (takeScreenshotRef.current) {
+      takeScreenshotRef.current = false;
       try {
-        // Must render first to ensure canvas has content
-        gl.render(scene, camera);
-        const dataUrl = gl.domElement.toDataURL("image/png");
+        state.gl.render(state.scene, state.camera);
+        const dataUrl = state.gl.domElement.toDataURL("image/png");
         const link = document.createElement("a");
         link.download = "brickxr-screenshot.png";
         link.href = dataUrl;
@@ -524,8 +520,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       } finally {
         setIsScreenshotting(false);
       }
+    }
+  });
+
+  const screenshotTrigger = useLegoStore((s) => s.screenshotTrigger);
+
+  useEffect(() => {
+    if (screenshotTrigger === 0) return;
+    setIsScreenshotting(true);
+    setTimeout(() => {
+      takeScreenshotRef.current = true;
     }, 50);
-  }, [screenshotTrigger, gl, scene, camera]);
+  }, [screenshotTrigger]);
 
   const movingBrick = useMemo(() => {
     return bricks.find((b) => b.id === movingBrickId) || null;
