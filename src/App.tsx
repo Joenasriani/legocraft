@@ -1282,6 +1282,10 @@ export default function App() {
           if (showHelp) { setShowHelp(false); menuClosed = true; }
           if (showBuildIdeas) { setShowBuildIdeas(false); menuClosed = true; }
           if (showClearConfirm) { setShowClearConfirm(false); menuClosed = true; }
+          if (state.activePreset) {
+            state.loadPreset(null);
+            menuClosed = true;
+          }
           if (menuClosed) {
             e.stopPropagation();
             e.stopImmediatePropagation();

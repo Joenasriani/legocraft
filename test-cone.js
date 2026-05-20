@@ -1,0 +1,10 @@
+import * as THREE from 'three';
+const geom = new THREE.ConeGeometry(0.5, 1, 32);
+geom.computeBoundingBox();
+const center = new THREE.Vector3();
+geom.boundingBox.getCenter(center);
+console.log('Original bounding box:', geom.boundingBox);
+console.log('Center:', center);
+geom.translate(-center.x, -geom.boundingBox.min.y, -center.z);
+geom.computeBoundingBox();
+console.log('Translated bounding box:', geom.boundingBox);

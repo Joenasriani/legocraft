@@ -13,6 +13,7 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       if (type === "3x3_cone") r = (MODULE_SIZE * 3) / 2;
       const radius = r - 0.001;
       geom = new THREE.ConeGeometry(radius, BRICK_HEIGHT, 32);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "2x2_dome" || type === "4x4_dome") {
       const radius = (type === "4x4_dome" ? MODULE_SIZE * 2 : MODULE_SIZE) - 0.001;
       geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
