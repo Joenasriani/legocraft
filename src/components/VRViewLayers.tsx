@@ -717,43 +717,18 @@ export const HumanViewLayer = ({
           }
         }
 
-        if (squeezePressed && wasSqueezePressed.current) {
-          if (
-            useLegoStore.getState().mode === "Move" &&
-            movingBrickId &&
-            squeezeStartPosRef.current &&
-            !useLegoStore.getState().isDraggingBrick &&
-            !squeezeMoveBlockedRef.current
-          ) {
-            const dist = pos.distanceTo(squeezeStartPosRef.current);
-            if (dist > 0.05) {
-              useLegoStore.getState().setIsDraggingBrick(true);
-              movePreviewActiveRef.current = true;
-            }
-          }
-        }
-
+        // Right grip / middle-finger button deletes the brick targeted by the right-controller reticle
         if (squeezePressed && !wasSqueezePressed.current) {
-          const instId = canHit.rawHit.instanceId;
-          const ud = canHit.rawHit.object.userData;
-          if (instId !== undefined && ud && ud.bricks) {
-            // Only switch to Move mode if we actually hit a brick
-            if (mode === "Build") {
-              store.setMode("Move");
-            }
-            const currentMode = useLegoStore.getState().mode;
-            if (currentMode === "Delete" || currentMode === "Move") {
-              let brickIndex = instId;
-              if (ud.isStud) {
-                brickIndex = Math.floor(instId / (ud.w * ud.d));
-              }
+          if (!isMenuItem && useLegoStore.getState().xrPanel === "none") {
+            const instId = canHit.rawHit.instanceId;
+            const ud = canHit.rawHit.object.userData;
+            if (instId !== undefined && ud && ud.bricks) {
+              let brickIndex = ud.isStud
+                ? Math.floor(instId / (ud.w * ud.d))
+                : instId;
               const b = ud.bricks[brickIndex];
               if (b) {
-                if (currentMode === "Delete") {
-                  performVRDelete(b, rightInput);
-                } else if (currentMode === "Move" && !movingBrickId) {
-                  performVRSelection(b, rightInput, pos);
-                }
+                performVRDelete(b, rightInput);
               }
             }
           }
