@@ -782,10 +782,8 @@ export const HumanViewLayer = ({
 
       // Handle A button (independent of ray hit)
       if (actionPressed && !wasActionPressed.current) {
-        if (mode === "Build" || (mode === "Move" && movingBrickId)) {
-          useLegoStore.getState().triggerRotateGhost();
-          triggerHaptics(rightInput, HapticType.ROTATE);
-        }
+        useLegoStore.getState().triggerRotateGhost();
+        triggerHaptics(rightInput, HapticType.ROTATE);
       }
 
       // Render laser (removed redundant assignment, handled above for responsiveness)
