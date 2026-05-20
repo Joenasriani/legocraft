@@ -478,7 +478,7 @@ export const HumanViewLayer = ({
     let hasRightPose = false;
 
     if (rightInput && referenceSpace && xrFrame) {
-      const rayPose = getVRTargetRay(rightInput, xrFrame, referenceSpace);
+      const rayPose = getVRTargetRay(rightInput, xrFrame, referenceSpace, rightController);
       if (rayPose) {
         controllerPos.copy(rayPose.position);
         controllerQuat.copy(rayPose.quaternion);

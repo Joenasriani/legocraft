@@ -70,27 +70,44 @@ export interface RayPose {
 /**
  * Gets the canonical target ray pose from an XRInputSource.
  * Uses xrFrame.getPose to ensure it's precisely matched to the WebXR targetRaySpace.
+ * Falls back to the controller Object3D if the WebXR pose is not available.
  */
 export function getVRTargetRay(
   inputSource: XRInputSource,
   xrFrame: XRFrame,
   referenceSpace: XRReferenceSpace,
+  controller?: THREE.Object3D | null,
 ): RayPose | null {
   const pose = xrFrame.getPose(inputSource.targetRaySpace, referenceSpace);
-  if (!pose) return null;
+  if (pose) {
+    const position = new THREE.Vector3(
+      pose.transform.position.x,
+      pose.transform.position.y,
+      pose.transform.position.z,
+    );
+    const quaternion = new THREE.Quaternion(
+      pose.transform.orientation.x,
+      pose.transform.orientation.y,
+      pose.transform.orientation.z,
+      pose.transform.orientation.w,
+    );
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
 
-  const position = new THREE.Vector3(
-    pose.transform.position.x,
-    pose.transform.position.y,
-    pose.transform.position.z,
-  );
-  const quaternion = new THREE.Quaternion(
-    pose.transform.orientation.x,
-    pose.transform.orientation.y,
-    pose.transform.orientation.z,
-    pose.transform.orientation.w,
-  );
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+    return { position, direction, quaternion };
+  }
 
-  return { position, direction, quaternion };
+  // Fallback to the controller Object3D's world transform if pose is null
+  if (controller) {
+    const position = new THREE.Vector3();
+    const quaternion = new THREE.Quaternion();
+
+    controller.updateMatrixWorld(true);
+    controller.getWorldPosition(position);
+    controller.getWorldQuaternion(quaternion);
+    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
+
+    return { position, direction, quaternion };
+  }
+
+  return null;
 }
