@@ -30,7 +30,7 @@ import {
   hasBrickStuds,
   getBrickHeightUnit,
 } from "../Store";
-import { audioService } from "../services/audioService";
+import { audioService } from "./services/audioService";
 
 import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT } from "../constants";
 import { createBrickGeometry, createStudGeometry } from "../lib/geometry";
@@ -1038,16 +1038,32 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             setIsDraggingBrick(true);
             useLegoStore.getState().setJustSelectedBrick(false);
           }
+          
+          if (pointerDownPos.current.isTouch && !useLegoStore.getState().isDraggingBrick) {
+            setHasPlacementCandidate(false);
+            return;
+          }
         } else if (pointerDownPos.current.isTouch) {
-          // TOUCH OPTIMIZATION: Even within the threshold, we update the ghost visually
-          // to avoid fixed-point "snapping" jump when the threshold is crossed.
-          // The commit logic will still use interactionStartCandidateRef if it turns out to be a click.
-          updateGhostFromEvent(e);
+          // Freeze the ghost in place during touch press to prevent snappy visual noise
           return;
         } else {
           return;
         }
       }
+    }
+
+    const isTouch =
+      e.pointerType === "touch" ||
+      e.nativeEvent?.pointerType === "touch" ||
+      e.nativeEvent?.type?.includes("touch") ||
+      false;
+
+    if (isTouch && !pointerDownPos.current && !useLegoStore.getState().isDraggingBrick) {
+      return;
+    }
+
+    if (pointerDownPos.current?.isTouch && !useLegoStore.getState().isDraggingBrick) {
+      return;
     }
 
     updateGhostFromEvent(e);
@@ -1687,6 +1703,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (!isCameraLocked && controlsRef.current) {
       controlsRef.current.enabled = true;
     }
+    if (isTouch) {
+      setHasPlacementCandidate(false);
+    }
   };
 
   const handlePointerUp = (e: any) => {
@@ -1851,6 +1870,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         console.log("[HIT] null - no viable target found");
     }
     interactionStartCandidateRef.current = null;
+    if (isTouch) {
+      setHasPlacementCandidate(false);
+    }
   };
 
   // Optimization: Group bricks by [type, color] for InstancedMesh rendering

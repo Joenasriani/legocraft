@@ -4,7 +4,7 @@ import { Text } from "@react-three/drei";
 import * as THREE from "three";
 import { useLegoStore, getGroupBricks, hasBrickAbove } from "../Store";
 import { MODULE_SIZE, BRICK_HEIGHT } from "../constants";
-import { audioService } from "../services/audioService";
+import { audioService } from "./services/audioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";

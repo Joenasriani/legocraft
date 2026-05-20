@@ -4,7 +4,7 @@ import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDime
 import { BRICK_HEIGHT, MODULE_SIZE } from "../constants";
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { audioService } from "../services/audioService";
+import { audioService } from "./services/audioService";
 
 interface SelectionToolbarProps {
   selectedBricks: BrickData[];

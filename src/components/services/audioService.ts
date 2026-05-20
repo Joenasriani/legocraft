@@ -1,4 +1,4 @@
-import { BrickData } from "../Store";
+import { BrickData } from "../../Store";
 
 type SoundType = 'place' | 'remove' | 'select' | 'error' | 'menu-open' | 'menu-close';
 

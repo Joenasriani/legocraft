@@ -11,7 +11,7 @@ import {
   isValidBrickData,
   SHAPE_DEFS,
 } from "./Store";
-import { audioService } from "./services/audioService";
+import { audioService } from "./components/services/audioService";
 import { createXRStore } from "@react-three/xr";
 import { Undo2 as LucideUndo2, Redo2 as LucideRedo2, Blocks as LucideBlocks, Shapes as LucideShapes, LayoutGrid as LucideLayoutGrid, Trash2 as LucideTrash2, Lightbulb as LucideLightbulb } from "lucide-react";
 

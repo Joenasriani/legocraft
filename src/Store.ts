@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { audioService } from "./services/audioService";
+import { audioService } from "./components/services/audioService";
 import { vrTargetManager } from "./lib/vrTargets";
 import {
   calculateRotMod,

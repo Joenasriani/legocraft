@@ -1,7 +1,7 @@
 import React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X, Home, Castle, Bot, GitCommit, DoorOpen } from "lucide-react";
-import { audioService } from "../services/audioService";
+import { audioService } from "./services/audioService";
 
 interface BuildIdea {
   id: string;
