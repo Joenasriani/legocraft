@@ -801,6 +801,28 @@ const SaveExportMenuOverlay = ({
   );
 };
 
+const safeLocalStorage = {
+  getItem(key: string): string | null {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn("localStorage.getItem failed", e);
+      }
+      return null;
+    }
+  },
+  setItem(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      if (import.meta.env.DEV) {
+        console.warn("localStorage.setItem failed", e);
+      }
+    }
+  }
+};
+
 export default function App() {
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -837,43 +859,73 @@ export default function App() {
   } = useLegoStore();
 
   const [showHelp, setShowHelp] = useState(() => {
-    return localStorage.getItem("brickxr-help-dismissed") !== "true";
+    return safeLocalStorage.getItem("brickxr-help-dismissed") !== "true";
   });
   
+  const showHelpFirst = useRef(true);
   useEffect(() => {
+    if (showHelpFirst.current) {
+      showHelpFirst.current = false;
+      return;
+    }
     if (showHelp) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showHelp]);
 
   const [showBuildIdeas, setShowBuildIdeas] = useState(false);
+  const showBuildIdeasFirst = useRef(true);
   useEffect(() => {
+    if (showBuildIdeasFirst.current) {
+      showBuildIdeasFirst.current = false;
+      return;
+    }
     if (showBuildIdeas) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showBuildIdeas]);
 
   const [showPresetMenu, setShowPresetMenu] = useState(false);
+  const showPresetMenuFirst = useRef(true);
   useEffect(() => {
+    if (showPresetMenuFirst.current) {
+      showPresetMenuFirst.current = false;
+      return;
+    }
     if (showPresetMenu) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showPresetMenu]);
 
   const presetMenuRef = React.useRef<HTMLDivElement>(null);
   const [showBrickMenu, setShowBrickMenu] = useState(false);
+  const showBrickMenuFirst = useRef(true);
   useEffect(() => {
+    if (showBrickMenuFirst.current) {
+      showBrickMenuFirst.current = false;
+      return;
+    }
     if (showBrickMenu) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showBrickMenu]);
 
   const brickMenuRef = React.useRef<HTMLDivElement>(null);
   const [showShapesMenu, setShowShapesMenu] = useState(false);
+  const showShapesMenuFirst = useRef(true);
   useEffect(() => {
+    if (showShapesMenuFirst.current) {
+      showShapesMenuFirst.current = false;
+      return;
+    }
     if (showShapesMenu) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showShapesMenu]);
 
   const shapesMenuRef = React.useRef<HTMLDivElement>(null);
   const [showSaveMenu, setShowSaveMenu] = useState(false);
+  const showSaveMenuFirst = useRef(true);
   useEffect(() => {
+    if (showSaveMenuFirst.current) {
+      showSaveMenuFirst.current = false;
+      return;
+    }
     if (showSaveMenu) audioService.play("menu-open");
     else audioService.play("menu-close");
   }, [showSaveMenu]);
@@ -961,7 +1013,7 @@ export default function App() {
 
   // Load save on startup
   useEffect(() => {
-    const saved = localStorage.getItem("brickxr-save");
+    const saved = safeLocalStorage.getItem("brickxr-save");
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -2090,7 +2142,7 @@ export default function App() {
               show={showHelp}
               onClose={() => {
                 setShowHelp(false);
-                localStorage.setItem("brickxr-help-dismissed", "true");
+                safeLocalStorage.setItem("brickxr-help-dismissed", "true");
               }}
             />
 

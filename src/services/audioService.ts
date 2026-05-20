@@ -7,6 +7,25 @@ class AudioService {
   private masterGain: GainNode | null = null;
   private initialized = false;
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      const handleGesture = () => {
+        this.init();
+        this.resume();
+        if (this.initialized && this.ctx && this.ctx.state === "running") {
+          window.removeEventListener("click", handleGesture);
+          window.removeEventListener("keydown", handleGesture);
+          window.removeEventListener("pointerdown", handleGesture);
+          window.removeEventListener("touchend", handleGesture);
+        }
+      };
+      window.addEventListener("click", handleGesture, { passive: true });
+      window.addEventListener("keydown", handleGesture, { passive: true });
+      window.addEventListener("pointerdown", handleGesture, { passive: true });
+      window.addEventListener("touchend", handleGesture, { passive: true });
+    }
+  }
+
   public init() {
     if (this.initialized) return;
     try {
@@ -25,7 +44,11 @@ class AudioService {
   public resume() {
     if (!this.initialized) this.init();
     if (this.ctx?.state === 'suspended') {
-      this.ctx.resume();
+      this.ctx.resume().catch((err) => {
+        if ((import.meta as any).env.DEV) {
+          console.warn("AudioContext resume failed", err);
+        }
+      });
     }
   }
 
@@ -42,9 +65,9 @@ class AudioService {
   }
 
   public play(type: SoundType) {
-    this.init();
-    this.resume();
-    if (!this.ctx || !this.masterGain) return;
+    if (!this.initialized || !this.ctx || !this.masterGain || this.ctx.state === "suspended") {
+      return;
+    }
 
     const pitchVar = 0.02; // 2%
     const volVar = 0.05;   // 5%

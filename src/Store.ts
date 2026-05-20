@@ -1026,13 +1026,25 @@ export const PRESETS: Record<PresetName, BrickData[]> = {
 let _saveTimer: ReturnType<typeof setTimeout> | null = null;
 let _pendingBricks: BrickData[] | null = null;
 
+const safeLocalStorage = {
+  setItem(key: string, value: string): void {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      if ((import.meta as any).env.DEV) {
+        console.warn("localStorage.setItem failed", e);
+      }
+    }
+  }
+};
+
 const flushSave = () => {
   if (_saveTimer) {
     clearTimeout(_saveTimer);
     _saveTimer = null;
   }
   if (_pendingBricks !== null) {
-    localStorage.setItem("brickxr-save", JSON.stringify(_pendingBricks));
+    safeLocalStorage.setItem("brickxr-save", JSON.stringify(_pendingBricks));
     _pendingBricks = null;
   }
 };
