@@ -1636,7 +1636,7 @@ export default function App() {
                       }
                       setMode("Move");
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${isCameraLocked || mode === "Build" ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
+                    className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
                     title={
                       mode === "Move"
                         ? "Lock Camera (\u2714 Required for drag-select)"

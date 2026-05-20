@@ -2247,7 +2247,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         dampingFactor={0.1}
         enabled={(!isCameraLocked || isMultiTouch) && !isVR && !isDraggingBrick && !marqueeStart}
         mouseButtons={mouseButtons as any}
-        touches={ (mode === "Build" || activePreset !== null) ? { ONE: undefined, TWO: THREE.TOUCH.ROTATE } : { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN } }
+        touches={touches as any}
       />
 
       {marqueeStart && marqueeCurrent && (
