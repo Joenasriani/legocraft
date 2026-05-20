@@ -143,6 +143,16 @@ export const HumanViewLayer = ({
     tk: string;
   } | null>(null);
 
+  const canonicalRightHitRef = useRef<{
+    rawHit: any;
+    pointWorld: THREE.Vector3;
+    normalWorld: THREE.Vector3;
+    pointLocal: THREE.Vector3;
+    targetKind: string;
+    isValidPlacement: boolean;
+    distance: number;
+  } | null>(null);
+
   const clearGhost = () => {
     updateGhostPosition(
       new THREE.Vector3(0, -1000, 0),
@@ -513,6 +523,54 @@ export const HumanViewLayer = ({
         }
       }
 
+      // Populate or clear canonicalRightHitRef immediately after raycast
+      if (hit) {
+        const pointWorld = hit.point.clone();
+        
+        // Calculate world space normal
+        const normalWorld = hit.face?.normal
+          ? hit.face.normal
+              .clone()
+              .transformDirection(hit.object.matrixWorld)
+              .normalize()
+          : new THREE.Vector3(0, 1, 0);
+
+        // Convert point to local space of sceneGroup
+        const pointLocal = pointWorld.clone();
+        if (sceneGroupRef.current) {
+          sceneGroupRef.current.worldToLocal(pointLocal);
+        } else {
+          pointLocal.divideScalar(currentVRScale);
+        }
+
+        let targetKind = "none";
+        if (
+          hit.object.name === "FloorPlacementCollider" ||
+          hit.object.name === "VRFloorCollider" ||
+          hit.object.name === "Grid"
+        )
+          targetKind = "floor";
+        else if (Math.abs(normalWorld.y) > 0.7) targetKind = "brick-top";
+        else targetKind = "brick-side";
+
+        let isValidPlacement = true;
+        if (mode === "Build" && Math.abs(normalWorld.y) < 0.5) {
+          isValidPlacement = false;
+        }
+
+        canonicalRightHitRef.current = {
+          rawHit: hit,
+          pointWorld,
+          normalWorld,
+          pointLocal,
+          targetKind,
+          isValidPlacement,
+          distance: hit.distance,
+        };
+      } else {
+        canonicalRightHitRef.current = null;
+      }
+
       if (isDebugXR) {
         const now = Date.now();
         if (
@@ -540,9 +598,10 @@ export const HumanViewLayer = ({
       let onTriggerFn = null;
       let hitMenuLabel = "";
 
-      if (hit) {
-        laserDistance = hit.distance;
-        let currentHitObj: THREE.Object3D | null = hit.object;
+      if (canonicalRightHitRef.current) {
+        const canHit = canonicalRightHitRef.current;
+        laserDistance = canHit.distance;
+        let currentHitObj: THREE.Object3D | null = canHit.rawHit.object;
 
         while (currentHitObj) {
           if (currentHitObj.userData?.isVRMenuItem) {
@@ -559,7 +618,7 @@ export const HumanViewLayer = ({
         latestHit.current = {
           hitMenuItem: isMenuItem,
           onTriggerFn,
-          hitLoc: hit,
+          hitLoc: canHit.rawHit,
         };
 
         if (isMenuItem && onTriggerFn) {
@@ -570,38 +629,6 @@ export const HumanViewLayer = ({
           clearGhost();
         } else {
           // Normal brick interaction
-          const pointLocal = hit.point.clone();
-          if (sceneGroupRef.current) {
-            sceneGroupRef.current.worldToLocal(pointLocal);
-          } else {
-            pointLocal.divideScalar(currentVRScale);
-          }
-
-          const normal = hit.face?.normal
-            ? hit.face.normal
-                .clone()
-                .transformDirection(hit.object.matrixWorld)
-                .normalize()
-            : new THREE.Vector3(0, 1, 0);
-
-          let isValidPlacement = true;
-          let rejectReason = "";
-          // Reject side placement for Build mode
-          if (mode === "Build" && Math.abs(normal.y) < 0.5) {
-            isValidPlacement = false;
-            rejectReason = "Side placement blocked in Build mode";
-          }
-
-          let targetKind = "none";
-          if (
-            hit.object.name === "FloorPlacementCollider" ||
-            hit.object.name === "VRFloorCollider" ||
-            hit.object.name === "Grid"
-          )
-            targetKind = "floor";
-          else if (Math.abs(normal.y) > 0.7) targetKind = "brick-top";
-          else targetKind = "brick-side";
-
           const isFrozenPreview =
             mode === "Move" &&
             useLegoStore.getState().isDraggingBrick &&
@@ -611,16 +638,16 @@ export const HumanViewLayer = ({
           if (isFrozenPreview) {
             // Keep frozen
           } else {
-            latestValidPlacement.current = isValidPlacement
+            latestValidPlacement.current = canHit.isValidPlacement
               ? {
-                  p: pointLocal,
-                  n: normal,
-                  tk: targetKind,
+                  p: canHit.pointLocal,
+                  n: canHit.normalWorld,
+                  tk: canHit.targetKind,
                 }
               : null;
             // Always update ghost position if we hit a valid physical target, 
             // so the user sees feedback even if placement is rejected.
-            updateGhostPosition(pointLocal, normal, targetKind);
+            updateGhostPosition(canHit.pointLocal, canHit.normalWorld, canHit.targetKind);
             setHasPlacementCandidate(true);
           }
         } // End of placement calc
@@ -632,9 +659,9 @@ export const HumanViewLayer = ({
             audioService.play("select");
           } else if (useLegoStore.getState().xrPanel !== "none") {
             // Do nothing to the world if a panel is open!
-          } else if (mode === "Delete" && hit) {
-            const instId = hit.instanceId;
-            const ud = hit.object.userData;
+          } else if (mode === "Delete") {
+            const instId = canHit.rawHit.instanceId;
+            const ud = canHit.rawHit.object.userData;
             if (instId !== undefined && ud && ud.bricks) {
               const brickIndex = ud.isStud
                 ? Math.floor(instId / (ud.w * ud.d))
@@ -707,8 +734,8 @@ export const HumanViewLayer = ({
         }
 
         if (squeezePressed && !wasSqueezePressed.current) {
-          const instId = hit.instanceId;
-          const ud = hit.object.userData;
+          const instId = canHit.rawHit.instanceId;
+          const ud = canHit.rawHit.object.userData;
           if (instId !== undefined && ud && ud.bricks) {
             // Only switch to Move mode if we actually hit a brick
             if (mode === "Build") {
@@ -793,32 +820,26 @@ export const HumanViewLayer = ({
 
       // Render hover marker
       if (hoverMarkerRef.current) {
+        const canHit = canonicalRightHitRef.current;
         if (
-          hit &&
-          (hit.object.name === "Grid" ||
-            hit.object.name === "GridHelper" ||
-            hit.object.name === "FloorPlacementCollider" ||
-            hit.object.name === "VRFloorCollider" ||
-            hit.object.name.includes("BrickBody") ||
-            hit.object.name.includes("BrickStuds") ||
-            hit.object.userData?.isVRPlacementTarget ||
+          canHit &&
+          (canHit.rawHit.object.name === "Grid" ||
+            canHit.rawHit.object.name === "GridHelper" ||
+            canHit.rawHit.object.name === "FloorPlacementCollider" ||
+            canHit.rawHit.object.name === "VRFloorCollider" ||
+            canHit.rawHit.object.name.includes("BrickBody") ||
+            canHit.rawHit.object.name.includes("BrickStuds") ||
+            canHit.rawHit.object.userData?.isVRPlacementTarget ||
             isMenuItem)
         ) {
           hoverMarkerRef.current.visible = true;
-          hoverMarkerRef.current.position.copy(hit.point);
+          hoverMarkerRef.current.position.copy(canHit.pointWorld);
           // Nudge marker slightly along normal to avoid Z-fighting
-          const normal = hit.face?.normal
-            ? hit.face.normal
-                .clone()
-                .transformDirection(hit.object.matrixWorld)
-                .normalize()
-            : new THREE.Vector3(0, 1, 0);
-
-          hoverMarkerRef.current.position.addScaledVector(normal, 0.001);
+          hoverMarkerRef.current.position.addScaledVector(canHit.normalWorld, 0.001);
 
           const quaternion = new THREE.Quaternion().setFromUnitVectors(
             new THREE.Vector3(0, 0, 1),
-            normal,
+            canHit.normalWorld,
           );
           hoverMarkerRef.current.quaternion.copy(quaternion);
         } else {
@@ -843,11 +864,12 @@ export const HumanViewLayer = ({
           `L-Ctrl: ${!!leftController} | R-Ctrl: ${!!rightController} | R-Obj: ${rightController?.name || "none"}`,
           `R-Stick: ${rightInput?.gamepad?.axes.map(a => a.toFixed(2)).join(",")}`,
           `X:${wasXPressed.current} Y:${wasYPressed.current} A:${actionPressed} B:${wasBPressed.current} Trg:${triggerPressed} Grp:${squeezePressed}`,
-          `Hit: ${hit ? hit.object.name : "none"}`,
+          `Hit: ${canonicalRightHitRef.current ? canonicalRightHitRef.current.rawHit.object.name : "none"}`,
           `PlacementValid: ${latestValidPlacement.current ? "yes" : "no"}`,
         ].join("\n");
       }
     } else {
+      canonicalRightHitRef.current = null;
       if (laserRef.current) laserRef.current.visible = false;
       if (hoverMarkerRef.current) hoverMarkerRef.current.visible = false;
       // Clear interactions when tracking lost
