@@ -1349,6 +1349,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   } | null>(null);
 
   const isMultiTouchRef = useRef(false);
+  const activeTouchPointersRef = useRef<Set<number>>(new Set());
 
   const activePointerIdRef = useRef<number | null>(null);
   const [isMultiTouch, setIsMultiTouch] = useState(false);
@@ -1363,12 +1364,14 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       e.nativeEvent?.type?.includes("touch") ||
       false;
 
-    const touchesCount = e.nativeEvent?.touches
-      ? e.nativeEvent.touches.length
-      : (isTouch ? 1 : 0);
+    if (isTouch) {
+      activeTouchPointersRef.current.add(e.pointerId);
+    }
+
+    const isMultiTouchActive = activeTouchPointersRef.current.size >= 2;
 
     // Multi-touch camera handling
-    if (isTouch && touchesCount >= 2) {
+    if (isMultiTouchActive) {
       setIsMultiTouch(true);
       isMultiTouchRef.current = true;
       wasMultiTouchRef.current = true;
@@ -1388,7 +1391,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
     
     // Only track pointer for placement if it's the first touch or not a touch interaction
-    if (touchesCount <= 1) {
+    if (!isMultiTouchActive) {
       activePointerIdRef.current = e.pointerId;
       wasMultiTouchRef.current = false;
       isMultiTouchRef.current = false;
@@ -1418,7 +1421,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         hitData.object.name.includes("BrickBody") ||
         hitData.object.name.includes("BrickStud"),
     );
-    if (isBrickHit && touchesCount <= 1 && !isMultiTouchRef.current) {
+    if (isBrickHit && !isMultiTouchRef.current) {
       isBrickInteractionRef.current = true;
       useLegoStore.getState().setIsInteractingWithBrick(true);
     }
@@ -1654,6 +1657,38 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   executeCommitRef.current = executeCommit;
 
+  const handlePointerCancel = (e: any) => {
+    const isTouch =
+      e.pointerType === "touch" ||
+      e.nativeEvent?.pointerType === "touch" ||
+      e.nativeEvent?.type?.includes("touch") ||
+      false;
+
+    if (isTouch) {
+      activeTouchPointersRef.current.delete(e.pointerId);
+    }
+
+    const isMultiTouchActive = activeTouchPointersRef.current.size >= 2;
+
+    if (activePointerIdRef.current !== null && e.pointerId === activePointerIdRef.current) {
+      activePointerIdRef.current = null;
+    }
+
+    if (!isMultiTouchActive) {
+      setIsMultiTouch(false);
+      isMultiTouchRef.current = false;
+    }
+
+    interactionStartCandidateRef.current = null;
+    latestPlacementCandidateRef.current = null;
+    pointerDownPos.current = null;
+    isBrickInteractionRef.current = false;
+    useLegoStore.getState().setIsInteractingWithBrick(false);
+    if (!isCameraLocked && controlsRef.current) {
+      controlsRef.current.enabled = true;
+    }
+  };
+
   const handlePointerUp = (e: any) => {
     const isTouch =
       e.pointerType === "touch" ||
@@ -1661,13 +1696,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       e.nativeEvent?.type?.includes("touch") ||
       false;
 
-    const touchesCount = e.nativeEvent?.touches
-      ? e.nativeEvent.touches.length
-      : 0;
+    if (isTouch) {
+      activeTouchPointersRef.current.delete(e.pointerId);
+    }
+
+    const isMultiTouchActive = activeTouchPointersRef.current.size >= 2;
 
     if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
       // If a non-active pointer is lifted, just update multi-touch state
-      if (isTouch && touchesCount < 2) {
+      if (!isMultiTouchActive) {
         setIsMultiTouch(false);
         isMultiTouchRef.current = false;
       }
@@ -1675,13 +1712,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
     activePointerIdRef.current = null;
 
-    if (isTouch && touchesCount < 2) {
+    if (!isMultiTouchActive) {
       setIsMultiTouch(false);
       isMultiTouchRef.current = false;
     }
 
     if (wasMultiTouchRef.current) {
-      if (touchesCount === 0) {
+      if (activeTouchPointersRef.current.size === 0) {
         wasMultiTouchRef.current = false;
       }
       interactionStartCandidateRef.current = null;
@@ -2059,7 +2096,16 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         onPointerMove={handlePointerMove}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onPointerOut={(e) => {
+          const isTouch =
+            e.pointerType === "touch" ||
+            e.nativeEvent?.pointerType === "touch" ||
+            e.nativeEvent?.type?.includes("touch") ||
+            false;
+          if (isTouch) {
+            return;
+          }
           if (activePointerIdRef.current !== null && e.pointerId !== activePointerIdRef.current) {
             return;
           }
