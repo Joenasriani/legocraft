@@ -78,6 +78,7 @@ export const HumanViewLayer = ({
   const selectionMode = useLegoStore((s) => s.selectionMode);
 
   const wasTriggerPressed = useRef(false);
+  const wasLeftTriggerPressed = useRef(false);
   const wasSqueezePressed = useRef(false);
   const wasActionPressed = useRef(false);
   const wasRecenterPressed = useRef(false);
@@ -90,7 +91,7 @@ export const HumanViewLayer = ({
   const snapTurnCooldown = useRef(false);
   const menuClickActiveRef = useRef(false);
 
-  const isValidTarget = (obj: THREE.Object3D) => {
+  const isValidTarget = (obj: THREE.Object3D, isLeft: boolean) => {
     let curr: THREE.Object3D | null = obj;
     let isMenu = false;
     while (curr) {
@@ -106,24 +107,23 @@ export const HumanViewLayer = ({
       curr = curr.parent;
     }
 
-    // VR target priority
     const xrPanel = useLegoStore.getState().xrPanel;
 
-    if (xrPanel === "buildMenu" || xrPanel === "palette") {
-      // Priority to menu items when interactive panels are open.
-      // This prevents accidental clicks through the panel to the world.
-      return isMenu;
-    } else if (xrPanel === "none") {
-      // Normal building mode, ignore menu items (radial menu is closed)
-      return !isMenu;
-    } else {
-      // onboarding, error, waitingControllers - no interaction with world or menu
+    if (xrPanel === "onboarding" || xrPanel === "waitingControllers" || xrPanel === "error") {
       return false;
+    }
+
+    if (isLeft) {
+      return isMenu && (xrPanel === "buildMenu" || xrPanel === "palette");
+    } else {
+      return !isMenu;
     }
   };
 
   const laserRef = useRef<THREE.Mesh>(null);
   const hoverMarkerRef = useRef<THREE.Mesh>(null);
+  const leftLaserRef = useRef<THREE.Mesh>(null);
+  const leftHoverMarkerRef = useRef<THREE.Mesh>(null);
 
   const laserGeo = React.useMemo(() => {
     const geo = new THREE.BoxGeometry(0.005, 0.005, 1);
@@ -150,6 +150,12 @@ export const HumanViewLayer = ({
     pointLocal: THREE.Vector3;
     targetKind: string;
     isValidPlacement: boolean;
+    distance: number;
+  } | null>(null);
+
+  const canonicalLeftHitRef = useRef<{
+    rawHit: any;
+    pointWorld: THREE.Vector3;
     distance: number;
   } | null>(null);
 
@@ -434,26 +440,14 @@ export const HumanViewLayer = ({
         }
       }
 
-      if (leftGripPressed && !wasRecenterPressed.current) {
-        store.triggerVRRecenter();
-        triggerHaptics(leftInput, HapticType.UI_CLICK);
-      }
-
       wasXPressed.current = xPressed;
       wasYPressed.current = yPressed;
-      // We will update wasRecenterPressed later after checking Right Stick as well
+      // Recenter logic removed to avoid input conflicts
     }
 
     // Process Right controller UI buttons
     if (rightInput) {
       const bPressed = rightActions.secondary;
-      const rightStickClick = rightActions.stick;
-
-      if (rightStickClick && !wasRecenterPressed.current) {
-        store.triggerVRRecenter();
-        triggerHaptics(rightInput, HapticType.UI_CLICK);
-      }
-      wasRecenterPressed.current = rightStickClick || leftActions.grip;
 
       if (bPressed && !wasBPressed.current) {
         let handled = false;
@@ -497,6 +491,112 @@ export const HumanViewLayer = ({
       }
     }
 
+    let leftControllerPos = new THREE.Vector3();
+    let leftControllerFwd = new THREE.Vector3(0, 0, -1);
+    let leftControllerQuat = new THREE.Quaternion();
+    let hasLeftPose = false;
+
+    if (leftInput && referenceSpace && xrFrame) {
+      const rayPose = getVRTargetRay(leftInput, xrFrame, referenceSpace, leftController);
+      if (rayPose) {
+        leftControllerPos.copy(rayPose.position);
+        leftControllerQuat.copy(rayPose.quaternion);
+        leftControllerFwd.copy(rayPose.direction);
+        hasLeftPose = true;
+      }
+    }
+
+    if (hasLeftPose && leftInput && leftInput.gamepad) {
+      const pos = leftControllerPos;
+      const fwd = leftControllerFwd;
+      if (leftLaserRef.current) {
+        leftLaserRef.current.visible = true;
+        leftLaserRef.current.position.copy(pos);
+        leftLaserRef.current.quaternion.copy(leftControllerQuat);
+      }
+      raycaster.set(pos, fwd);
+      const targets = vrTargetManager.getValidTargets();
+      const intersects = raycaster.intersectObjects(targets, false);
+
+      let hit = null;
+      for (const inter of intersects) {
+        if (isValidTarget(inter.object, true)) {
+          hit = inter;
+          break;
+        }
+      }
+
+      if (hit) {
+        canonicalLeftHitRef.current = {
+          rawHit: hit,
+          pointWorld: hit.point.clone(),
+          distance: hit.distance,
+        };
+      } else {
+        canonicalLeftHitRef.current = null;
+      }
+
+      let laserDistance = 2.0;
+      const leftTriggerPressed = leftActions.trigger;
+
+      let isLeftMenuItem = false;
+      let leftOnTriggerFn = null;
+      let leftHitMenuLabel = "";
+
+      if (canonicalLeftHitRef.current) {
+        const canHit = canonicalLeftHitRef.current;
+        laserDistance = canHit.distance;
+        let currentHitObj: THREE.Object3D | null = canHit.rawHit.object;
+
+        while (currentHitObj) {
+          if (currentHitObj.userData?.isVRMenuItem) {
+            isLeftMenuItem = true;
+            leftOnTriggerFn = currentHitObj.userData.onTrigger;
+            leftHitMenuLabel = currentHitObj.userData.label || "";
+            break;
+          }
+          currentHitObj = currentHitObj.parent;
+        }
+
+        if (leftHitMenuLabel) {
+          useLegoStore.getState().setVRMenuHoverContent(leftHitMenuLabel);
+        }
+      }
+
+      if (leftTriggerPressed && !wasLeftTriggerPressed.current) {
+        if (isLeftMenuItem && leftOnTriggerFn) {
+          leftOnTriggerFn();
+          triggerHaptics(leftInput, HapticType.UI_CLICK);
+          audioService.play("select");
+        }
+      }
+
+      if (leftLaserRef.current) {
+        leftLaserRef.current.scale.set(1, 1, laserDistance);
+      }
+
+      if (leftHoverMarkerRef.current) {
+        const canHit = canonicalLeftHitRef.current;
+        if (canHit && isLeftMenuItem) {
+          leftHoverMarkerRef.current.visible = true;
+          leftHoverMarkerRef.current.position.copy(canHit.pointWorld);
+          const quaternion = new THREE.Quaternion().setFromUnitVectors(
+            new THREE.Vector3(0, 0, 1),
+            canHit.rawHit.face?.normal?.clone().transformDirection(canHit.rawHit.object.matrixWorld).normalize() || new THREE.Vector3(0,1,0)
+          );
+          leftHoverMarkerRef.current.quaternion.copy(quaternion);
+        } else {
+          leftHoverMarkerRef.current.visible = false;
+        }
+      }
+
+      wasLeftTriggerPressed.current = leftTriggerPressed;
+    } else {
+      canonicalLeftHitRef.current = null;
+      if (leftLaserRef.current) leftLaserRef.current.visible = false;
+      if (leftHoverMarkerRef.current) leftHoverMarkerRef.current.visible = false;
+    }
+
     if (hasRightPose && rightInput && rightInput.gamepad) {
       const pos = controllerPos;
       const fwd = controllerFwd;
@@ -517,7 +617,7 @@ export const HumanViewLayer = ({
 
       let hit = null;
       for (const inter of intersects) {
-        if (isValidTarget(inter.object)) {
+        if (isValidTarget(inter.object, false)) {
           hit = inter;
           break;
         }
@@ -594,37 +694,17 @@ export const HumanViewLayer = ({
       const aPressed = rightActions.primary;
       const actionPressed = aPressed;
 
-      let isMenuItem = false;
-      let onTriggerFn = null;
-      let hitMenuLabel = "";
-
       if (canonicalRightHitRef.current) {
         const canHit = canonicalRightHitRef.current;
         laserDistance = canHit.distance;
-        let currentHitObj: THREE.Object3D | null = canHit.rawHit.object;
-
-        while (currentHitObj) {
-          if (currentHitObj.userData?.isVRMenuItem) {
-            isMenuItem = true;
-            onTriggerFn = currentHitObj.userData.onTrigger;
-            hitMenuLabel = currentHitObj.userData.label || "";
-            break;
-          }
-          currentHitObj = currentHitObj.parent;
-        }
-
-        useLegoStore.getState().setVRMenuHoverContent(hitMenuLabel);
 
         latestHit.current = {
-          hitMenuItem: isMenuItem,
-          onTriggerFn,
+          hitMenuItem: false,
+          onTriggerFn: null,
           hitLoc: canHit.rawHit,
         };
 
-        if (isMenuItem && onTriggerFn) {
-          latestValidPlacement.current = null;
-          clearGhost();
-        } else if (useLegoStore.getState().xrPanel !== "none") {
+        if (useLegoStore.getState().xrPanel !== "none") {
           latestValidPlacement.current = null;
           clearGhost();
         } else {
@@ -653,24 +733,13 @@ export const HumanViewLayer = ({
         } // End of placement calc
 
         if (triggerPressed && !wasTriggerPressed.current) {
-          if (isMenuItem && onTriggerFn) {
-            onTriggerFn();
-            triggerHaptics(rightInput, HapticType.UI_CLICK);
-            audioService.play("select");
-          } else if (useLegoStore.getState().xrPanel !== "none") {
+          if (useLegoStore.getState().xrPanel !== "none") {
             // Do nothing to the world if a panel is open!
           } else if (mode === "Delete") {
-            const instId = canHit.rawHit.instanceId;
-            const ud = canHit.rawHit.object.userData;
-            if (instId !== undefined && ud && ud.bricks) {
-              const brickIndex = ud.isStud
-                ? Math.floor(instId / (ud.w * ud.d))
-                : instId;
-              const b = ud.bricks[brickIndex];
-              if (b) {
-                performVRDelete(b, rightInput);
-              }
-            }
+            useLegoStore.getState().setToastMessage("Use Right Grip to delete.");
+            setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
+            triggerHaptics(rightInput, HapticType.ERROR);
+            audioService.play("error");
           } else {
             const state = useLegoStore.getState();
             const canCommitMove =
@@ -719,7 +788,7 @@ export const HumanViewLayer = ({
 
         // Right grip / middle-finger button deletes the brick targeted by the right-controller reticle
         if (squeezePressed && !wasSqueezePressed.current) {
-          if (!isMenuItem && useLegoStore.getState().xrPanel === "none") {
+          if (useLegoStore.getState().xrPanel === "none") {
             const instId = canHit.rawHit.instanceId;
             const ud = canHit.rawHit.object.userData;
             if (instId !== undefined && ud && ud.bricks) {
@@ -802,8 +871,7 @@ export const HumanViewLayer = ({
             canHit.rawHit.object.name === "VRFloorCollider" ||
             canHit.rawHit.object.name.includes("BrickBody") ||
             canHit.rawHit.object.name.includes("BrickStuds") ||
-            canHit.rawHit.object.userData?.isVRPlacementTarget ||
-            isMenuItem)
+            canHit.rawHit.object.userData?.isVRPlacementTarget)
         ) {
           hoverMarkerRef.current.visible = true;
           hoverMarkerRef.current.position.copy(canHit.pointWorld);
@@ -854,6 +922,28 @@ export const HumanViewLayer = ({
 
   return (
     <group>
+      <mesh
+        ref={leftLaserRef}
+        geometry={laserGeo}
+        visible={false}
+        raycast={() => null}
+      >
+        <meshBasicMaterial
+          color="#a855f7"
+          transparent
+          opacity={0.8}
+          depthWrite={false}
+        />
+      </mesh>
+      <mesh ref={leftHoverMarkerRef} visible={false} raycast={() => null}>
+        <ringGeometry args={[0.02, 0.025, 16]} />
+        <meshBasicMaterial
+          color="#a855f7"
+          transparent
+          opacity={0.8}
+          depthTest={false}
+        />
+      </mesh>
       <mesh
         ref={laserRef}
         geometry={laserGeo}
