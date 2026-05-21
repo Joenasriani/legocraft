@@ -1,23 +1,16 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { Text } from "@react-three/drei";
-import { useThree, useFrame } from "@react-three/fiber";
-import * as THREE from "three";
-import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useLegoStore } from "../Store";
 
 export const VROnboarding = () => {
   const instructions = [
-    { key: "Right Trigger", action: "Place / Confirm" },
-    { key: "Right Grip", action: "Pick Up / Drag" },
-    { key: "A (Right)", action: "Rotate Brick" },
-    { key: "B (Right)", action: "Cancel / Back" },
-    { key: "Left Stick", action: "Move & Strafe" },
-    { key: "Right Stick", action: "Snap Turn" },
-    { key: "X / Y (Left)", action: "Build Menu / Palette" },
-    { key: "Stick Click / L-Grip", action: "Recenter" },
+    { key: "Right Trigger", action: "Place" },
+    { key: "Right Grip", action: "Delete" },
+    { key: "A (Right)", action: "Rotate" },
+    { key: "B (Right)", action: "Cancel" },
+    { key: "Left Stick", action: "Move" },
+    { key: "X / Y (Left)", action: "Menu" },
   ];
-
-  const subtext = "Use Left Stick to move and Right Stick to turn your orientation.";
 
   const closeXRPanel = useLegoStore((state) => state.closeXRPanel);
 
@@ -28,16 +21,19 @@ export const VROnboarding = () => {
     return () => clearTimeout(t);
   }, [closeXRPanel]);
 
+  // VRHeadAnchor places the group at ~1.35m in front of the headset, and slightly below (-0.2m).
+  // We offset it further back (-0.25m on Z) to be ~1.6m away, and slightly lower it to be ~0.35m below eye level.
   return (
-    <group scale={0.7}>
+    <group position={[0, -0.15, -0.25]} scale={1.0}>
       <mesh position={[0, 0, -0.01]}>
-        <planeGeometry args={[2.4, 2.2]} />
-        <meshBasicMaterial color="#111111" transparent opacity={0.9} depthWrite={false} />
+        <planeGeometry args={[0.75, 0.55]} />
+        <meshBasicMaterial color="#18181b" transparent opacity={0.9} depthWrite={false} />
       </mesh>
+      
       <Text
-        position={[0, 0.9, 0]}
+        position={[0, 0.2, 0]}
         color="#a855f7"
-        fontSize={0.18}
+        fontSize={0.045}
         fontWeight="bold"
         anchorX="center"
         anchorY="middle"
@@ -45,48 +41,24 @@ export const VROnboarding = () => {
         HOW TO BUILD
       </Text>
       
-      <Text
-        position={[0, -0.7, 0]}
-        color="#fbbf24"
-        fontSize={0.08}
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={2.0}
-        textAlign="center"
-      >
-        {subtext}
-      </Text>
-      
-      <Text
-        position={[0, -0.9, 0]}
-        color="#aaaaaa"
-        fontSize={0.06}
-        anchorX="center"
-        anchorY="middle"
-        maxWidth={2.0}
-        textAlign="center"
-      >
-        Press B to close or wait.
-      </Text>
-      
-      <group position={[-0.9, 0.55, 0]}>
+      <group position={[-0.3, 0.1, 0]}>
         {instructions.map((item, i) => {
-          const y = -i * 0.16;
+          const y = -i * 0.055;
           return (
             <group key={item.key} position={[0, y, 0]}>
               <Text
                 position={[0, 0, 0]}
-                color="#aaaaaa"
-                fontSize={0.09}
+                color="#a1a1aa"
+                fontSize={0.035}
                 anchorX="left"
                 anchorY="middle"
               >
                 {item.key}:
               </Text>
               <Text
-                position={[0.7, 0, 0]}
-                color="white"
-                fontSize={0.09}
+                position={[0.28, 0, 0]}
+                color="#ffffff"
+                fontSize={0.035}
                 anchorX="left"
                 anchorY="middle"
               >
@@ -96,6 +68,18 @@ export const VROnboarding = () => {
           );
         })}
       </group>
+
+      <Text
+        position={[0, -0.22, 0]}
+        color="#71717a"
+        fontSize={0.025}
+        anchorX="center"
+        anchorY="middle"
+        maxWidth={0.7}
+        textAlign="center"
+      >
+        Press B to close or wait.
+      </Text>
     </group>
   );
 };
