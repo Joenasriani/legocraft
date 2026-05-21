@@ -118,8 +118,8 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
   };
 
   const handleDelete = () => {
-    const { removeBrick, setMovingBrickId, setMultiSelectedBrickIds } = useLegoStore.getState();
-    selectedBricks.forEach(b => removeBrick(b.id));
+    const { removeBricks, setMovingBrickId, setMultiSelectedBrickIds } = useLegoStore.getState();
+    removeBricks(selectedBricks.map(b => b.id));
     setMovingBrickId(null);
     setMultiSelectedBrickIds([]);
   };

@@ -64,8 +64,10 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
   const isHovered = hoveredLabel === hoverLabel && !disabled;
 
   React.useEffect(() => {
+    let active = true;
+    let localTex: THREE.CanvasTexture | null = null;
+    
     const canvas = document.createElement("canvas");
-    // Increased resolution for icons
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext("2d");
@@ -80,14 +82,15 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
 
       const img = new Image();
       img.onload = () => {
+        if (!active) return;
         ctx.clearRect(0, 0, 512, 512);
         ctx.globalAlpha = disabled ? 0.4 : 1.0;
-        // Drawing larger for the increased canvas
         ctx.drawImage(img, 64, 64, 384, 384);
         
         const t = new THREE.CanvasTexture(canvas);
         t.anisotropy = gl.capabilities.getMaxAnisotropy();
         t.minFilter = THREE.LinearMipmapLinearFilter;
+        localTex = t;
         setTex(t);
       };
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(str)}`;
@@ -99,14 +102,19 @@ const VRCardButton = ({ position, width, height, isActive, disabled, onClick, ho
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label || "", 256, 256);
+      
       const t = new THREE.CanvasTexture(canvas);
       t.anisotropy = gl.capabilities.getMaxAnisotropy();
       t.minFilter = THREE.LinearMipmapLinearFilter;
+      localTex = t;
       setTex(t);
     }
 
     return () => {
-      if (tex) tex.dispose();
+      active = false;
+      if (localTex) {
+        localTex.dispose();
+      }
     };
   }, [svgElement, label, disabled, gl]);
 

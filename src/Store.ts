@@ -590,7 +590,7 @@ export const hasBrickAbove = (
       ? SHAPE_DEFS[brick.type].hasStuds
       : true;
     const expectedY =
-      targetTopY + (bNeedsClearance && brickHasStuds ? 0.04 : 0); // 0.04 is STUD_HEIGHT
+      targetTopY + (bNeedsClearance && brickHasStuds ? STUD_HEIGHT : 0);
     return Math.abs(b.position[1] - expectedY) < epsilon;
   });
 

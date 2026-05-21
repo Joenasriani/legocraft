@@ -32,7 +32,7 @@ import {
 } from "../Store";
 import { audioService } from "./services/audioService";
 
-import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT } from "../constants";
+import { MODULE_SIZE, BRICK_HEIGHT, STUD_HEIGHT, getInitialCameraPosition } from "../constants";
 import { createBrickGeometry, createStudGeometry } from "../lib/geometry";
 
 import { VRRadialMenu } from "./VRRadialMenu";
@@ -349,6 +349,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       import("three/examples/jsm/exporters/GLTFExporter.js").then(
         ({ GLTFExporter }) => {
           const exporter = new GLTFExporter();
+
+          const cleanupExport = () => {
+            Object.values(geometries).forEach(g => g.dispose());
+            Object.values(materials).forEach(m => m.dispose());
+          };
+
           exporter.parse(
             exportGroup,
             (gltf: any) => {
@@ -381,10 +387,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                       useLegoStore
                         .getState()
                         .setToastMessage("Exported GLB successfully.");
+                      cleanupExport();
                     }),
                   )
                   .catch((e: any) => {
                     if (e.name !== "AbortError") console.error(e);
+                    cleanupExport();
                   });
               } else {
                 const url = URL.createObjectURL(blob);
@@ -396,11 +404,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                 useLegoStore
                   .getState()
                   .setToastMessage("Exported GLB successfully.");
+                cleanupExport();
               }
             },
             (error) => {
               console.error("An error happened during GLB export", error);
               useLegoStore.getState().setToastMessage("Error exporting GLB.");
+              cleanupExport();
             },
             { binary: true },
           );
@@ -502,7 +512,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (takeScreenshotRef.current) {
       takeScreenshotRef.current = false;
       try {
+        // Explicit render-before-capture strategy to avoid needing preserveDrawingBuffer: true,
+        // which would degrade normal render performance.
         state.gl.render(state.scene, state.camera);
+        // Note: screenshot capture is best-effort and experimental depending on browser WebGL support.
         const dataUrl = state.gl.domElement.toDataURL("image/png");
         const link = document.createElement("a");
         link.download = "brickxr-screenshot.png";
@@ -554,14 +567,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       maxZ = -Infinity;
     let minY = Infinity;
     movingGroupOriginalBricks.forEach((b) => {
-      const dim = getBrickDimensions(b.type as any);
-      const rot = (b.rotation || 0) % 360;
-      const w = rot === 90 || rot === 270 ? dim.d : dim.w;
-      const d = rot === 90 || rot === 270 ? dim.w : dim.d;
-      minX = Math.min(minX, b.position[0]);
-      maxX = Math.max(maxX, b.position[0] + w * 0.08);
-      minZ = Math.min(minZ, b.position[2]);
-      maxZ = Math.max(maxZ, b.position[2] + d * 0.08);
+      const aabb = getBrickAABB(b);
+      minX = Math.min(minX, aabb.minX);
+      maxX = Math.max(maxX, aabb.maxX);
+      minZ = Math.min(minZ, aabb.minZ);
+      maxZ = Math.max(maxZ, aabb.maxZ);
       minY = Math.min(minY, b.position[1]);
     });
 
@@ -777,10 +787,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
     }
 
-    let baseSnappedY = Math.max(
-      0,
-      Math.round(highestY / BRICK_HEIGHT) * BRICK_HEIGHT,
-    );
+    let baseSnappedY = Math.max(0, highestY);
 
     if (requiresClearance) {
       baseSnappedY += STUD_HEIGHT;
@@ -834,6 +841,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return null;
   };
 
+  const lastCanonicalHitRef = useRef<any>(null);
+
   const getCanonicalHit = (
     e: any,
   ): {
@@ -849,6 +858,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     let intersects = e.intersections;
 
     if (!intersects || intersects.length === 0) return null;
+
+    let validHits = [];
 
     for (const hit of intersects) {
       if (!hit.object) continue;
@@ -919,18 +930,42 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         p3.divideScalar(currentVRScale);
       }
 
-      // console.log("[hit]", targetKind, p3, worldNormal);
-
-      return {
+      validHits.push({
         point: p3,
         normal: worldNormal,
         object: currentHitObject,
         instanceId: currentInstanceId,
         targetKind,
         hitPoint: currentHitPoint,
-      };
+      });
     }
-    return null;
+
+    if (validHits.length === 0) return null;
+
+    validHits.sort((a, b) => {
+      if (a.targetKind.startsWith("brick") && b.targetKind === "floor") return -1;
+      if (b.targetKind.startsWith("brick") && a.targetKind === "floor") return 1;
+      return 0; // retain R3F distance order
+    });
+
+    const chosenHit = validHits[0];
+
+    if (!isVR && e.nativeEvent) {
+      const cx = e.nativeEvent.clientX;
+      const cy = e.nativeEvent.clientY;
+      if (cx !== undefined && cy !== undefined) {
+        if (lastCanonicalHitRef.current && e.type === "pointermove") {
+          const dx = cx - lastCanonicalHitRef.current.clientX;
+          const dy = cy - lastCanonicalHitRef.current.clientY;
+          if (dx * dx + dy * dy < 25) { // 5px radius hysteresis
+            return lastCanonicalHitRef.current.hit;
+          }
+        }
+        lastCanonicalHitRef.current = { clientX: cx, clientY: cy, hit: chosenHit };
+      }
+    }
+
+    return chosenHit;
   };
 
   const getPlacementTargetFromEvent = (e: any) => {
@@ -1175,7 +1210,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       ghostPosition,
       rotMod
     );
-  }, [activePreset, ghostPosition, ghostRotation]);
+  }, [activePreset, ghostPosition, ghostRotation, clipboard]);
 
   const presetPlacementStatus = useMemo(() => {
     if (mode !== "Build" || !activePreset)
@@ -1205,12 +1240,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         }
       }
 
-      const { bricks, mode, selectionMode, multiSelectedBrickIds, movingBrickId, removeBrick } =
+      const { bricks, mode, selectionMode, multiSelectedBrickIds, movingBrickId, removeBrick, removeBricks } =
         useLegoStore.getState();
 
       if (e.key === "Backspace" || e.key === "Delete") {
         if (mode === "Move" && movingGroupOriginalBricks.length > 0) {
-          movingGroupOriginalBricks.forEach(b => removeBrick(b.id));
+          removeBricks(movingGroupOriginalBricks.map(b => b.id));
           useLegoStore.getState().setMovingBrickId(null);
           useLegoStore.getState().setMultiSelectedBrickIds([]);
         }
@@ -2071,7 +2106,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       return;
     controlsRef.current.reset();
     controlsRef.current.target.set(0, 0.2, 0);
-    camera.position.set(2.8, 2.2, 3.2);
+    camera.position.set(...getInitialCameraPosition());
     controlsRef.current.update();
   }, [cameraRecenterTrigger, camera]);
 

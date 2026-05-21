@@ -262,7 +262,7 @@ export const HumanViewLayer = ({
       );
 
       store.setMovingBrickId(brick.id);
-      store.setIsDraggingBrick(false);
+      store.setIsDraggingBrick(true);
       squeezeMoveBlockedRef.current = isBlocked;
       movePreviewActiveRef.current = false;
       squeezeStartPosRef.current = controllerPos.clone();
@@ -295,7 +295,7 @@ export const HumanViewLayer = ({
             )
           );
         });
-        store.setIsDraggingBrick(false);
+        store.setIsDraggingBrick(true);
         squeezeMoveBlockedRef.current = isBlocked;
         movePreviewActiveRef.current = false;
         squeezeStartPosRef.current = controllerPos.clone();
@@ -312,12 +312,12 @@ export const HumanViewLayer = ({
         store.setMovingBrickId(newAnchorId || null);
         squeezeMoveBlockedRef.current = false;
         movePreviewActiveRef.current = false;
-        store.setIsDraggingBrick(false);
+        store.setIsDraggingBrick(true);
       }
     } else {
       const isBlocked = hasBrickAbove(brick, allBricks, MODULE_SIZE, BRICK_HEIGHT);
       store.setMovingBrickId(brick.id);
-      store.setIsDraggingBrick(false);
+      store.setIsDraggingBrick(true);
       squeezeMoveBlockedRef.current = isBlocked;
       movePreviewActiveRef.current = false;
       squeezeStartPosRef.current = controllerPos.clone();
@@ -650,11 +650,15 @@ export const HumanViewLayer = ({
           hit.object.name === "Grid"
         )
           targetKind = "floor";
-        else if (Math.abs(normalWorld.y) > 0.7) targetKind = "brick-top";
+        else if (normalWorld.y > 0.7) targetKind = "brick-top";
+        else if (normalWorld.y < -0.7) targetKind = "brick-bottom";
         else targetKind = "brick-side";
 
         let isValidPlacement = true;
         if (mode === "Build" && Math.abs(normalWorld.y) < 0.5) {
+          isValidPlacement = false;
+        }
+        if (targetKind === "brick-bottom") {
           isValidPlacement = false;
         }
 
@@ -767,15 +771,25 @@ export const HumanViewLayer = ({
                 rightInput,
               );
             } else if (mode === "Move" && !state.movingBrickId) {
-              useLegoStore
-                .getState()
-                .setToastMessage("Select and drag a brick to move it.");
-              setTimeout(
-                () => useLegoStore.getState().setToastMessage(null),
-                3000,
-              );
-              triggerHaptics(rightInput, HapticType.ERROR);
-              audioService.play("error");
+              const instId = canHit.rawHit.instanceId;
+              const ud = canHit.rawHit.object.userData;
+              if (instId !== undefined && ud && ud.bricks) {
+                const brickIndex = ud.isStud ? Math.floor(instId / (ud.w * ud.d)) : instId;
+                const b = ud.bricks[brickIndex];
+                if (b) {
+                  performVRSelection(b, rightInput, controllerPos);
+                }
+              } else {
+                useLegoStore
+                  .getState()
+                  .setToastMessage("Select and drag a brick to move it.");
+                setTimeout(
+                  () => useLegoStore.getState().setToastMessage(null),
+                  3000,
+                );
+                triggerHaptics(rightInput, HapticType.ERROR);
+                audioService.play("error");
+              }
             } else {
               useLegoStore
                 .getState()

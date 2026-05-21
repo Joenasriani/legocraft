@@ -28,7 +28,7 @@ The following chunks were generated during the production build (`npm run build`
 | `HelpModal.js` | 1.60 kB | 0.69 kB |
 
 ## Bundle Bloat Analysis
-- **Circular Chunks Resolved**: Removing the custom `manualChunks` logic resolved the circular dependency warned previously.
+- **Circular Chunks Resolved**: Custom `manualChunks` logic is used to cleanly separate libraries (e.g., `three-core`, `three-addons`, `ui-vendor`) and resolve circular dependency warnings.
 - **Initial Load**: The initial entry chunk (`index.js`) is ~1.68 MB. While significantly smaller than the previous circular-bloated vendor chunk, it remains large due to core 3D dependencies.
 - **Probable Bloat Causes**:
     - **@react-three/drei & three**: These provide the underlying 3D engine and utilities. They are robust but heavy.
