@@ -6,5 +6,5 @@ export const HALF_MODULE = MODULE_SIZE / 2;
 
 export const getInitialCameraPosition = (): [number, number, number] => {
   const isDesktop = typeof window !== "undefined" && window.innerWidth >= 1024;
-  return isDesktop ? [1.0, 1.0, 1.3] : [1.4, 1.4, 1.8];
+  return isDesktop ? [0.6, 0.6, 0.8] : [1.4, 1.4, 1.8];
 };

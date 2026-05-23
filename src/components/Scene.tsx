@@ -5,7 +5,7 @@ import {
   Html,
   ContactShadows,
   Environment,
-  Stars,
+  Sky,
 } from "@react-three/drei";
 import { XR, XROrigin } from "@react-three/xr";
 import * as THREE from "three";
@@ -2119,24 +2119,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   return (
     <>
-      <color attach="background" args={["#1c2834"]} />
+      <Sky sunPosition={[100, 20, 100]} />
       <Suspense fallback={null}>
         {!xrSessionActive && (
           <>
-            <Environment preset="sunset" background blur={0.4} />
-            <Stars
-              radius={100}
-              depth={50}
-              count={5000}
-              factor={4}
-              saturation={0}
-              fade
-              speed={1}
-            />
+            <Environment preset="city" />
           </>
         )}
       </Suspense>
-      <fog attach="fog" args={["#1c2834", 10, 200]} />
+      <fog attach="fog" args={["#c0e4ff", 10, 200]} />
       <ambientLight intensity={0.4} />
       <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#001804" />
       <directionalLight
