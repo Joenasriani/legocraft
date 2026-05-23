@@ -14,12 +14,43 @@ export function VRLocomotion() {
   const snapTurnAngle = useLegoStore((s) => s.snapTurnAngle);
   const vrRecenterTrigger = useLegoStore((s) => s.vrRecenterTrigger);
 
-  useEffect(() => {
-    if (vrRecenterTrigger > 0 && originRef.current) {
+  const recenter = () => {
+    if (!originRef.current) return;
+    const bricks = useLegoStore.getState().bricks;
+    if (bricks.length > 0) {
+      let minX = Infinity, maxX = -Infinity;
+      let minZ = Infinity, maxZ = -Infinity;
+      bricks.forEach((b: any) => {
+        if (b.position[0] < minX) minX = b.position[0];
+        if (b.position[0] > maxX) maxX = b.position[0];
+        if (b.position[2] < minZ) minZ = b.position[2];
+        if (b.position[2] > maxZ) maxZ = b.position[2];
+      });
+      const centerX = (minX + maxX) / 2;
+      const extentX = Math.max(0, maxX - minX);
+      const targetZ = maxZ + Math.max(1.0, extentX * 0.8);
+      
+      originRef.current.position.set(centerX, 0, targetZ);
+      originRef.current.quaternion.set(0, 0, 0, 1);
+    } else {
       originRef.current.position.set(0, 0, 1.0);
       originRef.current.quaternion.set(0, 0, 0, 1);
     }
+  };
+
+  useEffect(() => {
+    if (vrRecenterTrigger > 0) {
+      recenter();
+    }
   }, [vrRecenterTrigger]);
+
+  const initSpawnRef = useRef(false);
+  useEffect(() => {
+    if (!initSpawnRef.current) {
+      initSpawnRef.current = true;
+      recenter();
+    }
+  }, []);
 
   useFrame((_, delta) => {
     const session = gl.xr.getSession();
@@ -125,5 +156,5 @@ export function VRLocomotion() {
     }
   });
 
-  return <XROrigin ref={originRef} position={[0, 0, 1.0]} />;
+  return <XROrigin ref={originRef} />;
 }

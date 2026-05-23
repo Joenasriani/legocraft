@@ -144,6 +144,11 @@ export const HumanViewLayer = ({
     tk: string;
   } | null>(null);
 
+  const rightGripHoldStartRef = useRef<number | null>(null);
+  const rightGripHoldTargetRef = useRef<any>(null);
+  const rightGripDeletedRef = useRef<boolean>(false);
+  const rightGripWarnedRef = useRef<boolean>(false);
+
   const canonicalRightHitRef = useRef<{
     rawHit: any;
     pointWorld: THREE.Vector3;
@@ -423,6 +428,7 @@ export const HumanViewLayer = ({
       const leftGripPressed = leftActions.grip;
 
       if (xPressed && !wasXPressed.current) {
+        rightGripHoldStartRef.current = null;
         if (currentPanel === "none") {
           store.setXRPanel("buildMenu");
         } else if (currentPanel === "buildMenu") {
@@ -432,6 +438,7 @@ export const HumanViewLayer = ({
         }
       }
       if (yPressed && !wasYPressed.current) {
+        rightGripHoldStartRef.current = null;
         if (currentPanel === "none") {
           store.setXRPanel("palette");
         } else if (currentPanel === "palette") {
@@ -451,6 +458,7 @@ export const HumanViewLayer = ({
       const bPressed = rightActions.secondary;
 
       if (bPressed && !wasBPressed.current) {
+        rightGripHoldStartRef.current = null;
         let handled = false;
         if (currentPanel !== "none") {
           store.setXRPanel("none");
@@ -701,6 +709,76 @@ export const HumanViewLayer = ({
       const aPressed = rightActions.primary;
       const actionPressed = aPressed;
 
+      // ---- NEW RIGHT GRIP LOGIC ----
+      let currentHoverBrick: any = null;
+      if (canonicalRightHitRef.current && useLegoStore.getState().xrPanel === "none") {
+        const canHit = canonicalRightHitRef.current;
+        const instId = canHit.rawHit.instanceId;
+        const ud = canHit.rawHit.object.userData;
+        if (instId !== undefined && ud && ud.bricks) {
+          const brickIndex = ud.isStud ? Math.floor(instId / (ud.w * ud.d)) : instId;
+          currentHoverBrick = ud.bricks[brickIndex] || null;
+        }
+      }
+
+      if (squeezePressed && !wasSqueezePressed.current) {
+        if (currentHoverBrick && useLegoStore.getState().xrPanel === "none") {
+          rightGripHoldStartRef.current = performance.now();
+          rightGripHoldTargetRef.current = currentHoverBrick;
+          rightGripDeletedRef.current = false;
+          rightGripWarnedRef.current = false;
+        }
+      }
+
+      if (squeezePressed && rightGripHoldStartRef.current !== null) {
+        if (!currentHoverBrick || currentHoverBrick.id !== rightGripHoldTargetRef.current?.id) {
+          rightGripHoldStartRef.current = null;
+          if (useLegoStore.getState().xrPanel === "none") {
+            useLegoStore.getState().setVRMenuHoverContent(""); 
+          }
+        } else {
+          const holdTime = performance.now() - rightGripHoldStartRef.current;
+          if (!rightGripDeletedRef.current) {
+            if (holdTime > 200 && holdTime < 600) {
+              if (useLegoStore.getState().xrPanel === "none" && !useLegoStore.getState().isDraggingBrick) {
+                useLegoStore.getState().setVRMenuHoverContent("Hold to Delete");
+              }
+              if (!rightGripWarnedRef.current && holdTime > 250) {
+                triggerHaptics(rightInput, HapticType.UI_HOVER); 
+                rightGripWarnedRef.current = true;
+              }
+            }
+            if (holdTime >= 600) {
+              performVRDelete(rightGripHoldTargetRef.current, rightInput);
+              rightGripDeletedRef.current = true;
+              if (useLegoStore.getState().xrPanel === "none") {
+                useLegoStore.getState().setVRMenuHoverContent("");
+              }
+            }
+          }
+        }
+      }
+
+      if (!squeezePressed && wasSqueezePressed.current) {
+        if (rightGripHoldStartRef.current !== null) {
+          const holdTime = performance.now() - rightGripHoldStartRef.current;
+          if (!rightGripDeletedRef.current && holdTime < 600) {
+             if (useLegoStore.getState().mode !== "Move") {
+                useLegoStore.getState().setMode("Move");
+             }
+             if (rightGripHoldTargetRef.current) {
+                performVRSelection(rightGripHoldTargetRef.current, rightInput, controllerPos);
+             }
+          }
+          rightGripHoldStartRef.current = null;
+          rightGripHoldTargetRef.current = null;
+          if (useLegoStore.getState().xrPanel === "none") {
+             useLegoStore.getState().setVRMenuHoverContent("");
+          }
+        }
+      }
+      // ---- END RIGHT GRIP LOGIC ----
+
       if (canonicalRightHitRef.current) {
         const canHit = canonicalRightHitRef.current;
         laserDistance = canHit.distance;
@@ -798,48 +876,21 @@ export const HumanViewLayer = ({
                 rightInput,
               );
             } else if (mode === "Move" && !state.movingBrickId) {
-              const instId = canHit.rawHit.instanceId;
-              const ud = canHit.rawHit.object.userData;
-              if (instId !== undefined && ud && ud.bricks) {
-                const brickIndex = ud.isStud ? Math.floor(instId / (ud.w * ud.d)) : instId;
-                const b = ud.bricks[brickIndex];
-                if (b) {
-                  performVRSelection(b, rightInput, controllerPos);
-                }
-              } else {
-                useLegoStore
-                  .getState()
-                  .setToastMessage("Select and drag a brick to move it.");
-                setTimeout(
-                  () => useLegoStore.getState().setToastMessage(null),
-                  3000,
-                );
-                triggerHaptics(rightInput, HapticType.ERROR);
-                audioService.play("error");
-              }
+              useLegoStore
+                .getState()
+                .setToastMessage("Use Right Grip to select a brick.");
+              setTimeout(
+                () => useLegoStore.getState().setToastMessage(null),
+                3000,
+              );
+              triggerHaptics(rightInput, HapticType.ERROR);
+              audioService.play("error");
             } else {
               useLegoStore
                 .getState()
                 .setToastMessage("Invalid placement surface.");
               triggerHaptics(rightInput, HapticType.ERROR);
               audioService.play("error");
-            }
-          }
-        }
-
-        // Right grip / middle-finger button deletes the brick targeted by the right-controller reticle
-        if (squeezePressed && !wasSqueezePressed.current) {
-          if (useLegoStore.getState().xrPanel === "none") {
-            const instId = canHit.rawHit.instanceId;
-            const ud = canHit.rawHit.object.userData;
-            if (instId !== undefined && ud && ud.bricks) {
-              let brickIndex = ud.isStud
-                ? Math.floor(instId / (ud.w * ud.d))
-                : instId;
-              const b = ud.bricks[brickIndex];
-              if (b) {
-                performVRDelete(b, rightInput);
-              }
             }
           }
         }
@@ -929,13 +980,7 @@ export const HumanViewLayer = ({
         }
       }
 
-      // Handle Squeeze (Grip) release for dropping/placing
-      if (!squeezePressed && wasSqueezePressed.current) {
-        // Deliberately do nothing:
-        // Grip release does not commit nor cancel.
-        // User must use Right Trigger to confirm, or B to cancel.
-      }
-
+      // Handle Squeeze (Grip) state tracking handled above in Right Grip Logic
       // Always track state
       wasActionPressed.current = actionPressed;
       wasTriggerPressed.current = triggerPressed;
