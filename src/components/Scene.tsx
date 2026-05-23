@@ -704,36 +704,17 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (activePreset) {
       const presetBricksData = getActivePresetBricks(activePreset, clipboard);
       if (presetBricksData) {
-        const rotMod = (Math.round(ghostRotation / 90) * 90) % 360;
+        const rotMod = calculateRotMod(ghostRotation);
         const info = getPresetInfo(activePreset, clipboard);
-        testBricks = presetBricksData.filter(isValidBrickData).map((b) => {
-          let ox = b.position[0] - info.cx;
-          let oz = b.position[2] - info.cz;
-          let nx = ox,
-            nz = oz;
-          if (rotMod === 90 || rotMod === -270) {
-            nx = -oz;
-            nz = ox;
-          } else if (Math.abs(rotMod) === 180) {
-            nx = -ox;
-            nz = -oz;
-          } else if (rotMod === 270 || rotMod === -90) {
-            nx = oz;
-            nz = -ox;
-          }
-          return {
-            ...b,
-            rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-            position: [nx + baseSnappedX, b.position[1] - info.minY, nz + baseSnappedZ] as [
-              number,
-              number,
-              number,
-            ],
-          };
-        });
+        testBricks = transformBricks(
+          presetBricksData.filter(isValidBrickData),
+          [info.cx, info.minY, info.cz],
+          [baseSnappedX, 0, baseSnappedZ],
+          rotMod
+        );
       }
     } else if (mode === "Move" && movingBrick) {
-      const rotMod = calculateRotMod(ghostRotation);
+      const rotMod = calculateRotMod(ghostRotation - (movingBrick.rotation || 0));
       const currentPivot = calculatePivotPosition(
         movingBrick.position,
         movingGroupPivot as [number, number, number],
@@ -1122,7 +1103,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const ghostGroupBricks = useMemo(() => {
     if (mode !== "Move" || !movingBrick) return [];
-    const rotMod = calculateRotMod(ghostRotation);
+    const rotMod = calculateRotMod(ghostRotation - (movingBrick.rotation || 0));
 
     const currentPivot = calculatePivotPosition(
       movingBrick.position,
@@ -1206,7 +1187,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     return transformBricks(
       validPresetBricks,
-      [info.cx, 0, info.cz],
+      [info.cx, info.minY, info.cz],
       ghostPosition,
       rotMod
     );
@@ -1605,7 +1586,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             ghostGroupBricks: [] as any[],
           };
         // validate the whole group
-        const rotMod = calculateRotMod(ghostRotation);
+        const rotMod = calculateRotMod(ghostRotation - (movingBrick.rotation || 0));
         const currentPivot = calculatePivotPosition(
           movingBrick.position,
           movingGroupPivot as [number, number, number],
@@ -1660,7 +1641,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       const testPresetBricks = transformBricks(
         presetBricksData.filter(isValidBrickData),
-        [info.cx, 0, info.cz],
+        [info.cx, info.minY, info.cz],
         currentGhostPos,
         rotMod,
       );
@@ -1732,22 +1713,15 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       // But if justSelected is true we might skip if it was a selection click.
       const { status, ghostGroupBricks } = checkCurrentPlacement();
       if (status.valid) {
-        if (movingGroupOriginalBricks.length > 1) {
-          useLegoStore.getState().updateBricks(
-            ghostGroupBricks.map((b) => ({
-              id: b.id,
-              updates: {
-                position: b.position as [number, number, number],
-                rotation: b.rotation,
-              },
-            })),
-          );
-        } else {
-          useLegoStore.getState().updateBrick(movingBrick.id, {
-            position: currentGhostPos,
-            rotation: ghostRotation,
-          });
-        }
+        useLegoStore.getState().updateBricks(
+          ghostGroupBricks.map((b) => ({
+            id: b.id,
+            updates: {
+              position: b.position as [number, number, number],
+              rotation: b.rotation,
+            },
+          })),
+        );
         setMovingBrickId(null);
         commitSuccess = true;
       } else {

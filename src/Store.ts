@@ -252,7 +252,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0],
-    enabled: true,
+    enabled: false,
     needsStudClearance: true,
   },
   "2x2_dome": {
@@ -263,7 +263,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0],
-    enabled: true,
+    enabled: false,
     needsStudClearance: true,
   },
   "4x4_dome": {
@@ -355,7 +355,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
     needsStudClearance: true,
   },
   corner_slope: {
@@ -398,7 +398,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: true,
+    enabled: false,
     needsStudClearance: true,
   },
 };
@@ -498,6 +498,7 @@ export const getPresetInfo = (
     maxX = -Infinity;
   let minZ = Infinity,
     maxZ = -Infinity;
+  let minY = Infinity;
 
   for (const b of validBricks) {
     const aabb = getBrickAABB(b);
@@ -505,6 +506,7 @@ export const getPresetInfo = (
     if (aabb.maxX > maxX) maxX = aabb.maxX;
     if (aabb.minZ < minZ) minZ = aabb.minZ;
     if (aabb.maxZ > maxZ) maxZ = aabb.maxZ;
+    if (b.position[1] < minY) minY = b.position[1];
   }
 
   const cx = (minX + maxX) / 2;
@@ -512,7 +514,7 @@ export const getPresetInfo = (
   const w = Math.round((maxX - minX) / 0.08);
   const d = Math.round((maxZ - minZ) / 0.08);
 
-  return { cx, cz, w, d };
+  return { cx, cz, w, d, minY };
 };
 
 export const doAABBsOverlap = (
@@ -1534,7 +1536,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const transformed = transformBricks(
       validPresetBricks,
-      [info.cx, 0, info.cz], // Pivot in original preset space
+      [info.cx, info.minY, info.cz], // Pivot in original preset space
       newPivot,
       rotMod
     );

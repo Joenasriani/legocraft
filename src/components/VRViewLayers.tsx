@@ -25,7 +25,7 @@ interface ControllerActions {
 }
 
 const getControllerActions = (input: XRInputSource | null): ControllerActions => {
-  if (!input || !input.gamepad) {
+  if (!input || !input.gamepad || !input.gamepad.buttons) {
     return {
       trigger: false,
       grip: false,
@@ -35,12 +35,13 @@ const getControllerActions = (input: XRInputSource | null): ControllerActions =>
     };
   }
   const gp = input.gamepad;
+  const btn = (i: number) => (gp.buttons.length > i ? gp.buttons[i]?.pressed : false) || false;
   return {
-    trigger: gp.buttons[0]?.pressed || false,
-    grip: gp.buttons[1]?.pressed || false,
-    primary: gp.buttons[4]?.pressed || false,
-    secondary: gp.buttons[5]?.pressed || false,
-    stick: gp.buttons[3]?.pressed || gp.buttons[10]?.pressed || false,
+    trigger: btn(0),
+    grip: btn(1),
+    primary: btn(4) || btn(2), // Provide fallback indices for non-xr-standard gamepads
+    secondary: btn(5) || btn(3),
+    stick: btn(3) || btn(2),
   };
 };
 
@@ -704,9 +705,28 @@ export const HumanViewLayer = ({
         const canHit = canonicalRightHitRef.current;
         laserDistance = canHit.distance;
 
+        let currentHitObj: THREE.Object3D | null = canHit.rawHit.object;
+        let isRightMenuItem = false;
+        let rightOnTriggerFn: any = null;
+        let rightHitMenuLabel = "";
+
+        while (currentHitObj) {
+          if (currentHitObj.userData?.isVRMenuItem) {
+            isRightMenuItem = true;
+            rightOnTriggerFn = currentHitObj.userData.onTrigger;
+            rightHitMenuLabel = currentHitObj.userData.label || "";
+            break;
+          }
+          currentHitObj = currentHitObj.parent;
+        }
+
+        if (rightHitMenuLabel) {
+          useLegoStore.getState().setVRMenuHoverContent(rightHitMenuLabel);
+        }
+
         latestHit.current = {
-          hitMenuItem: false,
-          onTriggerFn: null,
+          hitMenuItem: isRightMenuItem,
+          onTriggerFn: rightOnTriggerFn,
           hitLoc: canHit.rawHit,
         };
 
@@ -741,6 +761,11 @@ export const HumanViewLayer = ({
         if (triggerPressed && !wasTriggerPressed.current) {
           if (useLegoStore.getState().xrPanel !== "none") {
             // Do nothing to the world if a panel is open!
+            if (isRightMenuItem && rightOnTriggerFn) {
+              rightOnTriggerFn();
+              triggerHaptics(rightInput, HapticType.UI_CLICK);
+              audioService.play("select");
+            }
           } else if (mode === "Delete") {
             useLegoStore.getState().setToastMessage("Use Right Grip to delete.");
             setTimeout(() => useLegoStore.getState().setToastMessage(null), 3000);
