@@ -1167,7 +1167,14 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setMovingBrickId: (id) => set({ movingBrickId: id }),
   setIsDraggingBrick: (val) => set({ isDraggingBrick: val }),
   setJustSelectedBrick: (val) => set({ justSelectedBrick: val }),
-  setIsCameraLocked: (val) => set({ isCameraLocked: val }),
+  setIsCameraLocked: (val) => {
+    const state = get();
+    if (!val && state.mode === "Build") {
+      set({ isCameraLocked: val, mode: "Move" });
+    } else {
+      set({ isCameraLocked: val });
+    }
+  },
 
   addBrick: (newBrickData) => {
     const { bricks, undoStack } = get();
@@ -1305,14 +1312,19 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
     scheduleSave(newBricks);
   },
 
-  setMode: (mode) =>
-    set({
+  setMode: (mode) => {
+    const changes: any = {
       mode,
       activePreset: null,
       movingBrickId: null,
       isDraggingBrick: false,
       multiSelectedBrickIds: [],
-    }),
+    };
+    if (mode === "Build") {
+      changes.isCameraLocked = true;
+    }
+    set(changes);
+  },
   setCameraMode: (cameraMode) => set({ cameraMode }),
   setSelectedType: (selectedType) => {
     if (get().selectedType !== selectedType) {

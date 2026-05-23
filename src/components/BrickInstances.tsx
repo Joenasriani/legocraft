@@ -314,8 +314,16 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     bodyMesh.computeBoundingSphere();
     studMesh.computeBoundingSphere();
 
-    bodyMesh.count = count;
-    studMesh.count = showStuds ? Math.max(0, count * w * d) : 0;
+    let actualCount = count;
+    let actualStudCount = showStuds ? Math.max(0, count * w * d) : 0;
+
+    if (isGhost && !isValid) {
+      actualCount = 0;
+      actualStudCount = 0;
+    }
+
+    bodyMesh.count = actualCount;
+    studMesh.count = actualStudCount;
 
     // Store bricks on userData so custom raycasters can retrieve them
     bodyMesh.userData.bricks = bricks;

@@ -1702,8 +1702,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           position: nextGhostPos,
         };
         commitSuccess = true;
-      } else if (status.reason === "floating") {
-        useLegoStore.getState().setToastMessage("Cannot float in mid-air.");
+      } else {
+        useLegoStore.getState().setToastMessage(status.reason === "floating" ? "Cannot float in mid-air." : `Cannot place: ${status.reason || "invalid"}`);
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
       }
     } else if (mode === "Move" && movingBrick) {
@@ -1853,7 +1853,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
       pointerDownPos.current = null;
 
-      if (!isClick && !useLegoStore.getState().isDraggingBrick) {
+      if (!isClick && !useLegoStore.getState().isDraggingBrick && mode !== "Build") {
         return; // It was a camera drag
       }
     } else {
