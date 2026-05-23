@@ -7,15 +7,14 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       const radius = type === "1x1_round_cylinder" ? (MODULE_SIZE / 2) - 0.001 : MODULE_SIZE - 0.001;
       geom = new THREE.CylinderGeometry(radius, radius, BRICK_HEIGHT, 32);
       geom.translate(0, BRICK_HEIGHT / 2, 0);
-    } else if (type === "1x1_cone" || type === "2x2_cone" || type === "3x3_cone") {
+    } else if (type === "1x1_cone" || type === "2x2_cone") {
       let r = (MODULE_SIZE / 2);
       if (type === "2x2_cone") r = MODULE_SIZE;
-      if (type === "3x3_cone") r = (MODULE_SIZE * 3) / 2;
       const radius = r - 0.001;
       geom = new THREE.ConeGeometry(radius, BRICK_HEIGHT, 32);
       geom.translate(0, BRICK_HEIGHT / 2, 0);
-    } else if (type === "2x2_dome" || type === "4x4_dome") {
-      const radius = (type === "4x4_dome" ? MODULE_SIZE * 2 : MODULE_SIZE) - 0.001;
+    } else if (type === "4x4_dome") {
+      const radius = (MODULE_SIZE * 2) - 0.001;
       geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
       geom.scale(1, BRICK_HEIGHT / radius, 1);
     } else if (type === "1x2_slope" || type === "2x2_slope") {
@@ -83,12 +82,6 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       geom.center();
       geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateY(Math.PI / 2);
-    } else if (type === "quarter_dome") {
-      const radius = Math.min(width, depth) - 0.001;
-      geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI / 2, 0, Math.PI / 2);
-      geom.scale(1, BRICK_HEIGHT / radius, 1);
-      geom.center();
-      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "2x2_corner_triangle") {
       const shape = new THREE.Shape();
       shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
@@ -120,11 +113,6 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       geom.center();
       geom.translate(0, BRICK_HEIGHT / 2, 0);
       geom.rotateY(Math.PI / 2);
-    } else if (type === "half_dome") {
-      geom = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI, 0, Math.PI / 2);
-      geom.scale(width / 2, BRICK_HEIGHT, depth);
-      geom.center();
-      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "corner_slope") {
       const halfW = width / 2;
       const halfD = depth / 2;

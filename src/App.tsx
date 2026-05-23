@@ -528,14 +528,12 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
       );
     case "1x1_cone":
     case "2x2_cone":
-    case "3x3_cone":
       return (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <ellipse cx="12" cy="6" rx="2" ry="1" />
            <path d="M10 6l-4 12c-0.2 0.5 4 1.5 6 1.5s6.2-1 6-1.5l-4-12" />
         </svg>
       );
-    case "2x2_dome":
     case "4x4_dome":
       return (
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
@@ -586,26 +584,11 @@ export const ShapeIcon = ({ id, active, supported }: { id: string, active: boole
            <polygon points="12,4 4,20 20,20" />
          </svg>
       );
-    case "quarter_dome":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" fill={color} fillOpacity="0.2"/>
-           <path d="M4 20 A 16 16 0 0 1 20 4 V20 H4 Z" />
-         </svg>
-      );
     case "arch":
       return (
          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
            <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" fill={color} fillOpacity="0.2" />
            <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" />
-         </svg>
-      );
-    case "half_dome":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 16 C4 6 20 6 20 16 Z" fill={color} fillOpacity="0.2" />
-           <path d="M4 16 C4 6 20 6 20 16" />
-           <ellipse cx="12" cy="16" rx="8" ry="2" />
          </svg>
       );
     case "corner_slope":

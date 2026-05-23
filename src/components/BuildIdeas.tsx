@@ -39,14 +39,12 @@ const BUILD_IDEAS: BuildIdea[] = [
     essentialBricks: [
       { type: "2x2", count: 12, color: "#A0A0A0" },
       { type: "2x2_cone", count: 1, color: "#000000" },
-      { type: "1x2", count: 6, color: "#808080" },
-      { type: "2x2_dome", count: 1, color: "#E3000B" }
+      { type: "1x2", count: 6, color: "#808080" }
     ],
     tips: [
       "Stack 2x2 bricks for a stable square base",
       "Use smaller bricks as you go higher for a tapered look",
-      "Add 'windows' by leaving small gaps or using different colors",
-      "Try adding a 2x2_dome at the very top"
+      "Add 'windows' by leaving small gaps or using different colors"
     ]
   },
   {

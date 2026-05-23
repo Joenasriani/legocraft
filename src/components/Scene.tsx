@@ -1711,6 +1711,11 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
       // In VR we don't have isClick exactly because VR is explicitly triggering commit.
       // But if justSelected is true we might skip if it was a selection click.
+      if (justSelected) {
+        useLegoStore.getState().setJustSelectedBrick(false);
+        return false;
+      }
+      
       const { status, ghostGroupBricks } = checkCurrentPlacement();
       if (status.valid) {
         useLegoStore.getState().updateBricks(

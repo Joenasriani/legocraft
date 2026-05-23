@@ -29,8 +29,6 @@ export type BrickType =
   | "2x2_round_cylinder"
   | "1x1_cone"
   | "2x2_cone"
-  | "3x3_cone"
-  | "2x2_dome"
   | "4x4_dome"
   | "1x2_slope"
   | "2x2_slope"
@@ -39,11 +37,9 @@ export type BrickType =
   | "wedge"
   | "2x2_corner_triangle"
   | "inverted_slope"
-  | "quarter_dome"
   | "corner_slope"
   | "curved_corner"
-  | "arch"
-  | "half_dome";
+  | "arch";
 export const BRICK_TYPES: BrickType[] = [
   "1x1",
   "1x2",
@@ -64,8 +60,6 @@ export const ALL_VALID_BRICK_TYPES: BrickType[] = [
   "2x2_round_cylinder",
   "1x1_cone",
   "2x2_cone",
-  "3x3_cone",
-  "2x2_dome",
   "4x4_dome",
   "1x2_slope",
   "2x2_slope",
@@ -74,11 +68,9 @@ export const ALL_VALID_BRICK_TYPES: BrickType[] = [
   "wedge",
   "2x2_corner_triangle",
   "inverted_slope",
-  "quarter_dome",
   "corner_slope",
   "curved_corner",
   "arch",
-  "half_dome",
 ];
 
 export const PLACEMENT_EPSILON = 0.002;
@@ -244,28 +236,6 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     enabled: true,
     needsStudClearance: true,
   },
-  "3x3_cone": {
-    id: "3x3_cone",
-    name: "3x3 Cone",
-    w: 3,
-    d: 3,
-    h: 1,
-    hasStuds: false,
-    allowedRotations: [0],
-    enabled: false,
-    needsStudClearance: true,
-  },
-  "2x2_dome": {
-    id: "2x2_dome",
-    name: "2x2 Dome",
-    w: 2,
-    d: 2,
-    h: 1,
-    hasStuds: false,
-    allowedRotations: [0],
-    enabled: false,
-    needsStudClearance: true,
-  },
   "4x4_dome": {
     id: "4x4_dome",
     name: "4x4 Dome",
@@ -347,17 +317,6 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     allowedRotations: [0, 90, 180, 270],
     enabled: true,
   },
-  quarter_dome: {
-    id: "quarter_dome",
-    name: "1/4 Dome",
-    w: 2,
-    d: 2,
-    h: 1,
-    hasStuds: false,
-    allowedRotations: [0, 90, 180, 270],
-    enabled: false,
-    needsStudClearance: true,
-  },
   corner_slope: {
     id: "corner_slope",
     name: "Corner Slope",
@@ -389,17 +348,6 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     hasStuds: true,
     allowedRotations: [0, 90, 180, 270],
     enabled: true,
-  },
-  half_dome: {
-    id: "half_dome",
-    name: "Half Dome 2x4",
-    w: 2,
-    d: 4,
-    h: 1,
-    hasStuds: false,
-    allowedRotations: [0, 90, 180, 270],
-    enabled: false,
-    needsStudClearance: true,
   },
 };
 
@@ -433,8 +381,6 @@ export const getBrickDimensions = (type: BrickType) => {
       return { w: 5, d: 5 };
     case "arch":
       return { w: 1, d: 4 };
-    case "half_dome":
-      return { w: 2, d: 4 };
     default:
       return { w: 2, d: 2 };
   }
@@ -489,10 +435,10 @@ export const getPresetInfo = (
   clipboardBricks?: BrickData[],
 ) => {
   const bricks = getActivePresetBricks(presetName, clipboardBricks);
-  if (!bricks) return { cx: 0, cz: 0, w: 1, d: 1 };
+  if (!bricks) return { cx: 0, cz: 0, w: 1, d: 1, minY: 0 };
 
   const validBricks = bricks.filter(isValidBrickData);
-  if (validBricks.length === 0) return { cx: 0, cz: 0, w: 1, d: 1 };
+  if (validBricks.length === 0) return { cx: 0, cz: 0, w: 1, d: 1, minY: 0 };
 
   let minX = Infinity,
     maxX = -Infinity;
