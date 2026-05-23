@@ -724,7 +724,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           return {
             ...b,
             rotation: (((b.rotation || 0) % 360) + rotMod + 360) % 360,
-            position: [nx + baseSnappedX, b.position[1], nz + baseSnappedZ] as [
+            position: [nx + baseSnappedX, b.position[1] - info.minY, nz + baseSnappedZ] as [
               number,
               number,
               number,

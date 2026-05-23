@@ -285,7 +285,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   "2x2_slope": {
     id: "2x2_slope",
@@ -295,7 +295,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   quarter_cylinder: {
     id: "quarter_cylinder",
@@ -305,7 +305,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   half_cylinder: {
     id: "half_cylinder",
@@ -315,7 +315,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   wedge: {
     id: "wedge",
@@ -325,7 +325,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   "2x2_corner_triangle": {
     id: "2x2_corner_triangle",
@@ -335,7 +335,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   inverted_slope: {
     id: "inverted_slope",
@@ -345,7 +345,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: true,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
   },
   quarter_dome: {
     id: "quarter_dome",
@@ -355,7 +355,7 @@ export const SHAPE_DEFS: Record<string, ShapeDef> = {
     h: 1,
     hasStuds: false,
     allowedRotations: [0, 90, 180, 270],
-    enabled: false,
+    enabled: true,
     needsStudClearance: true,
   },
   corner_slope: {

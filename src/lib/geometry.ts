@@ -43,7 +43,9 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       shape.lineTo(0, 0);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
       geom.rotateX(Math.PI / 2);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "half_cylinder") {
       const shape = new THREE.Shape();
       const r = depth / 2 - 0.001;
@@ -53,8 +55,10 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       shape.lineTo(-r, 0);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
       geom.rotateX(Math.PI / 2);
       geom.rotateY(Math.PI / 2);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "wedge") {
       const shape = new THREE.Shape();
       shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
@@ -63,7 +67,9 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       shape.lineTo(-width / 2 + 0.001, -depth / 2 + 0.001);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
       geom.rotateX(Math.PI / 2);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "inverted_slope") {
       const shape = new THREE.Shape();
       shape.moveTo(-depth / 2 + 0.001, BRICK_HEIGHT / 2);
@@ -81,6 +87,8 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       const radius = Math.min(width, depth) - 0.001;
       geom = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI / 2, 0, Math.PI / 2);
       geom.scale(1, BRICK_HEIGHT / radius, 1);
+      geom.center();
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "2x2_corner_triangle") {
       const shape = new THREE.Shape();
       shape.moveTo(-width / 2 + 0.001, -depth / 2 + 0.001);
@@ -89,7 +97,9 @@ export const createBrickGeometry = (type: string, width: number, depth: number):
       shape.lineTo(-width / 2 + 0.001, -depth / 2 + 0.001);
       const extrudeSettings = { depth: BRICK_HEIGHT, bevelEnabled: false };
       geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      geom.center();
       geom.rotateX(Math.PI / 2);
+      geom.translate(0, BRICK_HEIGHT / 2, 0);
     } else if (type === "arch") {
       const halfD = depth / 2;
       const halfH = BRICK_HEIGHT / 2;

@@ -506,11 +506,13 @@ export const HumanViewLayer = ({
       }
     }
 
-    if (hasLeftPose && leftInput && leftInput.gamepad) {
+    if (hasLeftPose && leftInput) {
       const pos = leftControllerPos;
       const fwd = leftControllerFwd;
+      const isLeftMenuOpen = currentPanel === "buildMenu" || currentPanel === "palette";
+
       if (leftLaserRef.current) {
-        leftLaserRef.current.visible = true;
+        leftLaserRef.current.visible = isLeftMenuOpen;
         leftLaserRef.current.position.copy(pos);
         leftLaserRef.current.quaternion.copy(leftControllerQuat);
       }
@@ -597,7 +599,7 @@ export const HumanViewLayer = ({
       if (leftHoverMarkerRef.current) leftHoverMarkerRef.current.visible = false;
     }
 
-    if (hasRightPose && rightInput && rightInput.gamepad) {
+    if (hasRightPose && rightInput) {
       const pos = controllerPos;
       const fwd = controllerFwd;
       
@@ -943,16 +945,16 @@ export const HumanViewLayer = ({
         raycast={() => null}
       >
         <meshBasicMaterial
-          color="#a855f7"
+          color="#ffffff"
           transparent
-          opacity={0.8}
+          opacity={0.5}
           depthWrite={false}
         />
       </mesh>
       <mesh ref={leftHoverMarkerRef} visible={false} raycast={() => null}>
         <ringGeometry args={[0.02, 0.025, 16]} />
         <meshBasicMaterial
-          color="#a855f7"
+          color="#ffffff"
           transparent
           opacity={0.8}
           depthTest={false}
