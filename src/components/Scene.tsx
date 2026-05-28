@@ -56,6 +56,8 @@ import { VRLocomotion } from "./VRLocomotion";
 import { VRHeadAnchor, VRLeftHandAnchor } from "../VRMenuAnchors";
 import { VRModeIndicator } from "./VRModeIndicator";
 
+import { AnimatePresence } from "motion/react";
+
 const isQuest =
   typeof navigator !== "undefined" &&
   /Quest|OculusBrowser/i.test(navigator.userAgent);
@@ -833,6 +835,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     hitPoint: THREE.Vector3;
     targetKind: string;
     instanceId?: number;
+    brick?: BrickData;
   } | null => {
     if (!sceneGroupRef.current) return null;
 
@@ -880,6 +883,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         continue;
       }
 
+      if (!isVR && targetKind === "floor" && useLegoStore.getState().mode === "Build") {
+        continue;
+      }
+
       const worldNormal =
         hit.face?.normal
           ?.clone()
@@ -904,6 +911,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       const currentHitObject = hit.object;
       const currentInstanceId = hit.instanceId;
 
+      let clickedBrick: BrickData | undefined;
+      if (currentHitObject.userData?.bricks && currentInstanceId !== undefined) {
+        if (currentHitObject.userData.isStud) {
+          const w = currentHitObject.userData.w || 1;
+          const d = currentHitObject.userData.d || 1;
+          const brickIdx = Math.floor(currentInstanceId / (w * d));
+          clickedBrick = currentHitObject.userData.bricks[brickIdx];
+        } else {
+          clickedBrick = currentHitObject.userData.bricks[currentInstanceId];
+        }
+      }
+
       let p3 = currentHitPoint.clone();
       if (sceneGroupRef.current) {
         sceneGroupRef.current.worldToLocal(p3);
@@ -916,6 +935,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         normal: worldNormal,
         object: currentHitObject,
         instanceId: currentInstanceId,
+        brick: clickedBrick,
         targetKind,
         hitPoint: currentHitPoint,
       });
@@ -955,22 +975,136 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return computePlacementTarget(hit.point, hit.normal, hit.targetKind);
   };
 
+  const computeDesktopBuildTarget = (
+    hit: any,
+  ): [number, number, number] | null => {
+    if (!hit.brick) {
+      // It might be a floor, sky, grid, or something. Just log what was hit if it's considered to be a brick target kind
+      if (hit.targetKind.startsWith("brick-")) {
+        console.log("DesktopBuild failed: hit a brick but missing hit.brick data -", hit.object?.name, "instanceId:", hit.instanceId);
+      }
+      return null;
+    }
+    
+    const brick = hit.brick as BrickData;
+    const kind = hit.targetKind;
+    
+    if (kind !== "brick-top" && kind !== "brick-side") {
+      return null;
+    }
+
+    const activeDims = getBrickDimensions(selectedType as any);
+    const rot = Math.round(ghostRotation / 90) % 4;
+    const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
+    const newW = isRot ? activeDims.d : activeDims.w;
+    const newD = isRot ? activeDims.w : activeDims.d;
+
+    const by = brick.position[1];
+
+    const alignSnap = (val: number, count: number, step: number) => {
+      const offset = count % 2 === 1 ? step / 2 : 0;
+      return Math.round((val - offset) / step) * step + offset;
+    };
+
+    if (kind === "brick-side") {
+      const hitX = hit.point.x + hit.normal.x * ((newW * MODULE_SIZE) / 2 + 0.001);
+      const hitZ = hit.point.z + hit.normal.z * ((newD * MODULE_SIZE) / 2 + 0.001);
+      
+      return [
+        alignSnap(hitX, newW, MODULE_SIZE),
+        by,
+        alignSnap(hitZ, newD, MODULE_SIZE)
+      ];
+    } else if (kind === "brick-top") {
+      const hitPoint = hit.point.clone();
+      const dims = getBrickDimensions(brick.type);
+      const bRot = Math.round((brick.rotation || 0) / 90) % 4;
+      const bIsRot = bRot === 1 || bRot === 3 || bRot === -1 || bRot === -3;
+      const effW = bIsRot ? dims.d : dims.w;
+      const effD = bIsRot ? dims.w : dims.d;
+      
+      const localX = hitPoint.x - brick.position[0];
+      const localZ = hitPoint.z - brick.position[2];
+      
+      const radX = (effW * MODULE_SIZE) / 2;
+      const radZ = (effD * MODULE_SIZE) / 2;
+      
+      const nx = localX / radX;
+      const nz = localZ / radZ;
+      
+      if (Math.abs(nx) > 0.6 || Math.abs(nz) > 0.6) {
+        return null;
+      }
+      
+      const targetHeight = (SHAPE_DEFS[brick.type]?.heightUnit || 1) * BRICK_HEIGHT;
+
+      return [
+        alignSnap(hitPoint.x, newW, MODULE_SIZE),
+        by + targetHeight,
+        alignSnap(hitPoint.z, newD, MODULE_SIZE)
+      ];
+    }
+    
+    return null;
+  };
+
   const updateGhostFromEvent = (e: any) => {
     const hit = getCanonicalHit(e);
     if (!hit) {
       setHasPlacementCandidate(false);
       return false;
     }
-    const position = computePlacementTarget(
-      hit.point,
-      hit.normal,
-      hit.targetKind,
-    );
-    latestPlacementCandidateRef.current = { hit, position };
 
     const state = useLegoStore.getState();
-    const isDragging = state.isDraggingBrick;
+    const isTouch =
+      e.pointerType === "touch" ||
+      e.nativeEvent?.pointerType === "touch" ||
+      e.nativeEvent?.type?.includes("touch") ||
+      false;
+    
     const isBuilding = state.mode === "Build";
+    const isDesktopBuild = !isVR && !isTouch && isBuilding;
+
+    let position: [number, number, number] | null = null;
+    
+    if (isDesktopBuild) {
+      position = computeDesktopBuildTarget(hit) || computePlacementTarget(hit.point, hit.normal, hit.targetKind);
+      console.log("DesktopBuild position:", position);
+      if (position) {
+        // Validate it
+        const testBrickData = {
+          id: "ghost",
+          type: selectedType,
+          position: position,
+          rotation: ghostRotation,
+        };
+        const status = checkPlacementValid(
+          state.bricks,
+          testBrickData,
+          MODULE_SIZE,
+          BRICK_HEIGHT,
+        );
+        console.log("DesktopBuild validation:", status);
+        if (!status.valid) {
+          position = null;
+        }
+      }
+    } else {
+      position = computePlacementTarget(
+        hit.point,
+        hit.normal,
+        hit.targetKind,
+      );
+    }
+
+    if (!position) {
+      setHasPlacementCandidate(false);
+      return false;
+    }
+
+    latestPlacementCandidateRef.current = { hit, position };
+
+    const isDragging = state.isDraggingBrick;
     const isPlacingPreset = state.activePreset !== null;
 
     if (isDragging || isBuilding || isPlacingPreset) {
@@ -1496,16 +1630,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     // ONLY if not in multi-touch mode
     const currentMovingBrickId = useLegoStore.getState().movingBrickId;
     if (hit && !isMultiTouchRef.current && (mode === "Build" || activePreset !== null || (mode === "Move" && currentMovingBrickId))) {
-      const position = computePlacementTarget(
-        hit.point,
-        hit.normal,
-        hit.targetKind,
-      );
-      const candidate = { hit, position };
-      interactionStartCandidateRef.current = candidate;
-      latestPlacementCandidateRef.current = candidate;
-      setGhostPosition(position);
-      setHasPlacementCandidate(true);
+      updateGhostFromEvent(e);
+      interactionStartCandidateRef.current = latestPlacementCandidateRef.current;
+      
+      if (!isVR && !isTouch && mode === "Build" && controlsRef.current) {
+        controlsRef.current.enabled = false;
+      }
     }
 
     const isBrickHit = e.intersections?.some(
@@ -1876,11 +2006,13 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
           (fallbackHit
             ? {
                 hit: fallbackHit,
-                position: computePlacementTarget(
-                  fallbackHit.point,
-                  fallbackHit.normal,
-                  fallbackHit.targetKind,
-                ),
+                position: (!isVR && !isTouch && mode === "Build") 
+                  ? computeDesktopBuildTarget(fallbackHit) || computePlacementTarget(fallbackHit.point, fallbackHit.normal, fallbackHit.targetKind)
+                  : computePlacementTarget(
+                      fallbackHit.point,
+                      fallbackHit.normal,
+                      fallbackHit.targetKind,
+                    ),
               }
             : null);
 
@@ -1891,7 +2023,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         setHasPlacementCandidate(false);
         return;
       }
+    }
 
+    if (candidate && mode === "Build" && hasPlacementCandidateRef.current) {
       // Enforce that we only place EXACTLY where the user saw the ghost
       candidate.position = [...ghostPositionRef.current] as [number, number, number];
     }
@@ -1947,8 +2081,17 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       }
 
       if (shouldCommit && candidate) {
+        console.log("Committing placement...", {shouldCommit, candidate, hasPlacement: hasPlacementCandidateRef.current, isVR, isTouch, mode});
+        if (!isVR && !isTouch && mode === "Build" && !hasPlacementCandidateRef.current) {
+          useLegoStore.getState().setToastMessage("Invalid placement.");
+          setTimeout(() => useLegoStore.getState().setToastMessage(null), 2000);
+          setIsDraggingBrick(false);
+          interactionStartCandidateRef.current = null;
+          return;
+        }
         executeCommit(candidate);
       } else {
+        console.log("Not committing placement...", {shouldCommit, candidate});
         setIsDraggingBrick(false);
       }
     } else {
@@ -2171,8 +2314,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
             </VRHeadAnchor>
             
             <VRLeftHandAnchor>
-              {xrPanel === "buildMenu" && <VRRadialMenu vrScale={vrScale} />}
-              {xrPanel === "palette" && <VRPalette />}
+              <AnimatePresence>
+                {xrPanel === "buildMenu" && <VRRadialMenu key="radial" vrScale={vrScale} />}
+                {xrPanel === "palette" && <VRPalette key="palette" />}
+              </AnimatePresence>
             </VRLeftHandAnchor>
           </>
         )}

@@ -742,10 +742,10 @@ const SaveExportMenuOverlay = ({
       {show && (
         <motion.div
           ref={saveMenuRef}
-          initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-          animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-          exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-          transition={{ duration: 0.2, ease: "easeOut" }}
+          initial={{ opacity: 0, y: 200, x: "-50%" }}
+          animate={{ opacity: 1, y: 0, x: "-50%" }}
+          exit={{ opacity: 0, y: 200, x: "-50%" }}
+          transition={{ type: "spring", stiffness: 350, damping: 25 }}
           className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/90 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex gap-2 sm:gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
         >
           <button
@@ -1108,20 +1108,57 @@ export default function App() {
         const parsed = JSON.parse(saved);
         if (!Array.isArray(parsed)) throw new Error("Not an array");
 
-        if (Array.isArray(parsed) && parsed.every(isValidBrickData)) {
-          setBricks(parsed);
+        if (Array.isArray(parsed)) {
+          const isValid = parsed.every((item, i) => {
+            const valid = isValidBrickData(item);
+            if (!valid) console.log("Invalid brick item at index", i, item);
+            return valid;
+          });
+          if (isValid) {
+            if (parsed.length > 0) {
+              setBricks(parsed);
+            } else {
+              const startBrick = {
+                id: crypto.randomUUID(),
+                type: "4x4" as any,
+                color: "#4ade80",
+                position: [0, 0, 0] as [number, number, number],
+                rotation: 0
+              };
+              setBricks([startBrick as any]);
+            }
+          } else {
+            throw new Error("Invalid save data format");
+          }
         } else {
-          throw new Error("Invalid save data format");
+          throw new Error("Invalid save data format: not an array");
         }
       } catch (e) {
         console.error("Failed to load save", e);
+        const startBrick = {
+          id: crypto.randomUUID(),
+          type: "4x4" as any,
+          color: "#4ade80", // Green fallback or use store COLORS
+          position: [0, 0, 0] as [number, number, number],
+          rotation: 0
+        };
+        setBricks([startBrick as any]);
         useLegoStore
           .getState()
           .setToastMessage(
-            "Saved build could not be loaded, so a fresh scene was started.",
+            "Seeded a baseplate to start building.",
           );
         setTimeout(() => useLegoStore.getState().setToastMessage(null), 4000);
       }
+    } else {
+      const startBrick = {
+        id: crypto.randomUUID(),
+        type: "4x4" as any,
+        color: "#4ade80",
+        position: [0, 0, 0] as [number, number, number],
+        rotation: 0
+      };
+      setBricks([startBrick as any]);
     }
   }, []);
 
@@ -1972,10 +2009,10 @@ export default function App() {
                 {mode === "Build" && !activePreset && showBrickMenu && (
                   <motion.div
                     ref={brickMenuRef}
-                    initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-                    animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    initial={{ opacity: 0, y: 200, x: "-50%" }}
+                    animate={{ opacity: 1, y: 0, x: "-50%" }}
+                    exit={{ opacity: 0, y: 200, x: "-50%" }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
                     className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/80 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex flex-col gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
                   >
                     <div className="bg-blue-500/20 px-4 py-2 -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 mb-1 rounded-t-[19px] sm:rounded-t-[23px] border-b border-blue-500/30">
@@ -2016,10 +2053,10 @@ export default function App() {
                 {mode === "Build" && !activePreset && showShapesMenu && (
                   <motion.div
                     ref={shapesMenuRef}
-                    initial={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-                    animate={{ opacity: 1, y: 0, scale: 1, x: "-50%" }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95, x: "-50%" }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    initial={{ opacity: 0, y: 200, x: "-50%" }}
+                    animate={{ opacity: 1, y: 0, x: "-50%" }}
+                    exit={{ opacity: 0, y: 200, x: "-50%" }}
+                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
                     className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/80 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex flex-col gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
                   >
                     <div className="bg-blue-500/20 px-4 py-2 -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 mb-1 rounded-t-[19px] sm:rounded-t-[23px] border-b border-blue-500/30">

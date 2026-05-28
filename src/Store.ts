@@ -1436,10 +1436,17 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   },
 
   clearAll: () => {
+    const startBrick: BrickData = {
+      id: crypto.randomUUID(),
+      type: "4x4" as BrickType,
+      color: COLORS[1],
+      position: [0, 0, 0] as [number, number, number],
+      rotation: 0
+    };
     set({
       undoStack: [],
       redoStack: [],
-      bricks: [],
+      bricks: [startBrick],
       movingBrickId: null,
       isDraggingBrick: false,
       multiSelectedBrickIds: [],
@@ -1457,7 +1464,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
       }
     }
 
-    scheduleSave([], true);
+    scheduleSave([startBrick], true);
   },
 
   setBricks: (newBricks) => {

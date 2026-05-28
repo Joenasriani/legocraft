@@ -8,6 +8,8 @@ import { triggerHaptics, HapticType } from "../lib/haptics";
 import { vrTargetManager } from "../lib/vrTargets";
 import { getSafePanelTransform } from "../lib/vrHelpers";
 import { useXRStore } from "@react-three/xr";
+import { usePresence } from "motion/react";
+import { animate } from "motion";
 
 const VRMenuItem = ({
   seg,
@@ -74,12 +76,53 @@ export const VRRadialMenu = ({
 
   const radius = vrScale === "human" ? 0.22 : 2.2;
   const boxDepth = vrScale === "human" ? 0.015 : 0.1;
-  const fontSize = vrScale === "human" ? 0.045 : 0.5;
-  const boxWidth = ((radius * Math.PI) / 3) * 1.6;
-  const boxHeight = vrScale === "human" ? 0.09 : 1.0;
+  const fontSize = vrScale === "human" ? 0.035 : 0.4;
+  const boxWidth = ((radius * Math.PI) / 4) * 1.4;
+  const boxHeight = vrScale === "human" ? 0.08 : 0.9;
 
   const showXRPerf = useLegoStore((s) => s.showXRPerf);
   const setShowXRPerf = useLegoStore((s) => s.setShowXRPerf);
+
+  const groupRef = useRef<THREE.Group>(null);
+  const [isPresent, safeToRemove] = usePresence();
+
+  React.useEffect(() => {
+    if (!groupRef.current) return;
+    
+    if (isPresent) {
+      groupRef.current.scale.set(0.1, 0.1, 0.1);
+      groupRef.current.position.z = 0.1;
+      
+      const controls = animate(0, 1, {
+        type: "spring",
+        stiffness: 350,
+        damping: 25,
+        onUpdate(v) {
+          if (groupRef.current) {
+            const s = 0.1 + v * 0.9;
+            groupRef.current.scale.set(s, s, s);
+            groupRef.current.position.z = 0.1 - (v * 0.1);
+          }
+        }
+      });
+      return () => controls.stop();
+    } else {
+      const controls = animate(1, 0, {
+        type: "spring",
+        stiffness: 350,
+        damping: 25,
+        onUpdate(v) {
+          if (groupRef.current) {
+            const s = 0.1 + v * 0.9;
+            groupRef.current.scale.set(s, s, s);
+            groupRef.current.position.z = 0.1 - (v * 0.1);
+          }
+        },
+        onComplete: () => safeToRemove()
+      });
+      return () => controls.stop();
+    }
+  }, [isPresent, safeToRemove]);
 
   const handleAction = (action: () => void) => {
     // Try to trigger haptic feedback on right controller if selecting
@@ -100,19 +143,37 @@ export const VRRadialMenu = ({
       label: "BUILD",
       color: "#00e676",
       action: () => setMode("Build"),
-      theta: Math.PI / 2, // Top
+      theta: Math.PI / 4,
     },
     {
       label: "MOVE",
       color: "#4da6ff",
       action: () => setMode("Move"),
-      theta: Math.PI / 6, // Top Right
+      theta: 0,
+    },
+    {
+      label: "UNDO",
+      color: "#feca57",
+      action: () => useLegoStore.getState().undo(),
+      theta: Math.PI / 2,
+    },
+    {
+      label: "REDO",
+      color: "#ff9ff3",
+      action: () => useLegoStore.getState().redo(),
+      theta: (Math.PI * 3) / 4,
+    },
+    {
+      label: "DELETE",
+      color: "#ff4757",
+      action: () => setMode("Delete"),
+      theta: Math.PI,
     },
     {
       label: "RESET POS",
       color: "#9b59b6",
       action: () => useLegoStore.getState().triggerVRRecenter(),
-      theta: -Math.PI / 6, // Bottom Right
+      theta: (-Math.PI * 3) / 4,
     },
     {
       label: clearArmed ? "CONFIRM" : "CLEAR",
@@ -125,45 +186,37 @@ export const VRRadialMenu = ({
           setClearArmed(false);
         }
       },
-      theta: -Math.PI / 2, // Down
+      theta: -Math.PI / 2,
     },
     {
       label: showXRPerf ? "HIDE STATS" : "SHOW STATS",
       color: "#ffb8b8",
       action: () => setShowXRPerf(!showXRPerf),
-      theta: (-Math.PI * 5) / 6, // Bottom Left
-    },
-    {
-      label: "DELETE",
-      color: "#ff4757",
-      action: () => setMode("Delete"),
-      theta: (Math.PI * 5) / 6, // Top Left
+      theta: -Math.PI / 4,
     },
   ];
 
-  if (!visible) return null;
-
   return (
-    <group>
+    <group ref={groupRef}>
       {SEGMENTS.map((seg, i) => {
-          const x = Math.cos(seg.theta) * radius;
-          const y = Math.sin(seg.theta) * radius;
-          const isHovered = hoveredLabel === seg.label;
-          const depth = isHovered ? boxDepth * 1.5 : boxDepth;
-          return (
-            <group key={i} position={[x, y, 0]}>
-              <VRMenuItem
-                seg={seg}
-                depth={depth}
-                fontSize={fontSize}
-                isHovered={isHovered}
-                boxWidth={boxWidth}
-                boxHeight={boxHeight}
-                handleAction={handleAction}
-              />
-            </group>
-          );
-        })}
+        const x = Math.cos(seg.theta) * radius;
+        const y = Math.sin(seg.theta) * radius;
+        const isHovered = hoveredLabel === seg.label;
+        const depth = isHovered ? boxDepth * 1.5 : boxDepth;
+        return (
+          <group key={i} position={[x, y, 0]}>
+            <VRMenuItem
+              seg={seg}
+              depth={depth}
+              fontSize={fontSize}
+              isHovered={isHovered}
+              boxWidth={boxWidth}
+              boxHeight={boxHeight}
+              handleAction={handleAction}
+            />
+          </group>
+        );
+      })}
     </group>
   );
 };

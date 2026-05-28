@@ -9,6 +9,8 @@ import { getSafePanelTransform } from "../lib/vrHelpers";
 import { SHAPE_OPTIONS, PRESET_OPTIONS, ShapeIcon } from "../App";
 import { renderToString } from "react-dom/server";
 import { useXRStore } from "@react-three/xr";
+import { usePresence } from "motion/react";
+import { animate } from "motion";
 
 // Color buttons
 const ColorButton = ({
@@ -190,148 +192,187 @@ export const VRPalette = () => {
   const loadPreset = useLegoStore((s) => s.loadPreset);
   const setMode = useLegoStore((s) => s.setMode);
 
-  if (!visible) return null;
-
   const PANEL_WIDTH = 0.6;
   const PANEL_HEIGHT = 0.45;
   const LEFT_WIDTH = 0.15;
   const RIGHT_WIDTH = 0.43;
 
+  const groupRef = useRef<THREE.Group>(null);
+  const [isPresent, safeToRemove] = usePresence();
+
+  React.useEffect(() => {
+    if (!groupRef.current) return;
+    
+    if (isPresent) {
+      groupRef.current.scale.set(0.1, 0.1, 0.1);
+      groupRef.current.position.z = 0.1;
+      
+      const controls = animate(0, 1, {
+        type: "spring",
+        stiffness: 350,
+        damping: 25,
+        onUpdate(v) {
+          if (groupRef.current) {
+            const s = 0.1 + v * 0.9;
+            groupRef.current.scale.set(s, s, s);
+            groupRef.current.position.z = 0.1 - (v * 0.1);
+          }
+        }
+      });
+      return () => controls.stop();
+    } else {
+      const controls = animate(1, 0, {
+        type: "spring",
+        stiffness: 350,
+        damping: 25,
+        onUpdate(v) {
+          if (groupRef.current) {
+            const s = 0.1 + v * 0.9;
+            groupRef.current.scale.set(s, s, s);
+            groupRef.current.position.z = 0.1 - (v * 0.1);
+          }
+        },
+        onComplete: () => safeToRemove()
+      });
+      return () => controls.stop();
+    }
+  }, [isPresent, safeToRemove]);
+
   return (
-    <group>
+    <group ref={groupRef}>
       {/* Background Panel */}
       <mesh position={[0, -0.05, -0.01]}>
-        <boxGeometry args={[PANEL_WIDTH, PANEL_HEIGHT, 0.005]} />
-        <meshStandardMaterial color="#0a0a0a" transparent opacity={0.95} />
-      </mesh>
+            <boxGeometry args={[PANEL_WIDTH, PANEL_HEIGHT, 0.005]} />
+            <meshStandardMaterial color="#0a0a0a" transparent opacity={0.95} />
+          </mesh>
 
-      {/* --- LEFT: COLORS --- */}
-      <group position={[-PANEL_WIDTH/2 + LEFT_WIDTH/2 + 0.01, 0.08, 0]}>
-        <Text position={[0, 0.055, 0.01]} fontSize={0.024} color="#93c5fd" fontWeight="bold">
-          COLORS
-        </Text>
-        {LEGO_COLORS.map((color, i) => {
-          const col = i % 3;
-          const row = Math.floor(i / 3);
-          return (
-            <ColorButton
-              key={color}
-              position={[(col - 1) * 0.04, -row * 0.04 - 0.02, 0]}
-              width={0.035}
-              height={0.035}
-              color={color}
-              isActive={activeColor === color}
-              hoverLabel={`Color ${color}`}
-              onClick={() => setActiveColor(color)}
-            />
-          );
-        })}
-      </group>
+          {/* --- LEFT: COLORS --- */}
+          <group position={[-PANEL_WIDTH/2 + LEFT_WIDTH/2 + 0.01, 0.08, 0]}>
+            <Text position={[0, 0.055, 0.01]} fontSize={0.024} color="#93c5fd" fontWeight="bold">
+              COLORS
+            </Text>
+            {LEGO_COLORS.map((color, i) => {
+              const col = i % 3;
+              const row = Math.floor(i / 3);
+              return (
+                <ColorButton
+                  key={color}
+                  position={[(col - 1) * 0.04, -row * 0.04 - 0.02, 0]}
+                  width={0.035}
+                  height={0.035}
+                  color={color}
+                  isActive={activeColor === color}
+                  hoverLabel={`Color ${color}`}
+                  onClick={() => setActiveColor(color)}
+                />
+              );
+            })}
+          </group>
 
-      {/* --- RIGHT: CONTENT TABS --- */}
-      <group position={[LEFT_WIDTH/2, 0.1, 0]}>
-        {/* TABS HEADER */}
-        <mesh position={[0, 0.04, 0.005]}>
-          <planeGeometry args={[RIGHT_WIDTH, 0.06]} />
-          <meshBasicMaterial color="#3b82f6" transparent opacity={0.2} />
-        </mesh>
-        <mesh position={[0, 0.01, 0.005]}>
-          <planeGeometry args={[RIGHT_WIDTH, 0.002]} />
-          <meshBasicMaterial color="#3b82f6" transparent opacity={0.4} />
-        </mesh>
+          {/* --- RIGHT: CONTENT TABS --- */}
+          <group position={[LEFT_WIDTH/2, 0.1, 0]}>
+            {/* TABS HEADER */}
+            <mesh position={[0, 0.04, 0.005]}>
+              <planeGeometry args={[RIGHT_WIDTH, 0.06]} />
+              <meshBasicMaterial color="#3b82f6" transparent opacity={0.2} />
+            </mesh>
+            <mesh position={[0, 0.01, 0.005]}>
+              <planeGeometry args={[RIGHT_WIDTH, 0.002]} />
+              <meshBasicMaterial color="#3b82f6" transparent opacity={0.4} />
+            </mesh>
 
-        {/* Tab Buttons */}
-        {[
-          { id: "bricks", label: "BRICKS" },
-          { id: "shapes", label: "SHAPES" },
-          { id: "presets", label: "PRESETS" }
-        ].map((tab, i) => {
-          const isActive = activeTab === tab.id;
-          return (
-            <group key={tab.id} position={[-0.15 + i * 0.15, 0.04, 0.01]}>
-              <VRCardButton
-                width={0.13}
-                height={0.045}
-                label={tab.label}
-                isActive={isActive}
-                hoverLabel={`${tab.label} Tab`}
-                onClick={() => setActiveTab(tab.id as any)}
-              />
+            {/* Tab Buttons */}
+            {[
+              { id: "bricks", label: "BRICKS" },
+              { id: "shapes", label: "SHAPES" },
+              { id: "presets", label: "PRESETS" }
+            ].map((tab, i) => {
+              const isActive = activeTab === tab.id;
+              return (
+                <group key={tab.id} position={[-0.15 + i * 0.15, 0.04, 0.01]}>
+                  <VRCardButton
+                    width={0.13}
+                    height={0.045}
+                    label={tab.label}
+                    isActive={isActive}
+                    hoverLabel={`${tab.label} Tab`}
+                    onClick={() => setActiveTab(tab.id as any)}
+                  />
+                </group>
+              );
+            })}
+
+            {/* GRID CONTENT */}
+            <group position={[0, -0.12, 0]}>
+              {activeTab === "bricks" && BRICK_TYPES.map((bt, i) => {
+                const col = i % 5;
+                const row = Math.floor(i / 5);
+                return (
+                  <VRCardButton
+                    key={bt}
+                    position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
+                    width={0.075}
+                    height={0.075}
+                    label={bt}
+                    isActive={activeBrickType === bt && !activePreset}
+                    hoverLabel={`Brick ${bt}`}
+                    onClick={() => {
+                      setActiveBrickType(bt);
+                      useLegoStore.getState().loadPreset(null);
+                      setMode("Build");
+                    }}
+                  />
+                );
+              })}
+
+              {activeTab === "shapes" && SHAPE_OPTIONS.filter((s) => s.supported).map((shape, i) => {
+                const col = i % 5;
+                const row = Math.floor(i / 5);
+                return (
+                  <VRCardButton
+                    key={shape.id}
+                    position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
+                    width={0.075}
+                    height={0.075}
+                    label={shape.name.split(" ")[0]}
+                    svgElement={<ShapeIcon id={shape.id} active={false} supported={true} />}
+                    isActive={activeBrickType === shape.id && !activePreset}
+                    hoverLabel={shape.name}
+                    onClick={() => {
+                      setActiveBrickType(shape.id as any);
+                      useLegoStore.getState().loadPreset(null);
+                      setMode("Build");
+                    }}
+                  />
+                );
+              })}
+
+              {activeTab === "presets" && PRESET_OPTIONS.map((preset, i) => {
+                const col = i % 5;
+                const row = Math.floor(i / 5);
+                return (
+                  <VRCardButton
+                    key={preset.id}
+                    position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
+                    width={0.075}
+                    height={0.075}
+                    label={preset.name}
+                    svgElement={preset.icon}
+                    isActive={activePreset === preset.id}
+                    hoverLabel={preset.name}
+                    onClick={() => {
+                      if (activePreset === preset.id) {
+                        loadPreset(null);
+                      } else {
+                        loadPreset(preset.id);
+                      }
+                      useLegoStore.getState().closeXRPanel();
+                    }}
+                  />
+                );
+              })}
             </group>
-          );
-        })}
-
-        {/* GRID CONTENT */}
-        <group position={[0, -0.12, 0]}>
-          {activeTab === "bricks" && BRICK_TYPES.map((bt, i) => {
-            const col = i % 5;
-            const row = Math.floor(i / 5);
-            return (
-              <VRCardButton
-                key={bt}
-                position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
-                width={0.075}
-                height={0.075}
-                label={bt}
-                isActive={activeBrickType === bt && !activePreset}
-                hoverLabel={`Brick ${bt}`}
-                onClick={() => {
-                  setActiveBrickType(bt);
-                  useLegoStore.getState().loadPreset(null);
-                  setMode("Build");
-                }}
-              />
-            );
-          })}
-
-          {activeTab === "shapes" && SHAPE_OPTIONS.filter((s) => s.supported).map((shape, i) => {
-            const col = i % 5;
-            const row = Math.floor(i / 5);
-            return (
-              <VRCardButton
-                key={shape.id}
-                position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
-                width={0.075}
-                height={0.075}
-                label={shape.name.split(" ")[0]}
-                svgElement={<ShapeIcon id={shape.id} active={false} supported={true} />}
-                isActive={activeBrickType === shape.id && !activePreset}
-                hoverLabel={shape.name}
-                onClick={() => {
-                  setActiveBrickType(shape.id as any);
-                  useLegoStore.getState().loadPreset(null);
-                  setMode("Build");
-                }}
-              />
-            );
-          })}
-
-          {activeTab === "presets" && PRESET_OPTIONS.map((preset, i) => {
-            const col = i % 5;
-            const row = Math.floor(i / 5);
-            return (
-              <VRCardButton
-                key={preset.id}
-                position={[-0.16 + col * 0.08, 0.08 - row * 0.08, 0]}
-                width={0.075}
-                height={0.075}
-                label={preset.name}
-                svgElement={preset.icon}
-                isActive={activePreset === preset.id}
-                hoverLabel={preset.name}
-                onClick={() => {
-                  if (activePreset === preset.id) {
-                    loadPreset(null);
-                  } else {
-                    loadPreset(preset.id);
-                  }
-                  useLegoStore.getState().closeXRPanel();
-                }}
-              />
-            );
-          })}
-        </group>
-      </group>
+          </group>
     </group>
   );
 };
