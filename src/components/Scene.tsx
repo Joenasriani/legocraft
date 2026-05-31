@@ -883,10 +883,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         continue;
       }
 
-      if (!isVR && targetKind === "floor" && useLegoStore.getState().mode === "Build") {
-        continue;
-      }
-
       const worldNormal =
         hit.face?.normal
           ?.clone()
@@ -978,6 +974,25 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const computeDesktopBuildTarget = (
     hit: any,
   ): [number, number, number] | null => {
+    const alignSnap = (val: number, count: number, step: number) => {
+      const offset = count % 2 === 1 ? step / 2 : 0;
+      return Math.round((val - offset) / step) * step + offset;
+    };
+
+    const activeDims = getBrickDimensions(selectedType as any);
+    const rot = Math.round(ghostRotation / 90) % 4;
+    const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
+    const newW = isRot ? activeDims.d : activeDims.w;
+    const newD = isRot ? activeDims.w : activeDims.d;
+
+    if (hit.targetKind === "floor") {
+      return [
+        alignSnap(hit.point.x, newW, MODULE_SIZE),
+        0,
+        alignSnap(hit.point.z, newD, MODULE_SIZE)
+      ];
+    }
+
     if (!hit.brick) {
       // It might be a floor, sky, grid, or something. Just log what was hit if it's considered to be a brick target kind
       if (hit.targetKind.startsWith("brick-")) {
@@ -993,18 +1008,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       return null;
     }
 
-    const activeDims = getBrickDimensions(selectedType as any);
-    const rot = Math.round(ghostRotation / 90) % 4;
-    const isRot = rot === 1 || rot === 3 || rot === -1 || rot === -3;
-    const newW = isRot ? activeDims.d : activeDims.w;
-    const newD = isRot ? activeDims.w : activeDims.d;
-
     const by = brick.position[1];
-
-    const alignSnap = (val: number, count: number, step: number) => {
-      const offset = count % 2 === 1 ? step / 2 : 0;
-      return Math.round((val - offset) / step) * step + offset;
-    };
 
     if (kind === "brick-side") {
       const hitX = hit.point.x + hit.normal.x * ((newW * MODULE_SIZE) / 2 + 0.001);
@@ -1036,7 +1040,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         return null;
       }
       
-      const targetHeight = (SHAPE_DEFS[brick.type]?.heightUnit || 1) * BRICK_HEIGHT;
+      const targetHeight = (SHAPE_DEFS[brick.type]?.h || 1) * BRICK_HEIGHT;
 
       return [
         alignSnap(hitPoint.x, newW, MODULE_SIZE),
@@ -1580,8 +1584,18 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
   const activePointerIdRef = useRef<number | null>(null);
   const [isMultiTouch, setIsMultiTouch] = useState(false);
   const wasMultiTouchRef = useRef(false);
+  const suppressNextBuildCommitRef = useRef(false);
+
+  useEffect(() => {
+    const handleWheel = () => {
+      suppressNextBuildCommitRef.current = true;
+    };
+    window.addEventListener("wheel", handleWheel, { passive: true });
+    return () => window.removeEventListener("wheel", handleWheel);
+  }, []);
 
   const handlePointerDown = (e: any) => {
+    suppressNextBuildCommitRef.current = false;
     // Only accept new pointers if we are not already tracking one (for placement),
     // OR if it's a touch event (where we might need to handle multi-touch).
     const isTouch =
@@ -1961,8 +1975,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
     if (e.button === 2 || e.nativeEvent?.type === "contextmenu") return;
 
-    if (wasMultiTouch) {
-      // It was a multi-touch gesture, do not treat as a click/placement
+    if (wasMultiTouch || suppressNextBuildCommitRef.current) {
+      // It was a multi-touch/wheel gesture, do not treat as a click/placement
       return;
     }
 
@@ -2157,8 +2171,8 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     if (mode === "Build" || isCameraLocked || activePreset !== null) {
       return {
         LEFT: undefined as any,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: cameraMode === "Pan" ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE,
+        MIDDLE: undefined as any,
+        RIGHT: undefined as any,
       };
     }
     switch (cameraMode) {
@@ -2535,7 +2549,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         maxDistance={100}
         enableDamping={true}
         dampingFactor={0.1}
-        enabled={(!isCameraLocked || isMultiTouch) && !isVR && !isDraggingBrick && !marqueeStart}
+        enabled={!isVR && !isDraggingBrick && !marqueeStart}
         mouseButtons={mouseButtons as any}
         touches={touches as any}
       />

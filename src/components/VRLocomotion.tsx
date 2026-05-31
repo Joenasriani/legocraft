@@ -4,6 +4,8 @@ import { XROrigin } from "@react-three/xr";
 import * as THREE from "three";
 import { useLegoStore } from "../Store";
 
+import { createInitialXRControllerState, resolveXRInputSource, readQuestControllerAxes } from "../lib/xrControllerResolver";
+
 export function VRLocomotion() {
   const originRef = useRef<THREE.Group>(null);
   const { camera, gl } = useThree();
@@ -64,27 +66,8 @@ export function VRLocomotion() {
 
     // 1. Smooth Movement (Left Stick)
     if (locomotionMode === "Smooth" && leftInput && leftInput.gamepad) {
-      const axes = leftInput.gamepad.axes;
-      
-      // Standard WebXR Gamepad Mapping:
-      // [0, 1] usually touchpad
-      // [2, 3] usually thumbstick
-      const hasThumbstick = axes.length >= 4;
-      let x = 0;
-      let y = 0;
-
-      if (hasThumbstick) {
-        x = axes[2];
-        y = axes[3];
-        // If thumbstick is idle but secondary (legacy) axes are active, use those
-        if (Math.abs(x) < 0.01 && Math.abs(y) < 0.01) {
-          x = axes[0];
-          y = axes[1];
-        }
-      } else {
-        x = axes[0] ?? 0;
-        y = axes[1] ?? 0;
-      }
+      const axesRef = readQuestControllerAxes(leftInput.gamepad);
+      const { x, y } = axesRef;
 
       if (Math.abs(x) > 0.05 || Math.abs(y) > 0.05) {
         // Headset-yaw relative movement
@@ -118,13 +101,8 @@ export function VRLocomotion() {
     // 2. Snap Turning (Right Stick)
     // Snap turning is enabled in all modes to allow orientation adjustment.
     if (rightInput && rightInput.gamepad) {
-      const axes = rightInput.gamepad.axes;
-      const hasThumbstick = axes.length >= 4;
-      const rx = hasThumbstick
-        ? Math.abs(axes[2]) > 0.01
-          ? axes[2]
-          : axes[0]
-        : (axes[0] ?? 0);
+      const axesRef = readQuestControllerAxes(rightInput.gamepad);
+      const rx = axesRef.x;
       
       const now = performance.now();
 

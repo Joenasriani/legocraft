@@ -2026,6 +2026,7 @@ export default function App() {
                           key={type}
                           onClick={() => {
                             setSelectedType(type);
+                            useLegoStore.getState().loadPreset(null);
                             setMode("Build");
                             setShowBrickMenu(false);
                           }}
@@ -2072,6 +2073,7 @@ export default function App() {
                           onClick={() => {
                             if (shape.supported) {
                               setSelectedType(shape.id as any);
+                              useLegoStore.getState().loadPreset(null);
                               setShowShapesMenu(false);
                             }
                           }}

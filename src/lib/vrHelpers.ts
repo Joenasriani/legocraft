@@ -19,9 +19,13 @@ export function getSafePanelTransform(camera: THREE.Camera): {
   // Allow it to be relative to the headset height, so seated players can reach it.
   position.y = Math.max(0.6, camPos.y - 0.2); // Comfort height (was max(0.8, camPos.y -0.1))
 
+  // Extract world rotation instead of local to account for VRLocomotion snap turns
+  const worldQuat = new THREE.Quaternion();
+  camera.getWorldQuaternion(worldQuat);
+
   // Instead of lookAt which can flip depending on height and axis,
   // we just use the camera's Y-rotation so the panel reliably faces the user.
-  const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+  const euler = new THREE.Euler().setFromQuaternion(worldQuat, "YXZ");
   euler.x = 0; // Remove pitch (so it stands vertically straight)
   euler.z = 0; // Remove roll
   const quaternion = new THREE.Quaternion().setFromEuler(euler);
@@ -61,55 +65,3 @@ export function isQuestControllerReady(
   );
 }
 
-export interface RayPose {
-  position: THREE.Vector3;
-  direction: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-}
-
-/**
- * Gets the canonical target ray pose from an XRInputSource.
- * Prioritizes the controller Object3D's world transform to ensure laser and reticle 
- * alignment remains perfect under locomotion, scaling, and snap turns.
- * Falls back to xrFrame.getPose in tracking space if the Object3D is not provided.
- */
-export function getVRTargetRay(
-  inputSource: XRInputSource,
-  xrFrame: XRFrame,
-  referenceSpace: XRReferenceSpace,
-  controller?: THREE.Object3D | null,
-): RayPose | null {
-  // Always prioritize the controller Object3D's world transform to guarantee alignment under locomotion and snap turns
-  if (controller) {
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-
-    controller.updateMatrixWorld(true);
-    controller.getWorldPosition(position);
-    controller.getWorldQuaternion(quaternion);
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
-
-    return { position, direction, quaternion };
-  }
-
-  // Fallback to referenceSpace tracking pose if no controller Object3D is passed
-  const pose = xrFrame.getPose(inputSource.targetRaySpace, referenceSpace);
-  if (pose) {
-    const position = new THREE.Vector3(
-      pose.transform.position.x,
-      pose.transform.position.y,
-      pose.transform.position.z,
-    );
-    const quaternion = new THREE.Quaternion(
-      pose.transform.orientation.x,
-      pose.transform.orientation.y,
-      pose.transform.orientation.z,
-      pose.transform.orientation.w,
-    );
-    const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion);
-
-    return { position, direction, quaternion };
-  }
-
-  return null;
-}

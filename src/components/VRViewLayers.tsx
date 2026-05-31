@@ -8,7 +8,8 @@ import { audioService } from "./services/audioService";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 
 import { vrTargetManager } from "../lib/vrTargets";
-import { isQuestControllerReady, getVRTargetRay } from "../lib/vrHelpers";
+import { isQuestControllerReady } from "../lib/vrHelpers";
+import { createInitialXRControllerState, resolveXRInputSource, getControllerAimRay, isButtonJustPressed, isButtonJustReleased } from "../lib/xrControllerResolver";
 
 import { useXRStore } from "@react-three/xr";
 
@@ -16,32 +17,53 @@ const isDebugXR =
   typeof window !== "undefined" &&
   new URLSearchParams(window.location.search).get("debugXR") === "1";
 
-interface ControllerActions {
-  trigger: boolean;
-  grip: boolean;
-  primary: boolean; // A or X
-  secondary: boolean; // B or Y
-  stick: boolean;
+
+interface VRHitResult {
+  aimRay: any;
+  intersections: THREE.Intersection[];
+  firstHit: THREE.Intersection | null;
+  hitObject: THREE.Object3D | null;
+  hitDistance: number;
+  isValid: boolean;
 }
 
-const getControllerActions = (input: XRInputSource | null): ControllerActions => {
-  if (!input || !input.gamepad || !input.gamepad.buttons) {
+const getCanonicalVRRaycastHit = (
+  controllerState: any,
+  raycaster: THREE.Raycaster,
+  targets: THREE.Object3D[],
+  isLeft: boolean,
+  isValidTargetFn: (obj: THREE.Object3D, isLeft: boolean) => boolean
+): VRHitResult => {
+  const aim = getControllerAimRay(controllerState);
+  if (!aim.isValid) {
     return {
-      trigger: false,
-      grip: false,
-      primary: false,
-      secondary: false,
-      stick: false,
+      aimRay: aim,
+      intersections: [],
+      firstHit: null,
+      hitObject: null,
+      hitDistance: 2.0,
+      isValid: false
     };
   }
-  const gp = input.gamepad;
-  const btn = (i: number) => (gp.buttons.length > i ? gp.buttons[i]?.pressed : false) || false;
+
+  raycaster.set(aim.origin, aim.direction);
+  const intersections = raycaster.intersectObjects(targets, false);
+
+  let hit = null;
+  for (const inter of intersections) {
+    if (isValidTargetFn(inter.object, isLeft)) {
+      hit = inter;
+      break;
+    }
+  }
+
   return {
-    trigger: btn(0),
-    grip: btn(1),
-    primary: btn(4) || btn(2), // Provide fallback indices for non-xr-standard gamepads
-    secondary: btn(5) || btn(3),
-    stick: btn(3) || btn(2),
+    aimRay: aim,
+    intersections,
+    firstHit: hit,
+    hitObject: hit ? hit.object : null,
+    hitDistance: hit ? hit.distance : 2.0,
+    isValid: !!hit
   };
 };
 
@@ -65,6 +87,9 @@ export const HumanViewLayer = ({
   const xrStore = useXRStore();
   const { gl, scene } = useThree();
   const raycaster = useRef(new THREE.Raycaster()).current;
+  
+  const leftControllerStateRef = useRef(createInitialXRControllerState("left"));
+  const rightControllerStateRef = useRef(createInitialXRControllerState("right"));
 
   // We rely on useXRStore for controller detection instead of gl.xr
 
@@ -78,15 +103,7 @@ export const HumanViewLayer = ({
   const setJustSelectedBrick = useLegoStore((s) => s.setJustSelectedBrick);
   const selectionMode = useLegoStore((s) => s.selectionMode);
 
-  const wasTriggerPressed = useRef(false);
-  const wasLeftTriggerPressed = useRef(false);
-  const wasSqueezePressed = useRef(false);
-  const wasActionPressed = useRef(false);
-  const wasRecenterPressed = useRef(false);
   const squeezeStartPosRef = useRef<THREE.Vector3 | null>(null);
-  const wasXPressed = useRef(false);
-  const wasYPressed = useRef(false);
-  const wasBPressed = useRef(false);
   const squeezeMoveBlockedRef = useRef(false);
   const movePreviewActiveRef = useRef(false);
   const snapTurnCooldown = useRef(false);
@@ -395,6 +412,24 @@ export const HumanViewLayer = ({
       leftController = leftState.object;
     }
 
+    // Phase 2: Resolve canonical state but preserve existing refs to not break logic yet
+    resolveXRInputSource(
+      leftInput,
+      leftController,
+      undefined,
+      leftControllerStateRef.current,
+      xrFrameArg as XRFrame,
+      referenceSpace
+    );
+    resolveXRInputSource(
+      rightInput,
+      rightController,
+      undefined,
+      rightControllerStateRef.current,
+      xrFrameArg as XRFrame,
+      referenceSpace
+    );
+
     if ((import.meta as any).env.DEV) {
       if (leftController && !(leftController as any)._hasLogged) {
         console.log("[VR] left controller found in useFrame");
@@ -418,16 +453,12 @@ export const HumanViewLayer = ({
       }
     }
 
-    const leftActions = getControllerActions(leftInput);
-    const rightActions = getControllerActions(rightInput);
-
     // Process Left controller UI buttons
     if (leftInput) {
-      const xPressed = leftActions.primary;
-      const yPressed = leftActions.secondary;
-      const leftGripPressed = leftActions.grip;
+      const xJustPressed = isButtonJustPressed(leftControllerStateRef.current, "xButton") || isButtonJustPressed(leftControllerStateRef.current, "primary");
+      const yJustPressed = isButtonJustPressed(leftControllerStateRef.current, "yButton") || isButtonJustPressed(leftControllerStateRef.current, "secondary");
 
-      if (xPressed && !wasXPressed.current) {
+      if (xJustPressed) {
         rightGripHoldStartRef.current = null;
         if (currentPanel === "none") {
           store.setXRPanel("buildMenu");
@@ -437,7 +468,7 @@ export const HumanViewLayer = ({
           store.setXRPanel("buildMenu");
         }
       }
-      if (yPressed && !wasYPressed.current) {
+      if (yJustPressed) {
         rightGripHoldStartRef.current = null;
         if (currentPanel === "none") {
           store.setXRPanel("palette");
@@ -447,17 +478,13 @@ export const HumanViewLayer = ({
           store.setXRPanel("palette");
         }
       }
-
-      wasXPressed.current = xPressed;
-      wasYPressed.current = yPressed;
-      // Recenter logic removed to avoid input conflicts
     }
 
     // Process Right controller UI buttons
     if (rightInput) {
-      const bPressed = rightActions.secondary;
+      const bJustPressed = isButtonJustPressed(rightControllerStateRef.current, "bButton") || isButtonJustPressed(rightControllerStateRef.current, "secondary");
 
-      if (bPressed && !wasBPressed.current) {
+      if (bJustPressed) {
         rightGripHoldStartRef.current = null;
         let handled = false;
         if (currentPanel !== "none") {
@@ -479,76 +506,60 @@ export const HumanViewLayer = ({
           triggerHaptics(rightInput, HapticType.UI_CLICK);
         }
       }
-
-      wasBPressed.current = bPressed;
     }
 
-    // Resolve RIGHT controller pose and direction using canonical targetRaySpace
+    // Resolve RIGHT controller pose and direction using canonical aim ray
     // This is the single canonical source for all right-hand ray interactions
     let controllerPos = new THREE.Vector3();
     let controllerFwd = new THREE.Vector3(0, 0, -1);
-    let controllerQuat = new THREE.Quaternion();
     let hasRightPose = false;
 
-    if (rightInput && referenceSpace && xrFrame) {
-      const rayPose = getVRTargetRay(rightInput, xrFrame, referenceSpace, rightController);
-      if (rayPose) {
-        controllerPos.copy(rayPose.position);
-        controllerQuat.copy(rayPose.quaternion);
-        controllerFwd.copy(rayPose.direction);
-        hasRightPose = true;
-      }
+    const rightAim = getControllerAimRay(rightControllerStateRef.current);
+    if (rightInput && rightAim.isValid) {
+      controllerPos.copy(rightAim.origin);
+      controllerFwd.copy(rightAim.direction);
+      hasRightPose = true;
     }
 
+    // Resolve LEFT controller pose and direction using canonical aim ray
     let leftControllerPos = new THREE.Vector3();
     let leftControllerFwd = new THREE.Vector3(0, 0, -1);
-    let leftControllerQuat = new THREE.Quaternion();
     let hasLeftPose = false;
 
-    if (leftInput && referenceSpace && xrFrame) {
-      const rayPose = getVRTargetRay(leftInput, xrFrame, referenceSpace, leftController);
-      if (rayPose) {
-        leftControllerPos.copy(rayPose.position);
-        leftControllerQuat.copy(rayPose.quaternion);
-        leftControllerFwd.copy(rayPose.direction);
-        hasLeftPose = true;
-      }
+    const leftAim = getControllerAimRay(leftControllerStateRef.current);
+    if (leftInput && leftAim.isValid) {
+      leftControllerPos.copy(leftAim.origin);
+      leftControllerFwd.copy(leftAim.direction);
+      hasLeftPose = true;
     }
 
     if (hasLeftPose && leftInput) {
-      const pos = leftControllerPos;
-      const fwd = leftControllerFwd;
       const isLeftMenuOpen = currentPanel === "buildMenu" || currentPanel === "palette";
+      const targets = vrTargetManager.getValidTargets();
+      const leftAim = getControllerAimRay(leftControllerStateRef.current);
+      const leftHitInfo = getCanonicalVRRaycastHit(leftControllerStateRef.current, raycaster, targets, true, isValidTarget);
 
       if (leftLaserRef.current) {
-        leftLaserRef.current.visible = isLeftMenuOpen;
-        leftLaserRef.current.position.copy(pos);
-        leftLaserRef.current.quaternion.copy(leftControllerQuat);
-      }
-      raycaster.set(pos, fwd);
-      const targets = vrTargetManager.getValidTargets();
-      const intersects = raycaster.intersectObjects(targets, false);
-
-      let hit = null;
-      for (const inter of intersects) {
-        if (isValidTarget(inter.object, true)) {
-          hit = inter;
-          break;
+        if (leftAim.isValid && isLeftMenuOpen) {
+          leftLaserRef.current.visible = true;
+          leftLaserRef.current.position.copy(leftAim.origin);
+          leftLaserRef.current.lookAt(leftAim.origin.clone().add(leftAim.direction));
+        } else {
+          leftLaserRef.current.visible = false;
         }
       }
 
-      if (hit) {
+      if (leftHitInfo.isValid && leftHitInfo.firstHit) {
         canonicalLeftHitRef.current = {
-          rawHit: hit,
-          pointWorld: hit.point.clone(),
-          distance: hit.distance,
+          rawHit: leftHitInfo.firstHit,
+          pointWorld: leftHitInfo.firstHit.point.clone(),
+          distance: leftHitInfo.hitDistance,
         };
       } else {
         canonicalLeftHitRef.current = null;
       }
 
       let laserDistance = 2.0;
-      const leftTriggerPressed = leftActions.trigger;
 
       let isLeftMenuItem = false;
       let leftOnTriggerFn = null;
@@ -574,7 +585,7 @@ export const HumanViewLayer = ({
         }
       }
 
-      if (leftTriggerPressed && !wasLeftTriggerPressed.current) {
+      if (isButtonJustPressed(leftControllerStateRef.current, "trigger")) {
         if (isLeftMenuItem && leftOnTriggerFn) {
           leftOnTriggerFn();
           triggerHaptics(leftInput, HapticType.UI_CLICK);
@@ -600,8 +611,6 @@ export const HumanViewLayer = ({
           leftHoverMarkerRef.current.visible = false;
         }
       }
-
-      wasLeftTriggerPressed.current = leftTriggerPressed;
     } else {
       canonicalLeftHitRef.current = null;
       if (leftLaserRef.current) leftLaserRef.current.visible = false;
@@ -609,33 +618,24 @@ export const HumanViewLayer = ({
     }
 
     if (hasRightPose && rightInput) {
-      const pos = controllerPos;
-      const fwd = controllerFwd;
+      const targets = vrTargetManager.getValidTargets();
+      const rightAim = getControllerAimRay(rightControllerStateRef.current);
+      const rightHitInfo = getCanonicalVRRaycastHit(rightControllerStateRef.current, raycaster, targets, false, isValidTarget);
       
       // Update laser visual immediately if we have a pose
-      // Laser matches the canonical ray exactly
       if (laserRef.current) {
-        laserRef.current.visible = true;
-        laserRef.current.position.copy(pos);
-        laserRef.current.quaternion.copy(controllerQuat);
-      }
-      
-      raycaster.set(pos, fwd);
-
-      const targets = vrTargetManager.getValidTargets();
-
-      const intersects = raycaster.intersectObjects(targets, false);
-
-      let hit = null;
-      for (const inter of intersects) {
-        if (isValidTarget(inter.object, false)) {
-          hit = inter;
-          break;
+        if (rightAim.isValid && currentPanel !== "onboarding") { // Keep general visibility logic
+          laserRef.current.visible = true;
+          laserRef.current.position.copy(rightAim.origin);
+          laserRef.current.lookAt(rightAim.origin.clone().add(rightAim.direction));
+        } else {
+          laserRef.current.visible = false;
         }
       }
-
+      
       // Populate or clear canonicalRightHitRef immediately after raycast
-      if (hit) {
+      if (rightHitInfo.isValid && rightHitInfo.firstHit) {
+        const hit = rightHitInfo.firstHit;
         const pointWorld = hit.point.clone();
         
         // Calculate world space normal
@@ -695,19 +695,16 @@ export const HumanViewLayer = ({
           (window as any)._lastVRLaserLogDebug = now;
           console.log("[VR] ?debugXR=1", {
             resolvedRightController: rightController?.name || "none",
-            laserOriginWorld: pos.toArray().map((v) => v.toFixed(3)),
-            controllerWorldPos: pos.toArray().map((v) => v.toFixed(3)),
-            rayDirection: fwd.toArray().map((v) => v.toFixed(3)),
-            hitTarget: hit?.object?.name || "none",
+            laserOriginWorld: controllerPos.toArray().map((v: number) => v.toFixed(3)),
+            controllerWorldPos: controllerPos.toArray().map((v: number) => v.toFixed(3)),
+            rayDirection: controllerFwd.toArray().map((v: number) => v.toFixed(3)),
+            hitTarget: rightHitInfo.firstHit?.object?.name || "none",
           });
         }
       }
 
       let laserDistance = 2.0; // Short length when not hitting anything
-      const triggerPressed = rightActions.trigger;
-      const squeezePressed = rightActions.grip;
-      const aPressed = rightActions.primary;
-      const actionPressed = aPressed;
+      const squeezePressed = rightControllerStateRef.current.buttonsCurrent.grip;
 
       // ---- NEW RIGHT GRIP LOGIC ----
       let currentHoverBrick: any = null;
@@ -721,7 +718,9 @@ export const HumanViewLayer = ({
         }
       }
 
-      if (squeezePressed && !wasSqueezePressed.current) {
+      const justGrip = isButtonJustPressed(rightControllerStateRef.current, "grip");
+      
+      if (justGrip) {
         if (currentHoverBrick && useLegoStore.getState().xrPanel === "none") {
           rightGripHoldStartRef.current = performance.now();
           rightGripHoldTargetRef.current = currentHoverBrick;
@@ -759,7 +758,7 @@ export const HumanViewLayer = ({
         }
       }
 
-      if (!squeezePressed && wasSqueezePressed.current) {
+      if (isButtonJustReleased(rightControllerStateRef.current, "grip")) {
         if (rightGripHoldStartRef.current !== null) {
           const holdTime = performance.now() - rightGripHoldStartRef.current;
           if (!rightGripDeletedRef.current && holdTime < 600) {
@@ -836,7 +835,7 @@ export const HumanViewLayer = ({
           }
         } // End of placement calc
 
-        if (triggerPressed && !wasTriggerPressed.current) {
+        if (isButtonJustPressed(rightControllerStateRef.current, "trigger")) {
           if (useLegoStore.getState().xrPanel !== "none") {
             // Do nothing to the world if a panel is open!
             if (isRightMenuItem && rightOnTriggerFn) {
@@ -908,7 +907,7 @@ export const HumanViewLayer = ({
         }
         latestHit.current = null;
 
-        if (triggerPressed && !wasTriggerPressed.current) {
+        if (isButtonJustPressed(rightControllerStateRef.current, "trigger")) {
           if (useLegoStore.getState().xrPanel !== "none") {
             // Ignore trigger completely
           } else {
@@ -942,7 +941,7 @@ export const HumanViewLayer = ({
       }
 
       // Handle A button (independent of ray hit)
-      if (actionPressed && !wasActionPressed.current) {
+      if (isButtonJustPressed(rightControllerStateRef.current, "aButton") || isButtonJustPressed(rightControllerStateRef.current, "primary")) {
         useLegoStore.getState().triggerRotateGhost();
         triggerHaptics(rightInput, HapticType.ROTATE);
       }
@@ -981,16 +980,13 @@ export const HumanViewLayer = ({
       }
 
       // Handle Squeeze (Grip) state tracking handled above in Right Grip Logic
-      // Always track state
-      wasActionPressed.current = actionPressed;
-      wasTriggerPressed.current = triggerPressed;
-      wasSqueezePressed.current = squeezePressed;
+      // Handled natively by xrControllerResolver buttonsPrevious
 
       if (isDebugXR && debugTextRef.current) {
         debugTextRef.current.text = [
           `L-Ctrl: ${!!leftController} | R-Ctrl: ${!!rightController} | R-Obj: ${rightController?.name || "none"}`,
           `R-Stick: ${rightInput?.gamepad?.axes.map(a => a.toFixed(2)).join(",")}`,
-          `X:${wasXPressed.current} Y:${wasYPressed.current} A:${actionPressed} B:${wasBPressed.current} Trg:${triggerPressed} Grp:${squeezePressed}`,
+          `X:${leftControllerStateRef.current.buttonsCurrent.xButton} Y:${leftControllerStateRef.current.buttonsCurrent.yButton} A:${rightControllerStateRef.current.buttonsCurrent.aButton} B:${rightControllerStateRef.current.buttonsCurrent.bButton} Trg:${rightControllerStateRef.current.buttonsCurrent.trigger} Grp:${rightControllerStateRef.current.buttonsCurrent.grip}`,
           `Hit: ${canonicalRightHitRef.current ? canonicalRightHitRef.current.rawHit.object.name : "none"}`,
           `PlacementValid: ${latestValidPlacement.current ? "yes" : "no"}`,
         ].join("\n");

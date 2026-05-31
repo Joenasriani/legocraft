@@ -41,6 +41,7 @@ const PresetMenuOverlay = ({
                     state.loadPreset(null);
                   } else {
                     state.loadPreset(preset.id);
+                    state.setMode("Build");
                   }
                   onClose();
                 }}

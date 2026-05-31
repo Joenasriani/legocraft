@@ -41,29 +41,10 @@ export const VRLeftHandAnchor = ({ children }: { children: React.ReactNode }) =>
     if (isMenuOpen && !wasMenuOpen.current) {
       // Menu just opened, let's place it in front of the headset!
       const cam = gl.xr.getCamera();
+      const target = getSafePanelTransform(cam);
 
-      const camPos = new THREE.Vector3().setFromMatrixPosition(cam.matrixWorld);
-      const camFwd = new THREE.Vector3(0, 0, -1).transformDirection(cam.matrixWorld);
-
-      // Flatten forward on Y to prevent tilting
-      camFwd.y = 0;
-      if (camFwd.lengthSq() < 0.001) camFwd.set(0, 0, -1);
-      camFwd.normalize();
-
-      // 1.2m to 1.8m -> ~1.4m is good.
-      const distance = 1.4;
-
-      // Slightly below eye level
-      const targetPos = camPos.clone().add(camFwd.multiplyScalar(distance));
-      targetPos.y = Math.max(0.6, camPos.y - 0.25);
-
-      const lookAtQuat = new THREE.Quaternion();
-      const m = new THREE.Matrix4().lookAt(targetPos, camPos, new THREE.Vector3(0, 1, 0));
-      // Panel front (+Z) should face camera. lookAt points -Z at target, so rotate 180deg around Y.
-      lookAtQuat.setFromRotationMatrix(m).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI, 0)));
-
-      groupRef.current.position.copy(targetPos);
-      groupRef.current.quaternion.copy(lookAtQuat);
+      groupRef.current.position.copy(target.position);
+      groupRef.current.quaternion.copy(target.quaternion);
     }
 
     wasMenuOpen.current = isMenuOpen;

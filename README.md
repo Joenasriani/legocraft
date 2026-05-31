@@ -1,8 +1,5 @@
 # Brick XR Builder
 
->> https://legocraftvr.vercel.app/
-
-
 Browser-based Lego-style 3D builder optimized for AI Studio development.
 
 ## Features
