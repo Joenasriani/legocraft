@@ -1,6 +1,6 @@
 import { BrickData } from "../../Store";
 
-type SoundType = 'place' | 'remove' | 'select' | 'error' | 'menu-open' | 'menu-close';
+type SoundType = 'place' | 'remove' | 'select' | 'error' | 'menu-open' | 'menu-close' | 'snap';
 
 class AudioService {
   private ctx: AudioContext | null = null;
@@ -90,6 +90,9 @@ class AudioService {
         break;
       case 'menu-close':
         this.playMenu(false);
+        break;
+      case 'snap':
+        this.playSnap(pitchVar, volVar);
         break;
     }
   }
@@ -244,6 +247,41 @@ class AudioService {
     gain.connect(this.masterGain!);
     osc.start(now);
     osc.stop(now + 0.1);
+  }
+
+  private playSnap(pVar: number, vVar: number) {
+    const now = this.ctx!.currentTime;
+    
+    // Very gentle/soft plastic click/tap
+    const osc = this.ctx!.createOscillator();
+    const gain = this.ctx!.createGain();
+    
+    osc.type = 'sine';
+    // Let's use a soft mid-frequency pitch for a nice lego-like snap tick
+    osc.frequency.setValueAtTime(this.getRandomized(450, pVar), now);
+    osc.frequency.exponentialRampToValueAtTime(this.getRandomized(300, pVar), now + 0.015);
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.012, now + 0.001); // ultra soft and gentle
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+    
+    osc.connect(gain);
+    gain.connect(this.masterGain!);
+    osc.start(now);
+    osc.stop(now + 0.02);
+
+    // Add a tiny snap transient click of high freq
+    const clickOsc = this.ctx!.createOscillator();
+    const clickGain = this.ctx!.createGain();
+    clickOsc.type = 'triangle';
+    clickOsc.frequency.setValueAtTime(this.getRandomized(1000, pVar), now);
+    clickGain.gain.setValueAtTime(0, now);
+    clickGain.gain.linearRampToValueAtTime(0.008, now + 0.001); // very quiet high end tap
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.005);
+    clickOsc.connect(clickGain);
+    clickGain.connect(this.masterGain!);
+    clickOsc.start(now);
+    clickOsc.stop(now + 0.01);
   }
 }
 

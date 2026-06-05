@@ -113,9 +113,25 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     0, 20, 0,
   ]);
   const ghostPositionRef = useRef<[number, number, number]>([0, 20, 0]);
+  const lastSnapSoundTimeRef = useRef<number>(0);
   const setGhostPosition = (val: [number, number, number]) => {
+    const prev = ghostPositionRef.current;
+    const changed = prev[0] !== val[0] || prev[1] !== val[1] || prev[2] !== val[2];
+
     setGhostPositionState(val);
     ghostPositionRef.current = val;
+
+    if (changed) {
+      const state = useLegoStore.getState();
+      const isPlacing = state.mode === "Build" || state.isDraggingBrick || state.activePreset !== null;
+      if (isPlacing) {
+        const now = Date.now();
+        if (now - lastSnapSoundTimeRef.current > 70) {
+          audioService.play("snap");
+          lastSnapSoundTimeRef.current = now;
+        }
+      }
+    }
   };
   const clipboard = useLegoStore((state) => state.clipboardBricks);
   // 14. Remove <Canvas preserveDrawingBuffer={true}> in App.tsx. This causes massive memory/performance drags in WebGL.

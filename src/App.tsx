@@ -847,6 +847,41 @@ export default function App() {
     setIsCameraLocked,
   } = useLegoStore();
 
+  // Periodic Auto-save State and Effect
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedTime, setLastSavedTime] = useState<string>(() => {
+    const now = new Date();
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  });
+  const lastSavedJsonRef = useRef<string>("");
+
+  // Periodically saves (every 10 seconds)
+  useEffect(() => {
+    // If the json hasn't been set yet, initialize it
+    if (!lastSavedJsonRef.current) {
+      lastSavedJsonRef.current = JSON.stringify(bricks);
+    }
+
+    const interval = setInterval(() => {
+      const currentJson = JSON.stringify(bricks);
+      if (lastSavedJsonRef.current && currentJson !== lastSavedJsonRef.current) {
+        setIsAutoSaving(true);
+        // Persist to safeLocalStorage
+        safeLocalStorage.setItem("brickxr-save", currentJson);
+        lastSavedJsonRef.current = currentJson;
+        
+        // Brief state feedback
+        setTimeout(() => {
+          setIsAutoSaving(false);
+          const now = new Date();
+          setLastSavedTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        }, 1200);
+      }
+    }, 10000); // Check every 10s
+
+    return () => clearInterval(interval);
+  }, [bricks]);
+
   const [showHelp, setShowHelp] = useState(() => {
     return safeLocalStorage.getItem("brickxr-help-dismissed") !== "true";
   });
@@ -1551,12 +1586,28 @@ export default function App() {
                     className={`px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center border truncate bg-black/40 border-white/20 text-white/80`}
                   >
                     {bricks.length} {bricks.length === 1 ? "Brick" : "Bricks"}
-                    {bricks.length > 200 && (
+                    {bricks.length > 1000 && (
                       <span className="text-yellow-400 ml-1">
                         {" "}
                         (High count)
                       </span>
                     )}
+                  </div>
+                  <div
+                    className="px-2 py-1.5 sm:px-4 sm:py-2 rounded-full text-[8px] sm:text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 border truncate bg-black/40 border-white/20 text-white/80"
+                    title={`Your progress is backed up locally. Last saved at ${lastSavedTime}`}
+                  >
+                    <span className="relative flex h-1.5 w-1.5">
+                      {isAutoSaving ? (
+                        <>
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                        </>
+                      ) : (
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                      )}
+                    </span>
+                    <span>{isAutoSaving ? "Saving..." : "Auto-saved"}</span>
                   </div>
                   {vrStatus === "ready" ? (
                     <button
@@ -1684,7 +1735,10 @@ export default function App() {
                   <button
                     onClick={() => {
                       if (mode === "Build") {
-                        // Camera lock is always on in Build Mode to allow placing bricks.
+                        // Unlocking in Build mode transitions automatically to Select/Move mode and unlocks the camera.
+                        setIsCameraLocked(false);
+                        setCameraMode("Orbit");
+                        setMode("Move");
                         return;
                       }
                       if (isCameraLocked) {
@@ -1700,7 +1754,7 @@ export default function App() {
                     }`}
                     title={
                       mode === "Build"
-                        ? "Camera is locked for blueprint building"
+                        ? "Click to unlock camera and switch to Select (Move) mode"
                         : mode === "Move"
                           ? "Lock Camera (✔ Required for drag-select)"
                           : "Lock Camera"
