@@ -6,7 +6,8 @@ import { useLegoStore, BRICK_TYPES, LEGO_COLORS } from "../Store";
 import { triggerHaptics, HapticType } from "../lib/haptics";
 import { vrTargetManager } from "../lib/vrTargets";
 import { getSafePanelTransform } from "../lib/vrHelpers";
-import { SHAPE_OPTIONS, PRESET_OPTIONS, ShapeIcon } from "../App";
+import { PRESET_OPTIONS } from "../App";
+import { SHAPE_OPTIONS, ShapeIcon } from "./ShapesMenuOverlay";
 import { renderToString } from "react-dom/server";
 import { useXRStore } from "@react-three/xr";
 import { usePresence } from "motion/react";
@@ -358,10 +359,10 @@ export const VRPalette = () => {
                     height={0.075}
                     label={preset.name}
                     svgElement={preset.icon}
-                    isActive={activePreset === preset.id}
+                    isActive={activePreset?.id === preset.id}
                     hoverLabel={preset.name}
                     onClick={() => {
-                      if (activePreset === preset.id) {
+                      if (activePreset?.id === preset.id) {
                         loadPreset(null);
                       } else {
                         loadPreset(preset.id);

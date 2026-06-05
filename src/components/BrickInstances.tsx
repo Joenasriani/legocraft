@@ -231,8 +231,10 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
 
   const material = useMemo(() => {
     let finalOpacity = isGhost ? 0.35 : 1;
+    let finalColor = color;
     if (isGhost && !isValid) {
-      finalOpacity = 0.5;
+      finalOpacity = 0.45;
+      finalColor = "#ff3b30"; // turn red on invalid placement
     }
 
     return new THREE.MeshStandardMaterial({
@@ -243,7 +245,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
       depthWrite: !isGhost,
       depthTest: true,
       toneMapped: !isGhost,
-      color: color,
+      color: finalColor,
     });
   }, [color, isGhost, isValid]);
 
@@ -317,11 +319,6 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     let actualCount = count;
     let actualStudCount = showStuds ? Math.max(0, count * w * d) : 0;
 
-    if (isGhost && !isValid) {
-      actualCount = 0;
-      actualStudCount = 0;
-    }
-
     bodyMesh.count = actualCount;
     studMesh.count = actualStudCount;
 
@@ -335,7 +332,7 @@ export const BrickInstances: React.FC<BrickInstancesProps> = ({
     studMesh.userData.d = d;
     studMesh.userData.isStud = true;
     studMesh.userData.isGhost = isGhost;
-  }, [bricks, w, d, isGhost]);
+  }, [bricks, w, d, isGhost, isValid]);
 
   return (
     <group>

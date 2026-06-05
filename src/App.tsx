@@ -10,6 +10,7 @@ import {
   getGroupBricks,
   isValidBrickData,
   SHAPE_DEFS,
+  safeRandomUUID,
 } from "./Store";
 import { audioService } from "./components/services/audioService";
 import { createXRStore } from "@react-three/xr";
@@ -22,6 +23,8 @@ const Scene = lazy(() =>
 const HelpModal = lazy(() => import("./components/HelpModal"));
 const ClearConfirmModal = lazy(() => import("./components/ClearConfirmModal"));
 const PresetMenuOverlay = lazy(() => import("./components/PresetMenuOverlay"));
+const BrickMenuOverlay = lazy(() => import("./components/BrickMenuOverlay"));
+const ShapesMenuOverlay = lazy(() => import("./components/ShapesMenuOverlay"));
 const BuildIdeas = lazy(() =>
   import("./components/BuildIdeas").then((m) => ({ default: m.BuildIdeas })),
 );
@@ -513,109 +516,6 @@ const MountainIcon = ({ size = 24 }: { size?: number }) => (
   </svg>
 );
 
-export const ShapeIcon = ({ id, active, supported }: { id: string, active: boolean, supported: boolean }) => {
-  const color = supported ? (active ? "currentColor" : "white") : "white";
-  const opacity = supported ? (active ? "1" : "0.6") : "0.2";
-  
-  switch (id) {
-    case "1x1_round_cylinder":
-    case "2x2_round_cylinder":
-      return (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <ellipse cx="12" cy="7" rx="6" ry="2" />
-           <path d="M6 7v10c0 1.1 6 1.1 12 0V7" />
-        </svg>
-      );
-    case "1x1_cone":
-    case "2x2_cone":
-      return (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <ellipse cx="12" cy="6" rx="2" ry="1" />
-           <path d="M10 6l-4 12c-0.2 0.5 4 1.5 6 1.5s6.2-1 6-1.5l-4-12" />
-        </svg>
-      );
-    case "4x4_dome":
-      return (
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 16 C4 8 20 8 20 16" />
-           <ellipse cx="12" cy="16" rx="8" ry="2" />
-        </svg>
-      );
-    case "1x2_slope":
-    case "2x2_slope":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M5 18L19 18L19 16L5 6Z" fill={color} fillOpacity="0.2" />
-           <path d="M5 18L19 18L19 16L5 6Z" />
-         </svg>
-      );
-    case "quarter_cylinder":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 4 h16 v16 A16 16 0 0 1 4 4 Z" fill={color} fillOpacity="0.2" />
-           <path d="M4 4 h16 v16 A16 16 0 0 1 4 4 Z" />
-         </svg>
-      );
-    case "half_cylinder":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 12 h16 A8 8 0 0 1 4 12 Z" fill={color} fillOpacity="0.2" />
-           <path d="M20 12 A8 8 0 0 0 4 12 v4 h16 v-4 Z" />
-         </svg>
-      );
-    case "wedge":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <polygon points="4,20 20,20 4,4" fill={color} fillOpacity="0.2" />
-           <polygon points="4,20 20,20 4,4" />
-         </svg>
-      );
-    case "inverted_slope":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M5 6 L19 6 L19 8 L5 18 Z" fill={color} fillOpacity="0.2" />
-           <path d="M5 6 L19 6 L19 8 L5 18 Z" />
-         </svg>
-      );
-    case "2x2_corner_triangle":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <polygon points="12,4 4,20 20,20" fill={color} fillOpacity="0.2" />
-           <polygon points="12,4 4,20 20,20" />
-         </svg>
-      );
-    case "arch":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" fill={color} fillOpacity="0.2" />
-           <path d="M4 18 L4 6 L20 6 L20 18 L16 18 Q12 10 8 18 Z" />
-         </svg>
-      );
-    case "corner_slope":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <polygon points="4,18 20,18 20,6 4,14" fill={color} fillOpacity="0.2" />
-           <path d="M4 18 L20 18 L20 6 L4 14 Z M20 6 L4 18" />
-         </svg>
-      );
-    case "curved_corner":
-      return (
-         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" strokeWidth="2" stroke={color} style={{ opacity }}>
-           <path d="M4 20 H20 V4 A16 16 0 0 0 4 20 Z" fill={color} fillOpacity="0.2" />
-           <path d="M4 20 H20 V4 A16 16 0 0 0 4 20 Z" />
-           <path d="M12 20 A8 8 0 0 0 20 12" />
-         </svg>
-      );
-    default:
-      return <div className={`w-8 h-8 rounded-sm rotate-45 border-2 ${supported ? (active ? 'border-accent bg-accent/20' : 'border-white bg-white/10') : 'border-white/20 bg-white/5'}`} style={{ opacity }} />;
-  }
-};
-
-export const SHAPE_OPTIONS = Object.values(SHAPE_DEFS).map(def => ({
-  id: def.id,
-  name: def.name,
-  supported: def.enabled
-}));
 
 export const PRESET_OPTIONS: {
   id: PresetName;
@@ -1065,6 +965,13 @@ export default function App() {
 
   useEffect(() => {
     const handleGlobalClick = (e: any) => {
+      // If the user is clicking on the 3D WebGL Canvas inside the scene, do not close overlays automatically.
+      // This allows continuous clicking on the floor to place bricks/presets without closing the menu.
+      const targetTag = (e.target as HTMLElement)?.tagName;
+      if (targetTag === "CANVAS") {
+        return;
+      }
+
       if (
         showPresetMenu &&
         presetMenuRef.current &&
@@ -1119,7 +1026,7 @@ export default function App() {
               setBricks(parsed);
             } else {
               const startBrick = {
-                id: crypto.randomUUID(),
+                id: safeRandomUUID(),
                 type: "4x4" as any,
                 color: "#4ade80",
                 position: [0, 0, 0] as [number, number, number],
@@ -1136,7 +1043,7 @@ export default function App() {
       } catch (e) {
         console.error("Failed to load save", e);
         const startBrick = {
-          id: crypto.randomUUID(),
+          id: safeRandomUUID(),
           type: "4x4" as any,
           color: "#4ade80", // Green fallback or use store COLORS
           position: [0, 0, 0] as [number, number, number],
@@ -1152,7 +1059,7 @@ export default function App() {
       }
     } else {
       const startBrick = {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         type: "4x4" as any,
         color: "#4ade80",
         position: [0, 0, 0] as [number, number, number],
@@ -2006,103 +1913,19 @@ export default function App() {
                 >
               {/* Brick Type Selector (Build Mode Only) */}
               <AnimatePresence>
-                {mode === "Build" && !activePreset && showBrickMenu && (
-                  <motion.div
-                    ref={brickMenuRef}
-                    initial={{ opacity: 0, y: 200, x: "-50%" }}
-                    animate={{ opacity: 1, y: 0, x: "-50%" }}
-                    exit={{ opacity: 0, y: 200, x: "-50%" }}
-                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/80 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex flex-col gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
-                  >
-                    <div className="bg-blue-500/20 px-4 py-2 -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 mb-1 rounded-t-[19px] sm:rounded-t-[23px] border-b border-blue-500/30">
-                      <div className="text-blue-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-center">
-                        Standard Bricks
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
-                      {BRICK_TYPES.map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => {
-                            setSelectedType(type);
-                            useLegoStore.getState().loadPreset(null);
-                            setMode("Build");
-                            setShowBrickMenu(false);
-                          }}
-                          className={`flex flex-col items-center justify-center gap-2 p-3 border rounded-2xl w-[90px] transition-colors flex-shrink-0 ${
-                            selectedType === type
-                              ? "bg-accent/20 border-accent/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
-                              : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
-                          }`}
-                          title={`Select brick type: ${type}`}
-                        >
-                          <span className={`text-2xl font-black font-mono tracking-tighter flex items-center justify-center h-10 w-10 ${selectedType === type ? 'text-accent' : 'text-white'}`}>
-                            {type}
-                          </span>
-                          <div className="text-center w-full">
-                            <div className={`text-[10px] font-bold leading-tight truncate uppercase tracking-widest ${selectedType === type ? 'text-accent/80' : 'text-white/40'}`}>
-                              Brick
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-
-                {mode === "Build" && !activePreset && showShapesMenu && (
-                  <motion.div
-                    ref={shapesMenuRef}
-                    initial={{ opacity: 0, y: 200, x: "-50%" }}
-                    animate={{ opacity: 1, y: 0, x: "-50%" }}
-                    exit={{ opacity: 0, y: 200, x: "-50%" }}
-                    transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                    className="fixed bottom-[85px] sm:bottom-[100px] left-1/2 bg-black/80 border border-white/20 backdrop-blur-2xl p-3 sm:p-4 rounded-[20px] sm:rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] z-[200] flex flex-col gap-3 pointer-events-auto overflow-y-auto max-h-[50vh] w-max max-w-[calc(100vw-32px)] scroll-panel"
-                  >
-                    <div className="bg-blue-500/20 px-4 py-2 -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 mb-1 rounded-t-[19px] sm:rounded-t-[23px] border-b border-blue-500/30">
-                      <div className="text-blue-300 text-[10px] sm:text-xs font-bold uppercase tracking-widest text-center">
-                        Special Shapes
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
-                      {SHAPE_OPTIONS.map((shape) => (
-                        <button
-                          key={shape.id}
-                          disabled={!shape.supported}
-                          onClick={() => {
-                            if (shape.supported) {
-                              setSelectedType(shape.id as any);
-                              useLegoStore.getState().loadPreset(null);
-                              setShowShapesMenu(false);
-                            }
-                          }}
-                          className={`flex flex-col items-center justify-center gap-2 p-3 border rounded-2xl w-[90px] transition-colors flex-shrink-0 ${
-                            !shape.supported
-                              ? "bg-white/5 border-white/5 cursor-not-allowed"
-                              : selectedType === shape.id
-                              ? "bg-accent/20 border-accent/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
-                              : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
-                          }`}
-                        >
-                          <span className={`text-3xl flex items-center justify-center h-10 w-10 ${selectedType === shape.id ? 'text-accent' : 'text-white'}`}>
-                            <ShapeIcon id={shape.id} active={selectedType === shape.id} supported={shape.supported} />
-                          </span>
-                          <div className="text-center w-full">
-                            <div className={`text-[12px] font-bold leading-tight truncate ${!shape.supported ? 'text-white/40' : selectedType === shape.id ? 'text-white' : 'text-white/80'}`}>
-                              {shape.name}
-                            </div>
-                            {!shape.supported && (
-                              <div className="text-[9px] text-white/30 leading-tight mt-1 px-1 line-clamp-2">
-                                Coming Soon
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
+                <Suspense fallback={null}>
+                  <BrickMenuOverlay
+                    show={mode === "Build" && !activePreset && showBrickMenu}
+                    onClose={() => setShowBrickMenu(false)}
+                    brickMenuRef={brickMenuRef}
+                    brickTypes={BRICK_TYPES}
+                  />
+                  <ShapesMenuOverlay
+                    show={mode === "Build" && !activePreset && showShapesMenu}
+                    onClose={() => setShowShapesMenu(false)}
+                    shapesMenuRef={shapesMenuRef}
+                  />
+                </Suspense>
 
                 {mode === "Build" && activePreset && (
                   <motion.div

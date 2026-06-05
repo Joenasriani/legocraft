@@ -1,6 +1,6 @@
 import { Html } from "@react-three/drei";
 import { Copy, ClipboardPaste, Trash2 } from "lucide-react";
-import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDimensions, checkStructureValid } from "../Store";
+import { useLegoStore, getBrickAABB, getBrickHeightUnit, BrickData, getBrickDimensions, checkStructureValid, safeRandomUUID } from "../Store";
 import { BRICK_HEIGHT, MODULE_SIZE } from "../constants";
 import { useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -71,7 +71,7 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
     for (let factor = 1; factor <= 10; factor++) {
       const testNewBricks = clipboardBricks.map((b) => ({
         ...b,
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         position: [
           b.position[0] + offsetX * factor,
           b.position[1],
@@ -90,7 +90,7 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
     if (!pastedBricksFound) {
       const testNewBricks = clipboardBricks.map((b) => ({
         ...b,
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         position: [
           b.position[0] + offsetX,
           b.position[1],

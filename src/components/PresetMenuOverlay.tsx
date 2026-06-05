@@ -15,6 +15,10 @@ const PresetMenuOverlay = ({
   presetMenuRef,
   presets,
 }: PresetMenuOverlayProps) => {
+  const activePreset = useLegoStore((state) => state.activePreset);
+  const loadPreset = useLegoStore((state) => state.loadPreset);
+  const setMode = useLegoStore((state) => state.setMode);
+
   return (
     <AnimatePresence>
       {show && (
@@ -32,34 +36,47 @@ const PresetMenuOverlay = ({
             </div>
           </div>
           <div className="grid grid-cols-2 min-[360px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 sm:gap-3">
-            {presets.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  const state = useLegoStore.getState();
-                  if (state.activePreset === preset.id) {
-                    state.loadPreset(null);
-                  } else {
-                    state.loadPreset(preset.id);
-                    state.setMode("Build");
-                  }
-                  onClose();
-                }}
-                className={`flex flex-col items-center justify-center gap-2 p-3 border rounded-2xl w-[90px] transition-colors flex-shrink-0 ${useLegoStore.getState().activePreset === preset.id ? "bg-accent/20 border-accent/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]" : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"}`}
-              >
-                <span className={`text-3xl flex items-center justify-center h-10 w-10 ${useLegoStore.getState().activePreset === preset.id ? 'text-accent' : 'text-white'}`}>
-                  {preset.icon}
-                </span>
-                <div className="text-center w-full">
-                  <div className={`text-[12px] font-bold leading-tight truncate ${useLegoStore.getState().activePreset === preset.id ? 'text-white' : 'text-white/80'}`}>
-                    {preset.name}
+            {presets.map((preset) => {
+              const isActive = activePreset?.id === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  onClick={() => {
+                    if (isActive) {
+                      loadPreset(null);
+                    } else {
+                      loadPreset(preset.id);
+                      onClose();
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center gap-2 p-3 border rounded-2xl w-[90px] transition-colors flex-shrink-0 ${
+                    isActive
+                      ? "bg-accent/20 border-accent/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                      : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <span
+                    className={`text-3xl flex items-center justify-center h-10 w-10 ${
+                      isActive ? "text-accent" : "text-white"
+                    }`}
+                  >
+                    {preset.icon}
+                  </span>
+                  <div className="text-center w-full">
+                    <div
+                      className={`text-[12px] font-bold leading-tight truncate ${
+                        isActive ? "text-white" : "text-white/80"
+                      }`}
+                    >
+                      {preset.name}
+                    </div>
+                    <div className="text-[10px] text-white/40 leading-tight mt-1 px-1 line-clamp-2">
+                      {preset.desc}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-white/40 leading-tight mt-1 px-1 line-clamp-2">
-                    {preset.desc}
-                  </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         </motion.div>
       )}

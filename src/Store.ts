@@ -748,7 +748,7 @@ interface LegoStore {
   setBricks: (bricks: BrickData[]) => void;
   loadPreset: (presetName: ActivePresetName | null) => void;
   commitPreset: (position: [number, number, number], rotation: number) => void;
-  activePreset: ActivePresetName | null;
+  activePreset: { id: string; bricks: BrickData[] } | null;
   toastTimeoutId: ReturnType<typeof setTimeout> | null;
   exportGLB: (() => void) | null;
   setExportGLB: (fn: (() => void) | null) => void;
@@ -769,6 +769,21 @@ const COLORS = [
   "#008080", // Teal
 ];
 
+export const safeRandomUUID = (): string => {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch (e) {
+      // ignore
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
+
 const ms = MODULE_SIZE;
 const bh = BRICK_HEIGHT;
 
@@ -780,7 +795,7 @@ const createBrick = (
   pz: number,
   rotation: number = 0,
 ): BrickData => ({
-  id: crypto.randomUUID(),
+  id: safeRandomUUID(),
   type,
   color,
   position: [px * ms, py * bh, pz * ms],
@@ -1022,7 +1037,7 @@ const safeLocalStorage = {
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      if ((import.meta as any).env.DEV) {
+      if (typeof import.meta !== 'undefined' && (import.meta as any).env && (import.meta as any).env.DEV) {
         console.warn("localStorage.setItem failed", e);
       }
     }
@@ -1170,7 +1185,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   setIsCameraLocked: (val) => {
     const state = get();
     if (!val && state.mode === "Build") {
-      set({ isCameraLocked: val, mode: "Move" });
+      set({ isCameraLocked: val, mode: "Move", activePreset: null });
     } else {
       set({ isCameraLocked: val });
     }
@@ -1178,7 +1193,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
   addBrick: (newBrickData) => {
     const { bricks, undoStack } = get();
-    const newBrick = { ...newBrickData, id: crypto.randomUUID() };
+    const newBrick = { ...newBrickData, id: safeRandomUUID() };
 
     set({
       undoStack: pushHistory(undoStack, bricks),
@@ -1466,29 +1481,37 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
   },
 
   loadPreset: (presetName) => {
-    set({ activePreset: presetName, mode: "Build" });
+    if (!presetName) {
+      set({ activePreset: null, mode: "Build" });
+      return;
+    }
+    const state = get();
+    const bricks = getActivePresetBricks(presetName, state.clipboardBricks);
+    if (bricks) {
+      set({ activePreset: { id: presetName, bricks }, mode: "Build" });
+    }
   },
 
   commitPreset: (position, rotation = 0) => {
     const { activePreset, bricks, undoStack, clipboardBricks } = get();
     if (!activePreset) return;
 
-    const presetSource = getActivePresetBricks(activePreset, clipboardBricks);
+    const presetSource = activePreset.bricks;
     if (!presetSource) return;
 
     const validPresetBricks = presetSource.filter((b) => {
       const valid = isValidBrickData(b);
       if (!valid) {
         if ((import.meta as any).env.DEV) {
-          console.warn(`Malformed brick found in preset ${activePreset}:`, b);
+          console.warn(`Malformed brick found in preset ${activePreset.id}:`, b);
         }
       }
       return valid;
     });
 
-    const info = getPresetInfo(activePreset, clipboardBricks);
+    const info = getPresetInfo(activePreset.id, clipboardBricks);
 
-    const groupId = crypto.randomUUID();
+    const groupId = safeRandomUUID();
     const rotMod = calculateRotMod(rotation);
     const newPivot = position; // In commitPreset, position is the target center/pivot
 
@@ -1501,7 +1524,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     const presetBricks = transformed.map((b) => ({
       ...b,
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       groupId,
     }));
 
@@ -1530,7 +1553,7 @@ export const useLegoStore = create<LegoStore>((set, get) => ({
 
     audioService.play("place");
 
-    if (activePreset === "clipboard") {
+    if (activePreset.id === "clipboard") {
       updates.activePreset = null;
       updates.mode = "Move";
       updates.selectionMode = "Multi";
