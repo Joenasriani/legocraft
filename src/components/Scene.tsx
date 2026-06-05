@@ -503,7 +503,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         controlsRef.current.enabled =
           !isDraggingBrick &&
           !marqueeStart &&
-          (isCameraLocked || (!isBrickInteractionRef.current && !isInteracting));
+          (isCameraLocked || mode === "Build" || activePreset !== null || (!isBrickInteractionRef.current && !isInteracting));
       }
       if (
         controlsRef.current.target.y < 0 &&
@@ -1650,8 +1650,10 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
       updateGhostFromEvent(e);
       interactionStartCandidateRef.current = latestPlacementCandidateRef.current;
       
-      if (!isVR && !isTouch && mode === "Build" && controlsRef.current) {
-        controlsRef.current.enabled = false;
+      if (!isVR && !isTouch && (mode === "Build" || activePreset !== null) && controlsRef.current) {
+        if (e.button === 0) {
+          controlsRef.current.enabled = false;
+        }
       }
     }
 
@@ -2158,13 +2160,61 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     return groups;
   }, [ghostGroupBricks]);
 
+  const orbitSettings = useMemo(() => {
+    const isLocked = mode === "Build" || isCameraLocked || activePreset !== null;
+    if (!isLocked) {
+      return {
+        enableRotate: true,
+        enablePan: true,
+        enableZoom: true,
+      };
+    }
+    switch (cameraMode) {
+      case "Pan":
+        return {
+          enableRotate: false,
+          enablePan: true,
+          enableZoom: true,
+        };
+      case "Zoom":
+        return {
+          enableRotate: false,
+          enablePan: false,
+          enableZoom: true,
+        };
+      case "Orbit":
+      default:
+        return {
+          enableRotate: true,
+          enablePan: false,
+          enableZoom: true,
+        };
+    }
+  }, [cameraMode, mode, isCameraLocked, activePreset]);
+
   const mouseButtons = useMemo(() => {
     if (mode === "Build" || isCameraLocked || activePreset !== null) {
-      return {
-        LEFT: undefined as any,
-        MIDDLE: undefined as any,
-        RIGHT: undefined as any,
-      };
+      switch (cameraMode) {
+        case "Pan":
+          return {
+            LEFT: undefined as any,
+            MIDDLE: THREE.MOUSE.PAN,
+            RIGHT: THREE.MOUSE.PAN,
+          };
+        case "Zoom":
+          return {
+            LEFT: undefined as any,
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.DOLLY,
+          };
+        case "Orbit":
+        default:
+          return {
+            LEFT: undefined as any,
+            MIDDLE: THREE.MOUSE.ROTATE,
+            RIGHT: THREE.MOUSE.ROTATE,
+          };
+      }
     }
     switch (cameraMode) {
       case "Orbit":
@@ -2190,7 +2240,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
 
   const touches = useMemo(() => {
     if (mode === "Build" || isCameraLocked || activePreset !== null) {
-      const two = cameraMode === "Orbit" ? THREE.TOUCH.DOLLY_ROTATE : THREE.TOUCH.DOLLY_PAN;
+      const two = cameraMode === "Pan" ? THREE.TOUCH.DOLLY_PAN : THREE.TOUCH.DOLLY_ROTATE;
       return { ONE: undefined as any, TWO: two };
     }
     // We cast undefined as any to bypass Drei's strict typing if it doesn't allow undefined
@@ -2542,9 +2592,9 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         enableDamping={true}
         dampingFactor={0.1}
         enabled={!isVR && !isDraggingBrick && !marqueeStart}
-        enableRotate={true}
-        enablePan={true}
-        enableZoom={true}
+        enableRotate={orbitSettings.enableRotate}
+        enablePan={orbitSettings.enablePan}
+        enableZoom={orbitSettings.enableZoom}
         mouseButtons={mouseButtons as any}
         touches={touches as any}
       />

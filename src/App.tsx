@@ -1612,22 +1612,26 @@ export default function App() {
                   <button
                     onClick={() => {
                       setCameraMode("Pan");
-                      setIsCameraLocked(false);
-                      setMode("Move");
+                      if (mode !== "Build") {
+                        setIsCameraLocked(false);
+                        setMode("Move");
+                      }
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-                    title="Pan Camera"
+                    className={`p-1.5 rounded-md transition-colors ${cameraMode === "Pan" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                    title="Pan Camera Mode (2 fingers dolly+pan, or middle-mouse)"
                   >
                     <PanIcon size={16} />
                   </button>
                   <button
                     onClick={() => {
                       setCameraMode("Zoom");
-                      setIsCameraLocked(false);
-                      setMode("Move");
+                      if (mode !== "Build") {
+                        setIsCameraLocked(false);
+                        setMode("Move");
+                      }
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-                    title="Zoom Camera"
+                    className={`p-1.5 rounded-md transition-colors ${cameraMode === "Zoom" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                    title="Zoom Camera Mode"
                   >
                     <ZoomIcon size={16} />
                   </button>
@@ -1656,11 +1660,13 @@ export default function App() {
                   <button
                     onClick={() => {
                       setCameraMode("Orbit");
-                      setIsCameraLocked(false);
-                      setMode("Move");
+                      if (mode !== "Build") {
+                        setIsCameraLocked(false);
+                        setMode("Move");
+                      }
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${!isCameraLocked && cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
-                    title="Orbit Camera"
+                    className={`p-1.5 rounded-md transition-colors ${cameraMode === "Orbit" ? "bg-white/20" : "hover:bg-white/10 opacity-70"}`}
+                    title="Orbit Camera Mode (2 fingers dolly+rotate, or right-mouse)"
                   >
                     <OrbitCameraIcon size={16} />
                   </button>
@@ -1677,6 +1683,10 @@ export default function App() {
                   <div className="w-[1px] h-[20px] bg-white/20 mx-0.5"></div>
                   <button
                     onClick={() => {
+                      if (mode === "Build") {
+                        // Camera lock is always on in Build Mode to allow placing bricks.
+                        return;
+                      }
                       if (isCameraLocked) {
                         setIsCameraLocked(false);
                         setCameraMode("Orbit");
@@ -1685,11 +1695,15 @@ export default function App() {
                       }
                       setMode("Move");
                     }}
-                    className={`p-1.5 rounded-md transition-colors ${isCameraLocked ? "bg-red-500/80 text-white" : "hover:bg-white/10 opacity-70"}`}
+                    className={`p-1.5 rounded-md transition-colors ${
+                      (isCameraLocked || mode === "Build") ? "bg-red-500/80 text-white animate-pulse-slow" : "hover:bg-white/10 opacity-70"
+                    }`}
                     title={
-                      mode === "Move"
-                        ? "Lock Camera (\u2714 Required for drag-select)"
-                        : "Lock Camera"
+                      mode === "Build"
+                        ? "Camera is locked for blueprint building"
+                        : mode === "Move"
+                          ? "Lock Camera (✔ Required for drag-select)"
+                          : "Lock Camera"
                     }
                   >
                     <LockIcon size={16} />
