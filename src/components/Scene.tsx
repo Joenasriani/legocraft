@@ -2466,20 +2466,6 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
                 isGhost
                 isValid={placementStatus.valid}
               />
-              {!xrSessionActive && placementStatus.valid && (
-                <mesh
-                  position={ghostPosition}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                  raycast={() => null}
-                >
-                  <ringGeometry args={[0.04, 0.05, 32]} />
-                  <meshBasicMaterial
-                    color={selectedColor}
-                    transparent
-                    opacity={0.8}
-                  />
-                </mesh>
-              )}
             </group>
           )}
 
