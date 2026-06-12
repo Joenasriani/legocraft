@@ -24,6 +24,7 @@ const BrickMenuOverlay = ({
     <AnimatePresence>
       {show && (
         <motion.div
+          key="brick-menu-panel"
           ref={brickMenuRef}
           initial={{ opacity: 0, y: 200, x: "-50%" }}
           animate={{ opacity: 1, y: 0, x: "-50%" }}

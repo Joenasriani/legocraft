@@ -108,6 +108,7 @@ export const BuildIdeas = ({ show, onClose }: { show: boolean; onClose: () => vo
     <AnimatePresence>
       {show && (
         <motion.div
+          key="build-ideas-overlay"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

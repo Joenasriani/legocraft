@@ -128,6 +128,7 @@ export const SelectionToolbar = ({ selectedBricks }: SelectionToolbarProps) => {
     <AnimatePresence>
       {show && position && (
         <Html
+          key="selection-toolbar-html"
           position={position}
           center
           zIndexRange={[100, 0]}

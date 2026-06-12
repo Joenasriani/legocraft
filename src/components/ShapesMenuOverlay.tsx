@@ -125,6 +125,7 @@ const ShapesMenuOverlay = ({
     <AnimatePresence>
       {show && (
         <motion.div
+          key="shapes-menu-panel"
           ref={shapesMenuRef}
           initial={{ opacity: 0, y: 200, x: "-50%" }}
           animate={{ opacity: 1, y: 0, x: "-50%" }}

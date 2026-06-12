@@ -641,6 +641,7 @@ const SaveExportMenuOverlay = ({
     <AnimatePresence>
       {show && (
         <motion.div
+          key="save-menu-panel"
           ref={saveMenuRef}
           initial={{ opacity: 0, y: 200, x: "-50%" }}
           animate={{ opacity: 1, y: 0, x: "-50%" }}
@@ -1341,6 +1342,7 @@ export default function App() {
       <AnimatePresence>
         {xrError && (
           <motion.div
+            key="xr-error-modal"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
@@ -1503,6 +1505,7 @@ export default function App() {
             <AnimatePresence>
               {uiVisible && (
                 <motion.div 
+                  key="top-area-container"
                   initial={{ opacity: 0, y: -20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
@@ -1768,6 +1771,7 @@ export default function App() {
               <AnimatePresence>
                 {toastMessage && (
                   <motion.div
+                    key={`toast-${toastMessage}`}
                     initial={{ opacity: 0, scale: 0.9, y: -10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.9, y: -10 }}
@@ -1889,6 +1893,7 @@ export default function App() {
               <AnimatePresence>
                 {uiVisible && (mode === "Move" || mode === "Delete") && (
                   <motion.div
+                    key="selection-mode-dock"
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
@@ -1936,6 +1941,7 @@ export default function App() {
             <AnimatePresence>
               {uiVisible && (
                 <motion.div 
+                  key="color-palette-dock"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
@@ -1974,6 +1980,7 @@ export default function App() {
             <AnimatePresence>
               {uiVisible && (
                 <motion.div 
+                  key="bottom-toolbar-area"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 20 }}
@@ -1997,6 +2004,7 @@ export default function App() {
 
                 {mode === "Build" && activePreset && (
                   <motion.div
+                    key="placing-preset-dock"
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     exit={{ y: 20, opacity: 0 }}
