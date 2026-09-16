@@ -1,12 +1,15 @@
 # Legocraft
 
-**Game:** Legocraft / Brick XR Builder  
+**Public listing:** Brick XR Builder  
 **Creator:** Joe Nasr  
-**Canonical creator identity:** https://joe-nasr-signals.vercel.app/v2/  
+**Creator profile:** https://joe-nasr-signals.vercel.app/v2/  
 **Live build:** https://legocraftvr.vercel.app/  
+**itch.io:** https://joenasr.itch.io/brickxr  
 **Repository:** https://github.com/Joenasriani/legocraft
 
-Legocraft is a browser based 3D building game and editor created by Joe Nasr. It combines brick placement, rotation, deletion, saved creations, preset structures, and WebXR support in one interactive building environment.
+Legocraft is a browser-based 3D building game and WebXR construction sandbox created by Joe Nasr. The same project is currently published on itch.io as **Brick XR Builder**.
+
+Players place, move, rotate, recolor, copy and delete digital bricks and shapes, save editable builds, export GLB models and explore creations through supported WebXR browsers.
 
 ## Game classification
 
@@ -18,13 +21,14 @@ Legocraft is a browser based 3D building game and editor created by Joe Nasr. It
 
 ## Technology
 
-Vite, React, TypeScript, Three.js, React Three Fiber, Zustand, Tailwind, and WebXR.
+Vite, React, TypeScript, Three.js, React Three Fiber, Zustand, Tailwind and WebXR.
 
 ## Current capabilities
 
-- Place, rotate, move, and delete bricks
-- Build with reusable brick types and preset structures
+- Place, rotate, move and delete bricks
+- Build with reusable brick types, shapes and preset structures
 - Save and load creations locally
+- Export builds as GLB models
 - Enter VR through supported WebXR browsers
 
-Legocraft is part of Joe Nasr's Games collection. The creator identity above resolves to the same Joe Nasr / Joe Ribal Nasr entity used across his portfolio, research, and public project records.
+Legocraft / Brick XR Builder is an independent project and is not affiliated with the LEGO Group.
