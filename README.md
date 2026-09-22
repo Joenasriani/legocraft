@@ -1,6 +1,6 @@
 # Brick XR Builder
 
-Browser-based Lego-style 3D builder optimized for AI Studio development.
+Browser-based brick-building 3D application with WebXR support.
 
 ## Features
 - Built with Vite, React, React Three Fiber, Three.js, Zustand, and WebXR
