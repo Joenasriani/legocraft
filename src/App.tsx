@@ -817,7 +817,7 @@ export default function App() {
   useEffect(() => {
     if (import.meta.env.DEV) {
       console.log(
-        "[Brick XR Builder] Build verification - App started at " +
+        "[Legocraft] Build verification - App started at " +
           new Date().toISOString(),
       );
     }
