@@ -1,5 +1,7 @@
 # Legocraft
 
+[![CI](https://github.com/Joenasriani/legocraft/actions/workflows/ci.yml/badge.svg)](https://github.com/Joenasriani/legocraft/actions/workflows/ci.yml)
+
 Browser-based 3D brick-building sandbox built with React Three Fiber, Three.js, and WebXR.
 
 Build and edit digital brick structures in the browser with desktop or touch controls, save and reload projects, export creations, and experiment with the same workspace in WebXR.
@@ -68,6 +70,27 @@ These commands are defined in `package.json`. They were not executed as part of 
 - automatic local browser persistence
 
 Screenshot capture is best-effort and may depend on browser WebGL behavior.
+
+## Verification and compatibility
+
+GitHub Actions currently verifies the repository on Node.js 22 with:
+
+- `npm ci`
+- `npm run test`
+- `npm run lint`
+- `npm run build`
+
+Current compatibility status:
+
+| Environment | Status |
+| --- | --- |
+| Production build | Verified by CI |
+| Automated tests | Verified by CI |
+| TypeScript check | Verified by CI |
+| Desktop browser interaction | Implemented; no formal cross-browser matrix yet |
+| Touch interaction | Implemented; no formal device matrix yet |
+| WebXR | Experimental |
+| Meta Quest hardware | Not yet tested on real hardware |
 
 ## WebXR status
 
