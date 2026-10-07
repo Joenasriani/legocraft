@@ -114,7 +114,7 @@ The project has clear extension surfaces for developers who want to fork and evo
 - improve export workflows
 - add automated tests and documentation
 
-Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow.
+Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the codebase map and extension points.
 
 ## Stack
 
