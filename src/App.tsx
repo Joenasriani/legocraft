@@ -1475,7 +1475,7 @@ export default function App() {
               const canvas = gl.domElement;
               const handleContextLost = (event: Event) => {
                 event.preventDefault();
-                console.warn("[BrickXR] WebGL context lost caught directly on canvas Element!");
+                console.warn("[Legocraft] WebGL context lost caught directly on canvas Element!");
                 useLegoStore.getState().setToastMessage("WebGL Context Lost! Try reloading the page.");
                 audioService.play("error");
               };
@@ -1532,7 +1532,7 @@ export default function App() {
                       },
                     }}
                   >
-                    {"LegoCraft".split("").map((char, index) => (
+                    {"Legocraft".split("").map((char, index) => (
                       <motion.span
                         key={index}
                         variants={{
