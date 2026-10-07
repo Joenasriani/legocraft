@@ -24,13 +24,16 @@ Live application: https://legocraftvr.vercel.app/
 - Export the current structure as `.glb`
 - Export screenshots as `.png`
 - Desktop and touch interaction
+- Orbit, pan, and zoom camera modes
+- Keyboard shortcuts for save, copy/paste, delete, and editing workflows
+- Automatic restoration of locally saved builds on startup
 - Experimental WebXR mode with controller interaction, haptics, locomotion controls, snap turning, and VR menus
 
 ## Run locally
 
 ### Requirements
 
-- Node.js
+- Node.js 22 recommended
 - npm
 - A browser with WebGL support
 
@@ -60,7 +63,7 @@ npm run lint
 npm run build
 ```
 
-These commands are defined in `package.json`. They were not executed as part of this documentation pass.
+These commands are defined in `package.json` and are verified by GitHub Actions on Node.js 22.
 
 ## Project files and export
 
