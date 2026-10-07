@@ -116,6 +116,10 @@ The project has clear extension surfaces for developers who want to fork and evo
 
 Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the codebase map and extension points.
 
+### WebXR / Quest frontier
+
+Legocraft already includes experimental WebXR interaction, controller input, locomotion, haptics, VR menus and XR-specific building workflows. Real Meta Quest hardware validation is still open. The XR layer is documented and intentionally extensible for developers who want to test, improve, optimize or push it further.
+
 ## Stack
 
 - React
