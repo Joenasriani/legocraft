@@ -1,4 +1,4 @@
-# Quest Browser QA Matrix - Brick XR Builder
+# Quest Browser QA Matrix - Legocraft
 
 **Current Status: NOT TESTED**
 *Real headset testing has not yet been performed. All performance and device-specific claims are theoretical targets.*
