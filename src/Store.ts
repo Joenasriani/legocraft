@@ -929,9 +929,7 @@ const generateHorse = (): BrickData[] => {
   horse.push(createBrick("1x1", brown, 1.5, 0, -1.5));
   horse.push(createBrick("1x1", brown, -0.5, 0, 1.5));
   horse.push(createBrick("1x1", brown, 1.5, 0, 1.5));
-  // Body (X: -1.5 to 2.5, Z: -2.5 to 2.5) -> Wait, W=4, D=4?
-  // Let's use two 2x4s side by side so it spans X: [-0.5, 1.5], Z: [-1.5, 2.5]
-  // 2x4 rot 0: X goes -0.5 to 1.5, Z goes -1.5 to 2.5. Fits all 4 legs!
+  // Body footprint spans the four leg positions.
   horse.push(createBrick("2x4", brown, 0.5, 1, 0.5, 0));
   // Neck & Head
   horse.push(createBrick("1x1", brown, 0.5, 2, 1.5));
