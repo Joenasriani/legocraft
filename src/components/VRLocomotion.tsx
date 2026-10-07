@@ -78,8 +78,7 @@ export function VRLocomotion() {
         headsetDir.y = 0;
         headsetDir.normalize();
 
-        // If looking straight up/down, default to forward relative to origin? 
-        // No, let's just make sure it's not zero.
+        // Fall back to the origin-forward direction when the horizontal look vector is near zero.
         if (headsetDir.lengthSq() < 0.001) {
              headsetDir.set(0, 0, -1).applyQuaternion(originRef.current.quaternion);
              headsetDir.y = 0;
