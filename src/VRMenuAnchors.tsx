@@ -39,7 +39,7 @@ export const VRLeftHandAnchor = ({ children }: { children: React.ReactNode }) =>
     const isMenuOpen = xrPanel === "buildMenu" || xrPanel === "palette";
 
     if (isMenuOpen && !wasMenuOpen.current) {
-      // Menu just opened, let's place it in front of the headset!
+      // Position newly opened menus in front of the headset.
       const cam = gl.xr.getCamera();
       const target = getSafePanelTransform(cam);
 
