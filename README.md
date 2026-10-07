@@ -1,6 +1,8 @@
-# Brick XR Builder
+# Legocraft
 
-Browser-based brick-building 3D application with WebXR support.
+Browser-based 3D brick-building sandbox built with React Three Fiber, Three.js, and WebXR.
+
+Build and edit digital brick structures in the browser with desktop or touch controls, with experimental WebXR interaction for immersive building.
 
 ## Features
 - Built with Vite, React, React Three Fiber, Three.js, Zustand, and WebXR
