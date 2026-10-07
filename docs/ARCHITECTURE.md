@@ -296,6 +296,6 @@ Before opening a pull request, run the same commands locally.
 
 ## Current architectural limitation
 
-`App.tsx` and `Scene.tsx` are both large integration files. That is a maintainability concern, but this documentation pass does not refactor them.
+`App.tsx` and `Scene.tsx` are both large integration files and are the main current maintainability hotspots.
 
 Contributors should prefer small focused modules for new reusable behavior so the integration files do not grow unnecessarily.
