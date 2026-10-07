@@ -134,8 +134,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
     }
   };
   const clipboard = useLegoStore((state) => state.clipboardBricks);
-  // 14. Remove <Canvas preserveDrawingBuffer={true}> in App.tsx. This causes massive memory/performance drags in WebGL.
-  // We'll also disable shadow map completely in XR to save on draw calls.
+  // Disable shadow mapping during XR sessions to reduce GPU work.
   useEffect(() => {
     gl.shadowMap.enabled = !xrSessionActive;
     scene.traverse((child) => {
@@ -216,7 +215,7 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         gl.compile(scene, camera);
       } catch (e) {
         if ((import.meta as any).env.DEV) {
-          console.warn("[BrickXR] VR shader pre-compile warning:", e);
+          console.warn("[Legocraft] VR shader pre-compile warning:", e);
         }
       }
 
@@ -546,12 +545,12 @@ const SceneContents = ({ xrStore }: { xrStore?: any }) => {
         // Note: screenshot capture is best-effort and experimental depending on browser WebGL support.
         const dataUrl = state.gl.domElement.toDataURL("image/png");
         const link = document.createElement("a");
-        link.download = "brickxr-screenshot.png";
+        link.download = "legocraft-screenshot.png";
         link.href = dataUrl;
         link.click();
       } catch (err) {
         if ((import.meta as any).env.DEV) {
-          console.warn("[BrickXR] Screenshot capture failed:", err);
+          console.warn("[Legocraft] Screenshot capture failed:", err);
         }
         useLegoStore
           .getState()
