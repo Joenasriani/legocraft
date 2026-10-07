@@ -257,7 +257,7 @@ class AudioService {
     const gain = this.ctx!.createGain();
     
     osc.type = 'sine';
-    // Let's use a soft mid-frequency pitch for a nice lego-like snap tick
+    // Soft mid-frequency snap feedback.
     osc.frequency.setValueAtTime(this.getRandomized(450, pVar), now);
     osc.frequency.exponentialRampToValueAtTime(this.getRandomized(300, pVar), now + 0.015);
     
