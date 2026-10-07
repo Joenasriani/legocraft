@@ -1,6 +1,8 @@
 {
-  "name": "Brick XR Builder",
-  "description": "Browser-based WebXR Lego-style builder targeting Meta Quest Browser, with grid snapping, static brick placement, desktop/mobile controls, and experimental controller-based VR interaction.",
-  "requestFramePermissions": ["xr-spatial-tracking"],
+  "name": "Legocraft",
+  "description": "Browser-based 3D brick-building sandbox with desktop and touch controls, plus experimental WebXR interaction and Quest-oriented controller support that has not yet been validated on real hardware.",
+  "requestFramePermissions": [
+    "xr-spatial-tracking"
+  ],
   "majorCapabilities": []
 }
