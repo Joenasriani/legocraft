@@ -23,7 +23,7 @@ const HelpModal = ({ show, onClose }: HelpModalProps) => {
           >
             <h2 className="text-4xl font-light mb-3">Immersive Building</h2>
             <p className="text-white/60 mb-8 leading-relaxed text-[15px]">
-              Welcome to Brick XR. Build, move, and rotate your bricks using the
+              Welcome to Legocraft. Build, move, and rotate your bricks using the
               UI tools. VR mode allows you to explore your creations
               immersively.
             </p>
