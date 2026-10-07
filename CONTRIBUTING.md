@@ -14,6 +14,8 @@ Legocraft is an open-source browser-based 3D brick-building sandbox. Contributio
 - automated tests
 - documentation
 
+For a map of the codebase and common extension paths, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ## Development setup
 
 Clone the repository and install dependencies:
