@@ -2,6 +2,31 @@
 
 Legocraft is an open-source browser-based 3D brick-building sandbox. Contributions that improve the builder, developer experience, documentation, testing, performance, and WebXR behavior are welcome.
 
+## Ways to contribute
+
+You can contribute in several ways:
+
+- test the live builder and report reproducible interaction or compatibility problems
+- add or improve brick shapes and generated geometry
+- create and validate preset structures
+- improve desktop, touch, selection, camera, export, or WebXR behavior
+- add focused automated tests
+- improve documentation and contributor examples
+- propose non-code spatial or interaction concepts that fit the current builder
+
+### Non-code proposals
+
+Designers and technical artists may open an issue with a concept before implementation. Useful proposals can include sketches, diagrams, reference layouts, preset specifications, interaction flows, accessibility observations, or clearly described construction challenges.
+
+A proposal should explain:
+
+- what should change or be added
+- how it fits the existing Legocraft builder
+- what the user should be able to do
+- any constraints or edge cases that matter
+
+If an accepted proposal is implemented by someone else, the original proposal should be referenced in the implementation issue or pull request so the contribution remains attributable.
+
 ## Useful contribution areas
 
 - new brick types and custom geometry
@@ -14,7 +39,7 @@ Legocraft is an open-source browser-based 3D brick-building sandbox. Contributio
 - automated tests
 - documentation
 
-For a map of the codebase and common extension paths, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+For a map of the codebase and common extension paths, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). For current hardware validation work, see [`docs/QUEST_QA.md`](docs/QUEST_QA.md).
 
 ## Development setup
 
