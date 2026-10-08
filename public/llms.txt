@@ -1,0 +1,19 @@
+# Legocraft
+
+Legocraft is an open-source browser-based 3D brick-building sandbox built with React Three Fiber, Three.js, TypeScript, and experimental WebXR.
+
+Live application: https://legocraftvr.vercel.app/
+Source: https://github.com/Joenasriani/legocraft
+
+## Project documentation
+
+- README: https://github.com/Joenasriani/legocraft/blob/main/README.md
+- Architecture: https://github.com/Joenasriani/legocraft/blob/main/docs/ARCHITECTURE.md
+- Contributing: https://github.com/Joenasriani/legocraft/blob/main/CONTRIBUTING.md
+- WebXR / Quest QA: https://github.com/Joenasriani/legocraft/blob/main/docs/QUEST_QA.md
+
+## Scope
+
+The project includes grid-snapped 3D brick placement, generated brick geometry, selection and editing workflows, local persistence, JSON project files, GLB export, touch and desktop interaction, and experimental WebXR controller interaction.
+
+Meta Quest hardware compatibility has not yet been validated on real hardware.
