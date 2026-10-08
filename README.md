@@ -12,6 +12,14 @@ Build and edit digital brick structures in the browser with desktop or touch con
 
 Live application: https://legocraftvr.vercel.app/
 
+## For developers
+
+Legocraft is also an inspectable example of a browser-based 3D construction system: grid-snapped placement, generated brick geometry, connected-object selection, local persistence, GLB export, and experimental WebXR controller interaction all live in the same React Three Fiber codebase.
+
+- [Explore the architecture](docs/ARCHITECTURE.md)
+- [Contribute](CONTRIBUTING.md)
+- [Review the WebXR / Quest QA matrix](docs/QUEST_QA.md)
+
 ## Features
 
 - Place, move, rotate, recolor, and delete bricks on a snapped 3D building grid
@@ -105,19 +113,26 @@ See [`docs/QUEST_QA.md`](docs/QUEST_QA.md) for the current hardware QA matrix.
 
 ## Build on Legocraft
 
-The project has clear extension surfaces for developers who want to fork and evolve it:
+Concrete ways to explore or extend the project:
 
-- add brick types and custom geometry
-- add preset structures
-- add environments
-- improve desktop, touch, or XR interaction
-- improve controller compatibility
-- test and optimize Quest performance
-- add new editing tools
-- improve export workflows
-- add automated tests and documentation
+- **Play it:** try the existing builder and identify an interaction or workflow worth improving.
+- **Explore the code:** use [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) to find the relevant subsystem.
+- **Add a brick:** extend the brick definitions and generated geometry.
+- **Build a preset:** add and validate a reusable structure using the existing preset system.
+- **Improve interaction:** work on desktop, touch, selection, editing, or camera behavior.
+- **Test WebXR:** run the Quest QA procedure and report actual hardware results.
+- **Improve XR:** work on controller compatibility, locomotion, haptics, VR UI, or performance.
+- **Improve reliability:** add focused tests for placement, selection, presets, or shared domain logic.
+- **Open an issue:** discuss larger changes or reproducible limitations before implementation.
+- **Submit a pull request:** keep the change focused and run the existing CI commands.
 
-Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the codebase map and extension points.
+Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow.
+
+### Creative and spatial contributions
+
+Coding is not required for every useful contribution. Designers and technical artists can propose preset structures, spatial compositions, new shape concepts, interaction flows, construction challenges, or accessibility improvements through a GitHub issue. Clear sketches, diagrams, reference layouts, and behavior notes are useful when they describe something compatible with the existing builder.
+
+Accepted contributions are credited through the Git history and pull request record; proposal authors should be referenced in the implementation discussion when someone else turns an accepted concept into code.
 
 ### WebXR / Quest frontier
 
