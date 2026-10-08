@@ -128,6 +128,12 @@ Concrete ways to explore or extend the project:
 
 Legocraft is open source under the MIT License. You can fork it, modify it, extend it, and redistribute it under the terms of [`LICENSE`](LICENSE). See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow.
 
+### Current contributor entry points
+
+- [WebXR / Meta Quest hardware validation and extension](https://github.com/Joenasriani/legocraft/issues/1)
+- [Move preset validation into automated Vitest coverage](https://github.com/Joenasriani/legocraft/issues/2)
+- [Expand automated coverage for placement and selection rules](https://github.com/Joenasriani/legocraft/issues/3)
+
 ### Creative and spatial contributions
 
 Coding is not required for every useful contribution. Designers and technical artists can propose preset structures, spatial compositions, new shape concepts, interaction flows, construction challenges, or accessibility improvements through a GitHub issue. Clear sketches, diagrams, reference layouts, and behavior notes are useful when they describe something compatible with the existing builder.
