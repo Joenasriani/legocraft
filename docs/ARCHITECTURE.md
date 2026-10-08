@@ -1,6 +1,6 @@
 # Legocraft Architecture
 
-This document maps the current codebase for contributors. It describes where major behavior lives and where common extensions should start.
+This document maps the current codebase for contributors. It describes where major behavior lives and where common extensions should start. See [`../CONTRIBUTING.md`](../CONTRIBUTING.md) for the contribution workflow.
 
 ## High-level flow
 
