@@ -113,6 +113,10 @@ See [`docs/QUEST_QA.md`](docs/QUEST_QA.md) for the current hardware QA matrix.
 
 ## Build on Legocraft
 
+Any idea is welcome if it can produce a real improvement, experiment, feature, design, tool, performance gain, accessibility gain, or useful extension.
+
+The current game is the starting point, not the ceiling.
+
 Concrete ways to explore or extend the project:
 
 - **Play it:** try the existing builder and identify an interaction or workflow worth improving.
