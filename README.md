@@ -159,3 +159,7 @@ Legocraft already includes experimental WebXR interaction, controller input, loc
 - Zustand
 - Vite
 - Vitest
+
+**Created by Joe Nasr** — Interactive experiences, 3D and WebXR.
+
+https://joe-nasr-signals.vercel.app/
