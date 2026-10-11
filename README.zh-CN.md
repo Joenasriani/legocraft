@@ -1,7 +1,15 @@
 # Legocraft
 
 <p align="center">
-[English](README.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt.md) · [العربية](README.ar.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [हिन्दी](README.hi.md) · [한국어](README.ko.md)
+  <a href="README.md">English</a> ·
+  <a href="README.fr.md">Français</a> ·
+  <a href="README.es.md">Español</a> ·
+  <a href="README.pt.md">Português</a> ·
+  <a href="README.ar.md">العربية</a> ·
+  <a href="README.zh-CN.md">简体中文</a> ·
+  <a href="README.ja.md">日本語</a> ·
+  <a href="README.hi.md">हिन्दी</a> ·
+  <a href="README.ko.md">한국어</a>
 </p>
 
 <p align="center">
