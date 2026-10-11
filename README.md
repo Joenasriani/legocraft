@@ -1,5 +1,9 @@
 # Legocraft
 
+<p align="center">
+  <img src="docs/screenshots/Brick%20XR%20Builder%20App%20Showcase.png" alt="Legocraft browser 3D brick-building sandbox showcase" width="100%">
+</p>
+
 [![CI](https://github.com/Joenasriani/legocraft/actions/workflows/ci.yml/badge.svg)](https://github.com/Joenasriani/legocraft/actions/workflows/ci.yml)
 
 Browser-based 3D brick-building sandbox built with React Three Fiber, Three.js, and WebXR.
